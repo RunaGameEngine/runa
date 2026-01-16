@@ -1,0 +1,13 @@
+[package]
+name = "runa_render"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+runa_asset = { path = "../runa_asset" }
+runa_render_api = { path = "../runa_render_api" }
+wgpu = "0.19"
+winit = "0.29"
+pollster = "0.3"
+glam = "0.30.9"
+bytemuck = { version = "1.14", features = ["derive"] }

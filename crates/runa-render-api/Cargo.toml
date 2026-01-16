@@ -1,8 +1,0 @@
-[package]
-name = "runa-render-api"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-runa-asset = {path = "../runa-asset"}
-glam = "0.30.9"

@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-runa-render = { path = "../../crates/runa-render" }
-runa-asset = {path = "../../crates/runa-asset"}
+runa_render = { path = "../../crates/runa_render" }
+runa_asset = { path = "../../crates/runa_asset" }
+runa_render_api = { path = "../../crates/runa_render_api" }
+runa_core = { path = "../../crates/runa_core" }
 winit = "0.29"
 pollster = "0.3"
 glam = "0.30.9"
+wgpu = "0.19"

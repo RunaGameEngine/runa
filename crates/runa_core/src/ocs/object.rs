@@ -1,0 +1,45 @@
+use crate::ocs::script::Script;
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+
+pub struct Object {
+    components: HashMap<TypeId, Box<dyn Any>>,
+    script: Option<Box<dyn Script>>,
+}
+
+impl Object {
+    pub fn new() -> Self {
+        Self {
+            components: HashMap::new(),
+            script: None,
+        }
+    }
+
+    /// Adding component to object. Only one per object!
+    pub fn add_component<T: 'static>(&mut self, component: T) -> &mut T {
+        let type_id = TypeId::of::<T>();
+        assert!(
+            !self.components.contains_key(&type_id),
+            "Component already exists"
+        );
+        self.components.insert(type_id, Box::new(component));
+        self.get_component_mut::<T>().unwrap()
+    }
+
+    /// To get component by Type if it exist
+    pub fn get_component<T: 'static>(&self) -> Option<&T> {
+        self.components
+            .get(&TypeId::of::<T>())
+            .and_then(|c| c.downcast_ref())
+    }
+
+    pub fn get_component_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.components
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|c| c.downcast_mut())
+    }
+
+    pub fn set_script<S: Script>(&mut self, script: S) {
+        self.script = Some(Box::new(script));
+    }
+}

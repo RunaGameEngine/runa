@@ -1301,7 +1301,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
-name = "runa-asset"
+name = "runa_asset"
 version = "0.1.0"
 dependencies = [
  "image",
@@ -1309,43 +1309,43 @@ dependencies = [
 ]
 
 [[package]]
-name = "runa-core"
+name = "runa_core"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
  "glam",
- "runa-asset",
- "runa-render",
- "wgpu",
+ "runa_asset",
+ "runa_render",
+ "runa_render_api",
 ]
 
 [[package]]
-name = "runa-editor"
+name = "runa_editor"
 version = "0.1.0"
 
 [[package]]
-name = "runa-math"
+name = "runa_math"
 version = "0.1.0"
 
 [[package]]
-name = "runa-render"
+name = "runa_render"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
  "glam",
  "pollster",
- "runa-asset",
- "runa-render-api",
+ "runa_asset",
+ "runa_render_api",
  "wgpu",
  "winit",
 ]
 
 [[package]]
-name = "runa-render-api"
+name = "runa_render_api"
 version = "0.1.0"
 dependencies = [
  "glam",
- "runa-asset",
+ "runa_asset",
 ]
 
 [[package]]
@@ -1401,8 +1401,11 @@ version = "0.1.0"
 dependencies = [
  "glam",
  "pollster",
- "runa-asset",
- "runa-render",
+ "runa_asset",
+ "runa_core",
+ "runa_render",
+ "runa_render_api",
+ "wgpu",
  "winit",
 ]
 

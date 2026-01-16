@@ -1,0 +1,11 @@
+[package]
+name = "runa_core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+runa_asset = {path = "../runa_asset"}
+runa_render = {path = "../runa_render"}
+runa_render_api = {path = "../runa_render_api"}
+glam = "0.30.9"
+bytemuck = { version = "1.14", features = ["derive"] }

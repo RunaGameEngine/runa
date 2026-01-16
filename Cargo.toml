@@ -1,11 +1,11 @@
 [workspace]
 members = [
-    "crates/runa-core",
-    "crates/runa-render",
-    "crates/runa-asset",
-    "crates/runa-math",
-    "crates/runa-editor",
-    "crates/runa-render-api",
+    "crates/runa_core",
+    "crates/runa_render",
+    "crates/runa_asset",
+    "crates/runa_math",
+    "crates/runa_editor",
+    "crates/runa_render_api",
     "examples/sandbox",
 ]
 
