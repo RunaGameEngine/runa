@@ -1,6 +1,6 @@
 use crate::{input::InputState, ocs::object::Object};
 
-/// Impl to script object
+/// Impl to scripting object
 pub trait Script: 'static {
     fn construct(&self, _object: &mut Object) {}
     fn start(&mut self, _object: &mut Object) {}

@@ -2,12 +2,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use runa_core::components::camera2d::Camera2D;
+use runa_core::console::Console;
 use runa_core::input::InputState;
 use runa_core::ocs::world::World;
+use runa_core::systems::interaction_system::InteractionSystem;
 use runa_render::renderer::Renderer;
 use runa_render_api::queue::RenderQueue;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Fullscreen, Window, WindowId};
@@ -27,6 +29,9 @@ pub struct App<'window> {
 
     pub is_fullscreen: bool,
     pub input_state: InputState,
+    pub interaction_system: InteractionSystem,
+
+    pub console: Console,
 }
 
 impl<'window> App<'window> {
@@ -45,13 +50,13 @@ impl<'window> App<'window> {
         }
     }
 
-    fn render(&mut self) {
+    fn render(&mut self, interpolation_factor: f32) {
         if let (Some(renderer), Some(window)) = (&mut self.renderer, &self.window) {
             // Очищаем очередь
             self.queue.clear();
 
             // Собираем команды
-            self.world.render(&mut self.queue);
+            self.world.render(&mut self.queue, interpolation_factor);
 
             // Рендерим
             renderer.draw(&self.queue, self.camera.matrix(), self.camera.virtual_size);
@@ -87,6 +92,9 @@ impl<'window> ApplicationHandler for App<'window> {
     }
 
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
+        // Clear the "just" input states at the beginning of each event loop cycle
+        // This ensures that "just pressed" events are only valid for one frame
+
         const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
 
         let current_time = Instant::now();
@@ -103,12 +111,35 @@ impl<'window> ApplicationHandler for App<'window> {
             self.world.input(&self.input_state);
 
             self.world.update(FIXED_TIMESTEP);
+            self.input_state.update_frame();
+
             self.accumulator -= FIXED_TIMESTEP;
         }
+
+        let interpolation_factor = (self.accumulator / FIXED_TIMESTEP).min(1.0);
 
         // Запрашиваем перерисовку
         if let Some(window) = &self.window {
             window.request_redraw();
+            self.render(interpolation_factor);
+        }
+
+        // Update console
+        self.console.handle_input(&self.input_state);
+        self.console.render(&mut self.queue, &self.camera);
+
+        // Only process world input if console is not visible
+        if !self.console.is_visible() {
+            // Process input for all scripts
+            self.world.input(&self.input_state);
+
+            // Process interaction system
+            self.interaction_system
+                .update(&mut self.world, &self.input_state);
+        } else {
+            // When console is visible, still process input for the world
+            // but scripts can check if console is visible and decide whether to respond
+            self.world.input(&self.input_state);
         }
     }
 
@@ -137,7 +168,6 @@ impl<'window> ApplicationHandler for App<'window> {
                         frame.present();
                     }
                 }
-                self.render();
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -158,8 +188,44 @@ impl<'window> ApplicationHandler for App<'window> {
                         self.input_state.keys_just_pressed.insert(key_code);
                     } else {
                         self.input_state.keys_pressed.remove(&key_code);
-                        self.input_state.keys_just_released.insert(key_code);
+                        self.input_state.keys_just_pressed.remove(&key_code);
                     }
+                    if key_code == KeyCode::Backquote {
+                        self.console.toggle();
+                    }
+                }
+
+                // Handle text input for the console
+                if event.state == ElementState::Pressed && self.console.is_visible() {
+                    match event.logical_key {
+                        winit::keyboard::Key::Character(c) => {
+                            self.console.input_buffer.push_str(&c);
+                        }
+                        winit::keyboard::Key::Named(winit::keyboard::NamedKey::Tab) => {
+                            self.console.input_buffer.push_str("    "); // Insert 4 spaces for tab
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.input_state.mouse_position = (position.x as f32, position.y as f32);
+            }
+
+            WindowEvent::MouseWheel { delta, .. } => match delta {
+                MouseScrollDelta::LineDelta(_, y) => {
+                    self.input_state.mouse_wheel_delta = y;
+                }
+                _ => {}
+            },
+
+            WindowEvent::MouseInput { state, button, .. } => {
+                if state == ElementState::Pressed {
+                    self.input_state.mouse_buttons_pressed.insert(button);
+                    self.input_state.mouse_buttons_just_pressed.insert(button);
+                } else {
+                    self.input_state.mouse_buttons_pressed.remove(&button);
+                    self.input_state.mouse_buttons_just_pressed.remove(&button);
                 }
             }
 

@@ -20,7 +20,7 @@ impl Object {
         let type_id = TypeId::of::<T>();
         assert!(
             !self.components.contains_key(&type_id),
-            "Component already exists"
+            "Component already exists {type_id:?}"
         );
         self.components.insert(type_id, Box::new(component));
         self
@@ -28,12 +28,22 @@ impl Object {
 
     /// To get component by Type if it exist
     pub fn get_component<T: 'static>(&self) -> Option<&T> {
+        // let type_id = TypeId::of::<T>();
+        // assert!(
+        //     !self.components.contains_key(&type_id),
+        //     "Component not exists"
+        // );
         self.components
             .get(&TypeId::of::<T>())
             .and_then(|c| c.downcast_ref())
     }
 
     pub fn get_component_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        // let type_id = TypeId::of::<T>();
+        // assert!(
+        //     !self.components.contains_key(&type_id),
+        //     "Component not exists"
+        // );
         self.components
             .get_mut(&TypeId::of::<T>())
             .and_then(|c| c.downcast_mut())

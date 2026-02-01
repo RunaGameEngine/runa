@@ -13,7 +13,7 @@ pub struct Player {
 impl Player {
     pub fn new() -> Self {
         Self {
-            speed: 0.5,
+            speed: 0.25,
             direction: Vec2::ZERO,
         }
     }
@@ -24,7 +24,7 @@ impl Script for Player {
         _object
             .add_component(Transform::default())
             .add_component(SpriteRenderer {
-                texture: Some(runa_asset::loader::load_image("assets/Tester1.png")),
+                texture: Some(runa_asset::loader::load_image("assets/Charactert.png")),
             });
     }
 
@@ -35,16 +35,16 @@ impl Script for Player {
     ) {
         self.direction = Vec2::ZERO;
 
-        if _input.is_just_pressed(KeyCode::KeyW) {
+        if _input.is_key_pressed(KeyCode::KeyW) {
             self.direction.y = 1.0;
         }
-        if _input.is_just_pressed(KeyCode::KeyS) {
+        if _input.is_key_pressed(KeyCode::KeyS) {
             self.direction.y = -1.0;
         }
-        if _input.is_just_pressed(KeyCode::KeyD) {
+        if _input.is_key_pressed(KeyCode::KeyD) {
             self.direction.x = 1.0;
         }
-        if _input.is_just_pressed(KeyCode::KeyA) {
+        if _input.is_key_pressed(KeyCode::KeyA) {
             self.direction.x = -1.0;
         }
     }

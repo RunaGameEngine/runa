@@ -10,4 +10,15 @@ pub enum RenderCommands {
         rotation: Quat,
         scale: Vec2,
     },
+    Text {
+        text: String,
+        position: Vec2,
+        color: [f32; 4],
+        size: f32,
+    },
+    DebugRect {
+        position: Vec2,
+        size: Vec2,
+        color: [f32; 4],
+    },
 }

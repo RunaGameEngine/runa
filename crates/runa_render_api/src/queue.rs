@@ -29,6 +29,15 @@ impl RenderQueue {
         });
     }
 
+    pub fn draw_text(&mut self, text: String, position: Vec2, color: [f32; 4], size: f32) {
+        self.commands.push(RenderCommands::Text {
+            text,
+            position,
+            color,
+            size,
+        });
+    }
+
     pub fn clear(&mut self) {
         self.commands.clear();
     }

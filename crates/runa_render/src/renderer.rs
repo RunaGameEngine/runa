@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{resources::texture::GpuTexture, sprite::pipeline::SpritePipeline};
+use crate::{font::FontManager, resources::texture::GpuTexture, sprite::pipeline::SpritePipeline};
 use glam::{Vec2, Vec3};
 use runa_render_api::{command::RenderCommands, queue::RenderQueue};
 use wgpu::util::DeviceExt;
@@ -37,6 +37,8 @@ pub struct Renderer<'window> {
 
     textures: HashMap<usize, GpuTexture>,
     nearest_sampler: wgpu::Sampler,
+
+    font_manager: FontManager,
 }
 
 impl<'window> Renderer<'window> {
@@ -66,8 +68,7 @@ impl<'window> Renderer<'window> {
             .expect("Failed to create device");
 
         let size = window.inner_size();
-        let width = size.width.max(1);
-        let height = size.height.max(1);
+
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface.get_capabilities(&adapter).formats[0],
@@ -114,6 +115,8 @@ impl<'window> Renderer<'window> {
             ..Default::default()
         });
 
+        let font_manager = FontManager::new(&device, &queue);
+
         Self {
             surface,
             surface_config,
@@ -125,6 +128,7 @@ impl<'window> Renderer<'window> {
             globals_buffer,
             textures: HashMap::new(),
             nearest_sampler,
+            font_manager,
         }
     }
 
@@ -223,6 +227,54 @@ impl<'window> Renderer<'window> {
 
                     all_vertices.extend(transformed_vertices);
                 }
+                RenderCommands::DebugRect {
+                    position,
+                    size,
+                    color,
+                } => {
+                    // Create vertices for a rectangle
+                    let half_width = size.x * 0.5;
+                    let half_height = size.y * 0.5;
+
+                    let rect_vertices: [Vertex; 6] = [
+                        Vertex {
+                            position: [position.x - half_width, position.y - half_height],
+                            tex_coords: [0.0, 1.0],
+                        },
+                        Vertex {
+                            position: [position.x + half_width, position.y - half_height],
+                            tex_coords: [1.0, 1.0],
+                        },
+                        Vertex {
+                            position: [position.x - half_width, position.y + half_height],
+                            tex_coords: [0.0, 0.0],
+                        },
+                        Vertex {
+                            position: [position.x + half_width, position.y - half_height],
+                            tex_coords: [1.0, 1.0],
+                        },
+                        Vertex {
+                            position: [position.x + half_width, position.y + half_height],
+                            tex_coords: [1.0, 0.0],
+                        },
+                        Vertex {
+                            position: [position.x - half_width, position.y + half_height],
+                            tex_coords: [0.0, 0.0],
+                        },
+                    ];
+
+                    all_vertices.extend_from_slice(&rect_vertices);
+                }
+                RenderCommands::Text {
+                    text,
+                    position,
+                    color,
+                    size,
+                } => {
+                    // For now, we'll skip generating vertices for text rendering
+                    // In a real implementation, we would render text using character sprites
+                    // This is a placeholder to avoid errors
+                }
             }
         }
 
@@ -260,41 +312,21 @@ impl<'window> Renderer<'window> {
             ..Default::default()
         });
 
-        let mut vertex_offset = 0;
-        for cmd in &queue.commands {
-            match cmd {
-                RenderCommands::Sprite { texture, .. } => {
-                    let key = Arc::as_ptr(&texture.inner) as usize;
-                    let gpu_texture = self.textures.entry(key).or_insert_with(|| {
-                        GpuTexture::from_asset(&self.device, &self.queue, &texture.inner)
-                    });
+        // Now render the accumulated vertices (DebugRects and potentially Text)
+        if !all_vertices.is_empty() {
+            // Create a simple pipeline for rendering colored rectangles without textures
+            // For now, we'll reuse the sprite pipeline but this would ideally be a separate pipeline
+            // For simplicity, we'll just render the vertices directly
 
-                    let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout: &self.sprite_pipeline.bind_group_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: self.globals_buffer.as_entire_binding(),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::TextureView(&gpu_texture.view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 2,
-                                resource: wgpu::BindingResource::Sampler(&self.nearest_sampler),
-                            },
-                        ],
-                        label: Some("Sprite BindGroup"),
-                    });
+            // We need to make sure the vertex buffer has all the vertices
+            // The vertices are already written to the buffer earlier
 
-                    rpass.set_pipeline(&self.sprite_pipeline.pipeline);
-                    rpass.set_bind_group(0, &bind_group, &[]);
-                    rpass.set_vertex_buffer(0, self.vertex_buffer.slice(vertex_offset..));
-                    rpass.draw(0..6, 0..1);
-
-                    vertex_offset += (std::mem::size_of::<Vertex>() * 6) as u64;
-                }
+            // Calculate how many rectangles we have based on vertex count (6 vertices per rect)
+            let total_rect_vertices = all_vertices.len();
+            if total_rect_vertices > 0 {
+                rpass.set_pipeline(&self.sprite_pipeline.pipeline);
+                rpass.set_vertex_buffer(0, self.vertex_buffer.slice(0..)); // Start from beginning of buffer
+                rpass.draw(0..total_rect_vertices as u32, 0..1); // Draw all accumulated vertices
             }
         }
 
