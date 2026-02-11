@@ -1,9 +1,11 @@
-use eframe::{egui, App, CreationContext};
+use eframe::{egui, App};
 use egui::{IconData, TextureHandle, ViewportBuilder};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+
+mod icon_loader;
 
 const TEMPLATES_DIR: &str = "../templates/default";
 const HUB_CONFIG_PATH: &str = ".runa_hub/recent_projects.ron";
@@ -109,9 +111,12 @@ impl App for RunaHub {
 
 impl RunaHub {
     fn load_icons(&mut self, ctx: &egui::Context) {
-        self.icon_projects = load_icon(ctx, include_bytes!("../assets/projects.png"));
-        self.icon_versions = load_icon(ctx, include_bytes!("../assets/version.png"));
-        self.icon_settings = load_icon(ctx, include_bytes!("../assets/settings.png"));
+        self.icon_projects =
+            crate::icon_loader::load_icon(ctx, include_bytes!("../assets/projects.png"));
+        self.icon_versions =
+            crate::icon_loader::load_icon(ctx, include_bytes!("../assets/version.png"));
+        self.icon_settings =
+            crate::icon_loader::load_icon(ctx, include_bytes!("../assets/settings.png"));
     }
 
     fn create_project(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -313,21 +318,8 @@ fn open_in_file_manager(path: &PathBuf) {
         .ok();
 }
 
-fn load_app_icon() -> Option<IconData> {
-    let icon_bytes = include_bytes!("../assets/icon.png");
-    let image = image::load_from_memory(icon_bytes).ok()?;
-    let image = image.to_rgba8();
-    let (width, height) = image.dimensions();
-
-    Some(IconData {
-        rgba: image.into_raw(),
-        width,
-        height,
-    })
-}
-
 fn main() -> eframe::Result {
-    let icon_data = load_app_icon();
+    let icon_data = crate::icon_loader::load_app_icon();
 
     let viewport = ViewportBuilder::default()
         .with_title("Runa Hub")
@@ -381,26 +373,6 @@ fn setup_style(ctx: &egui::Context) {
         .size = 18.0;
 
     ctx.set_style(style);
-}
-
-fn load_icon(ctx: &egui::Context, bytes: &[u8]) -> Option<Arc<egui::TextureHandle>> {
-    match image::load_from_memory(bytes) {
-        Ok(image) => {
-            let size = [image.width() as _, image.height() as _];
-            let image_buffer = image.to_rgba8();
-            let pixels = image_buffer.as_flat_samples();
-            let texture = ctx.load_texture(
-                "icon",
-                egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_slice()),
-                Default::default(),
-            );
-            Some(Arc::new(texture))
-        }
-        Err(e) => {
-            eprintln!("Failed to load icon: {}", e);
-            None
-        }
-    }
 }
 
 use egui::{Align, Layout, Response, RichText, Ui};

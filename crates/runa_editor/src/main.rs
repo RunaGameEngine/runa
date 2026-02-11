@@ -10,8 +10,8 @@ mod preview;
 
 struct Editor {
     world: World,
-    selected_object_id: Option<usize>,
     show_content_browser: bool,
+    selected_object_id: Option<usize>,
 }
 
 impl Default for Editor {
