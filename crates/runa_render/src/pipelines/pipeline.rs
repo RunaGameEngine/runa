@@ -3,7 +3,7 @@ use wgpu::{Device, TextureFormat, VertexState};
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
-    pub pos: [f32; 2],
+    pub pos: [f32; 3],
     pub tex_coords: [f32; 2],
 }
 
@@ -16,10 +16,10 @@ impl Vertex {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 0, // pos
-                    format: wgpu::VertexFormat::Float32x2,
+                    format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: 8,          // смещение после pos ([f32;2] = 8 байт)
+                    offset: 12,         // смещение после pos ([f32;3] = 12 байт)
                     shader_location: 1, // tex_coords
                     format: wgpu::VertexFormat::Float32x2,
                 },

@@ -1,8 +1,8 @@
-use runa_render_api::queue::RenderQueue;
+use runa_render_api::RenderQueue;
 
 use crate::{
-    components::{physics_collision::PhysicsCollision, transform::Transform},
-    ocs::world::World,
+    components::{PhysicsCollision, Transform},
+    ocs::World,
 };
 
 #[derive(Default)]

@@ -1,10 +1,12 @@
-use glam::Vec2;
-use runa_render_api::queue::RenderQueue;
+use std::sync::Arc;
+
+use glam::Vec3;
+use runa_render_api::RenderQueue;
 
 use crate::{
-    components::{sprite_renderer::SpriteRenderer, transform::Transform},
+    components::{SpriteRenderer, Tilemap, Transform},
     debug_renderer::DebugRenderer,
-    ocs::{object::Object, script::Script},
+    ocs::{Object, Script},
 };
 
 #[derive(Default)]
@@ -69,7 +71,7 @@ impl World {
                 object.get_component::<SpriteRenderer>(),
             ) {
                 // Интерполируем позицию
-                let interpolated_position = Vec2::lerp(
+                let interpolated_position = Vec3::lerp(
                     transform.previous_position,
                     transform.position,
                     interpolation_factor,
@@ -79,11 +81,50 @@ impl World {
                     + (transform.rotation - transform.previous_rotation) * interpolation_factor;
 
                 render_queue.draw_sprite(
-                    sprite.get_texture_handle(),
+                    Arc::from(sprite.get_texture_handle()),
                     interpolated_position,
                     interpolated_rotation,
                     transform.scale,
                 );
+            }
+            if let (Some(tilemap), Some(transform)) = (
+                object.get_component::<Tilemap>(),
+                object.get_component::<Transform>(),
+            ) {
+                for layer in &tilemap.layers {
+                    if !layer.visible {
+                        continue;
+                    }
+
+                    for y in tilemap.offset.y..(tilemap.offset.y + tilemap.height as i32) {
+                        for x in tilemap.offset.x..(tilemap.offset.x + tilemap.width as i32) {
+                            if let Some(tile) = tilemap.get_tile(x, y) {
+                                if tile.texture.is_none() {
+                                    continue;
+                                }
+
+                                // Мировая позиция тайла относительно объекта
+                                let world_pos = tilemap.tile_to_world(x, y);
+                                let final_pos = transform.position + world_pos;
+
+                                render_queue.push_tile(
+                                    tile.texture.clone().unwrap(),
+                                    final_pos,
+                                    tilemap.tile_size,
+                                    [
+                                        tile.uv_rect.x,
+                                        tile.uv_rect.y,
+                                        tile.uv_rect.width,
+                                        tile.uv_rect.height,
+                                    ],
+                                    tile.flip_x,
+                                    tile.flip_y,
+                                    [1.0, 1.0, 1.0, 1.0],
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
 

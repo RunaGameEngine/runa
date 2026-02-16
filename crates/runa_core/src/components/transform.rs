@@ -1,13 +1,13 @@
-use glam::{Quat, Vec2};
+use glam::{Quat, Vec3};
 
 #[derive(Clone, Debug)]
 pub struct Transform {
-    pub position: Vec2,
+    pub position: Vec3,
     pub rotation: Quat,
-    pub scale: Vec2,
+    pub scale: Vec3,
 
     // for interpolation for fixedframe
-    pub previous_position: Vec2,
+    pub previous_position: Vec3,
     pub previous_rotation: Quat,
 }
 
@@ -15,10 +15,10 @@ impl Transform {
     /// position: Vec2::ZERO, rotation: Quat::IDENTITY, scale: Vec2::ONE,
     pub fn default() -> Self {
         Self {
-            position: Vec2::ZERO,
+            position: Vec3::ZERO,
             rotation: Quat::IDENTITY,
-            scale: Vec2::ONE,
-            previous_position: Vec2::ZERO,
+            scale: Vec3::ONE,
+            previous_position: Vec3::ZERO,
             previous_rotation: Quat::IDENTITY,
         }
     }

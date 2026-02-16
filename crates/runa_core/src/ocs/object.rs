@@ -1,8 +1,12 @@
-use crate::ocs::script::Script;
+use crate::components::Transform;
+use crate::ocs::Script;
+use crate::ocs::World;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 pub struct Object {
+    pub name: String,
+    pub transform: Transform,
     components: HashMap<TypeId, Box<dyn Any>>,
     pub script: Option<Box<dyn Script>>,
 }
@@ -10,9 +14,19 @@ pub struct Object {
 impl Object {
     pub fn new() -> Self {
         Self {
+            name: String::default(),
+            transform: Transform::default(),
             components: HashMap::new(),
             script: None,
         }
+    }
+
+    pub fn get_transform(&self) -> &Transform {
+        &self.transform
+    }
+
+    pub fn get_transform_mut(&mut self) -> &mut Transform {
+        &mut self.transform
     }
 
     /// Adding component to object. Only one per object!

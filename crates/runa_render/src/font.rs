@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::resources::texture::GpuTexture;
 use glam::Vec2;
-use runa_asset::texture::TextureAsset;
-use runa_render_api::command::RenderCommands;
+use runa_asset::TextureAsset;
+use runa_render_api::RenderCommands;
 use wgpu::{Device, Queue};
 
 pub struct FontManager {

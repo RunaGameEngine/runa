@@ -1,13 +1,14 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use runa_core::components::camera2d::Camera2D;
-use runa_core::console::Console;
+use runa_core::components::Camera2D;
 use runa_core::input::InputState;
-use runa_core::ocs::world::World;
-use runa_core::systems::interaction_system::InteractionSystem;
-use runa_render::renderer::Renderer;
-use runa_render_api::queue::RenderQueue;
+use runa_core::ocs::World;
+use runa_core::systems::InteractionSystem;
+use runa_core::Console;
+use runa_render::Renderer;
+use runa_render_api::RenderQueue;
+
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ActiveEventLoop;

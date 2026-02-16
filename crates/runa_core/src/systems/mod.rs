@@ -1,1 +1,3 @@
-pub mod interaction_system;
+mod interaction_system;
+
+pub use interaction_system::InteractionSystem;

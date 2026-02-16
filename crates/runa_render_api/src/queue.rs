@@ -1,6 +1,6 @@
-use crate::command::RenderCommands;
-use glam::{Quat, Vec2};
-use runa_asset::{handle::Handle, texture::TextureAsset};
+use crate::RenderCommands;
+use glam::{Quat, USizeVec2, Vec2, Vec3};
+use runa_asset::TextureAsset;
 
 #[derive(Default)]
 pub struct RenderQueue {
@@ -16,10 +16,10 @@ impl RenderQueue {
 
     pub fn draw_sprite(
         &mut self,
-        texture: Handle<TextureAsset>,
-        position: Vec2,
+        texture: std::sync::Arc<TextureAsset>,
+        position: Vec3,
         rotation: Quat,
-        scale: Vec2,
+        scale: Vec3,
     ) {
         self.commands.push(RenderCommands::Sprite {
             texture,
@@ -35,6 +35,27 @@ impl RenderQueue {
             position,
             color,
             size,
+        });
+    }
+
+    pub fn push_tile(
+        &mut self,
+        texture: std::sync::Arc<TextureAsset>,
+        position: Vec3,
+        size: USizeVec2,
+        uv_rect: [f32; 4],
+        flip_x: bool,
+        flip_y: bool,
+        color: [f32; 4],
+    ) {
+        self.commands.push(RenderCommands::Tile {
+            texture,
+            position,
+            size,
+            uv_rect,
+            flip_x,
+            flip_y,
+            color,
         });
     }
 

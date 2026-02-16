@@ -1,7 +1,9 @@
-use crate::components::transform::Transform;
-use runa_asset::handle::Handle;
-use runa_asset::texture::TextureAsset;
-use runa_render_api::queue::RenderQueue;
+use std::sync::Arc;
+
+use crate::components::Transform;
+use runa_asset::Handle;
+use runa_asset::TextureAsset;
+use runa_render_api::RenderQueue;
 
 pub struct Sprite {
     pub transform: Transform,
@@ -21,7 +23,7 @@ impl CoreRenderer {
 
     pub fn submit_sprite(&mut self, sprite: &Sprite, transform: &Transform) {
         self.queue.draw_sprite(
-            sprite.texture.clone(),
+            Arc::from(sprite.texture.clone()),
             transform.position,
             transform.rotation,
             transform.scale,

@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 
-use crate::components::camera2d::Camera2D;
+use crate::components::Camera2D;
 use crate::input_system::*;
-use runa_asset::handle::Handle;
-use runa_asset::texture::TextureAsset;
-use runa_render_api::queue::RenderQueue;
+use runa_asset::Handle;
+use runa_asset::TextureAsset;
+use runa_render_api::RenderQueue;
 
 pub struct Console {
     messages: VecDeque<String>,
@@ -66,15 +66,16 @@ impl Console {
         let console_width = bottom_right.x - top_left.x; // Full width
 
         // Position console at the top
-        let console_position = glam::Vec2::new(
+        let console_position = glam::Vec3::new(
             top_left.x + console_width / 2.0,
             top_left.y + console_height / 2.0,
+            0.0,
         );
 
         // Draw console background (semi-transparent overlay)
         queue
             .commands
-            .push(runa_render_api::command::RenderCommands::DebugRect {
+            .push(runa_render_api::RenderCommands::DebugRect {
                 position: console_position,
                 size: glam::Vec2::new(console_width * 0.95, console_height * 0.95), // Slightly smaller for padding
                 color: [0.0, 0.0, 0.0, 0.7], // Black with 70% opacity
@@ -88,26 +89,22 @@ impl Console {
         // Render recent messages (most recent at the top)
         for (i, message) in self.messages.iter().rev().take(10).enumerate() {
             let text_y = start_y - (i as f32 * line_height * 1.2);
-            queue
-                .commands
-                .push(runa_render_api::command::RenderCommands::Text {
-                    text: message.clone(),
-                    position: glam::Vec2::new(console_position.x - console_width * 0.45, text_y),
-                    color: [1.0, 1.0, 1.0, 1.0], // White text
-                    size: 0.5,                   // Text size
-                });
+            queue.commands.push(runa_render_api::RenderCommands::Text {
+                text: message.clone(),
+                position: glam::Vec2::new(console_position.x - console_width * 0.45, text_y),
+                color: [1.0, 1.0, 1.0, 1.0], // White text
+                size: 0.5,                   // Text size
+            });
         }
 
         // Render input buffer with prompt
         let input_y = start_y - (10.0 * line_height * 1.2); // Below the messages
-        queue
-            .commands
-            .push(runa_render_api::command::RenderCommands::Text {
-                text: format!("> {}", self.input_buffer),
-                position: glam::Vec2::new(console_position.x - console_width * 0.45, input_y),
-                color: [0.0, 1.0, 0.0, 1.0], // Green text for input
-                size: 0.5,
-            });
+        queue.commands.push(runa_render_api::RenderCommands::Text {
+            text: format!("> {}", self.input_buffer),
+            position: glam::Vec2::new(console_position.x - console_width * 0.45, input_y),
+            color: [0.0, 1.0, 0.0, 1.0], // Green text for input
+            size: 0.5,
+        });
     }
 
     pub fn handle_input(&mut self) {

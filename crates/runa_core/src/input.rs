@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::Vec3;
 use std::{
     collections::HashSet,
     sync::{Mutex, OnceLock},
@@ -77,14 +77,15 @@ impl InputState {
     //     Self::current().mouse_buttons_just_released.contains(&button)
     // }
 
-    pub fn get_mouse_world_position() -> Option<Vec2> {
+    pub fn get_mouse_world_position() -> Option<Vec3> {
         let input_state = INPUT_STATE
             .get()
             .expect("InputState not initialized")
             .lock()
             .unwrap();
         if let Some(camera) = &input_state.camera {
-            Some(camera.screen_to_world(input_state.mouse_position))
+            let pos_2d = camera.screen_to_world(input_state.mouse_position);
+            Some(Vec3::new(pos_2d.x, pos_2d.y, 0.0)) // Z = 0 для совместимости с 2D
         } else {
             None
         }

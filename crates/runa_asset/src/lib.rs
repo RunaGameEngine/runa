@@ -1,4 +1,8 @@
-pub mod font;
-pub mod handle;
+mod font;
+mod handle;
 pub mod loader;
-pub mod texture;
+mod texture;
+
+pub use font::FontAsset;
+pub use handle::Handle;
+pub use texture::TextureAsset;

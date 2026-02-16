@@ -10,6 +10,7 @@
 .zed/
 
 # VS Code
+.obsidian/
 .vscode/
 !.vscode/settings.json
 !.vscode/tasks.json

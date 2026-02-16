@@ -1,13 +1,13 @@
 use crate::{
-    components::{cursor_interactable::CursorInteractable, transform::Transform},
+    components::{CursorInteractable, Transform},
     input_system::*,
-    ocs::world::World,
+    ocs::World,
 };
-use glam::Vec2;
+use glam::Vec3;
 
 pub struct InteractionSystem {
-    mouse_position: Vec2,
     mouse_just_pressed: bool,
+    mouse_position: Vec3,
     mouse_just_released: bool,
     pressed_object_index: Option<usize>, // Track which object was pressed
 }
@@ -15,7 +15,7 @@ pub struct InteractionSystem {
 impl InteractionSystem {
     pub fn new() -> Self {
         Self {
-            mouse_position: Vec2::ZERO,
+            mouse_position: Vec3::ZERO,
             mouse_just_pressed: false,
             mouse_just_released: false,
             pressed_object_index: None,
@@ -23,7 +23,7 @@ impl InteractionSystem {
     }
 
     pub fn update(&mut self, world: &mut World) {
-        self.mouse_position = Input::get_mouse_world_position().unwrap_or(Vec2::ZERO);
+        self.mouse_position = Input::get_mouse_world_position().unwrap_or(Vec3::ZERO);
 
         // Reset states
         for object in &mut world.objects {

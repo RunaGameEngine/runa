@@ -1,6 +1,6 @@
 use crate::components::component::Component;
-use runa_asset::handle::Handle;
-use runa_asset::texture::TextureAsset;
+use runa_asset::Handle;
+use runa_asset::TextureAsset;
 
 pub struct SpriteRenderer {
     pub texture: Option<Handle<TextureAsset>>,

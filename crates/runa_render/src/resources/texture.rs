@@ -1,5 +1,5 @@
-use runa_asset::handle::Handle;
-use runa_asset::texture::TextureAsset;
+use runa_asset::Handle;
+use runa_asset::TextureAsset;
 use std::collections::HashMap;
 
 pub struct GpuTexture {

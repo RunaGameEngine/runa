@@ -1,4 +1,3 @@
-
 [workspace]
 members = [
     "crates/runa_core",
@@ -10,8 +9,15 @@ members = [
     "examples/sandbox",
     "crates/runa_hub",
 ]
-
 resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+authors = ["Your Name <you@example.com>"]
+edition = "2021"
+license = ""
+repository = "https://github.com/AnuranGames/runa-engine"
+description = "2D/3D game engine in Rust"
 
 [workspace.dependencies]
 winit = { version = "0.30.12" }
