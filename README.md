@@ -66,7 +66,7 @@ cd my_game
 	Add dependencies:
 ```toml
 [dependencies]
-runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.1.0-alpha.1" }
+runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.1.0-alpha.2" }
 ```
 
 ### Create Your Game with Player Script
