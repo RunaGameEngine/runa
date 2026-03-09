@@ -3650,7 +3650,7 @@ checksum = "ad8388ea1a9e0ea807e442e8263a699e7edcb320ecbcd21b4fa8ff859acce3ba"
 
 [[package]]
 name = "runa_app"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "runa_core",
  "runa_render",
@@ -3660,7 +3660,7 @@ dependencies = [
 
 [[package]]
 name = "runa_asset"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "image 0.24.9",
  "wgpu 28.0.0",
@@ -3668,7 +3668,7 @@ dependencies = [
 
 [[package]]
 name = "runa_core"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "bytemuck",
  "glam",
@@ -3683,7 +3683,7 @@ dependencies = [
 
 [[package]]
 name = "runa_editor"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "egui",
  "egui-wgpu",
@@ -3699,7 +3699,7 @@ dependencies = [
 
 [[package]]
 name = "runa_engine"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "glam",
  "runa_app",
@@ -3709,7 +3709,7 @@ dependencies = [
 
 [[package]]
 name = "runa_hub"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "dirs",
  "eframe",
@@ -3724,7 +3724,7 @@ dependencies = [
 
 [[package]]
 name = "runa_render"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "bytemuck",
  "glam",
@@ -3737,7 +3737,7 @@ dependencies = [
 
 [[package]]
 name = "runa_render_api"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "glam",
  "runa_asset",
@@ -3798,7 +3798,7 @@ dependencies = [
 
 [[package]]
 name = "sandbox"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.1"
 dependencies = [
  "runa_app",
  "runa_asset",

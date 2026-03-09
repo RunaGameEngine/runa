@@ -11,6 +11,7 @@
 ## 🌟 Features
 
 ### ✅ Implemented
+
 - **2D Rendering**
   - Sprites with textures and rotation
   - Automatic batching (1000+ objects = 1 draw call)
@@ -26,13 +27,14 @@
   - `CursorInteractable` component for object clicks
 
 ### 🚧 In Progress
+
 - [ ] World (Scene) serialization
 - [ ] Object serialization
 - [ ] Physics (2D/3D)
 - [ ] Animations (sprites, skeletal)
 - [ ] Level editor
 - [ ] Custom shader support
-- [ ] Tilemap 
+- [ ] Tilemap
 - [ ] **Audio** (basic)
   - [ ] Sound playback via `rodio`
 - [ ] **3D Support** (experimental)
@@ -43,10 +45,12 @@
 ## 🚀 Quick Start
 
 ### Requirements
+
 - Rust 1.75+
 - GPU with Vulkan/Metal/DirectX 12 support
 
 ### Run Example
+
 ```bash
 # Clone (when public)
 git clone https://github.com/AnuranGames/runa-engine
@@ -57,19 +61,23 @@ cargo run --example sandbox
 ```
 
 ### Create a new game project with Runa:
-	Create project:
+
+    Create project:
+
 ```sh
 cargo new my_game
 cd my_game
 ```
 
-	Add dependencies:
+    Add dependencies:
+
 ```toml
 [dependencies]
-runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.1.0-alpha.2" }
+runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.1.0-alpha.1" }
 ```
 
 ### Create Your Game with Player Script
+
 ```rust
 // main.rs
 use runa_app::{RunaApp, RunaWindowConfig};
@@ -169,6 +177,7 @@ impl Script for Player {
 ```
 
 ## 📂 Project Structure
+
 ```
 runa-engine/
 ├── crates/
@@ -190,6 +199,7 @@ runa-engine/
 ## 📜 License
 
 Dual-licensed under:
+
 - [MIT License](LICENSE-MIT)
 - [Apache License 2.0](LICENSE-APACHE)
 
@@ -198,6 +208,7 @@ Choose whichever suits your project best.
 ## 🤝 Contributing
 
 Project is currently private. When public:
+
 - Open Issues for bugs and feature requests
 - Submit PRs to `dev` branch
 - Follow Conventional Commits
@@ -210,4 +221,4 @@ Project is currently private. When public:
 
 ---
 
-✨ *Built with ❤️ in Rust* ✨
+✨ _Built with ❤️ in Rust_ ✨
