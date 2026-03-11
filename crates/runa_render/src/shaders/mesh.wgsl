@@ -7,11 +7,11 @@ struct MeshUniforms {
 };
 @group(0) @binding(0) var<uniform> globals: MeshUniforms;
 
-// ===== ТЕКСТУРЫ =====
+// ===== TEXTURES =====
 @group(0) @binding(1) var t_diffuse: texture_2d<f32>;
 @group(0) @binding(2) var s_sampler: sampler;
 
-// ===== ВЕРШИННЫЙ ШЕЙДЕР =====
+// ===== VERTEX SHADER =====
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,

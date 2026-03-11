@@ -1,5 +1,7 @@
 use wgpu::{Device, TextureFormat, VertexState};
 
+use crate::renderer::InstanceData;
+
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
@@ -39,6 +41,26 @@ impl SpritePipeline {
             label: Some("Sprite Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
         });
+
+        let vertex_buffers = [
+            // Базовый квад (шаг: вершина)
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<Vertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2],
+            },
+            // Инстансы (шаг: инстанс)
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<InstanceData>() as u64,
+                step_mode: wgpu::VertexStepMode::Instance,
+                attributes: &wgpu::vertex_attr_array![
+                    2 => Float32x3, // position
+                    3 => Float32,   // rotation
+                    4 => Float32x2, // scale
+                    5 => Float32,   // _pad
+                ],
+            },
+        ];
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Sprite BindGroup Layout"),
@@ -87,7 +109,7 @@ impl SpritePipeline {
             vertex: VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Vertex::layout()],
+                buffers: &vertex_buffers,
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {

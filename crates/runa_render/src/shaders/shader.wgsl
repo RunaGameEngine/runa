@@ -1,6 +1,18 @@
+struct VertexInput {
+    @location(0) position: vec3<f32>,   // локальная позиция вершины квада (-0.5..0.5)
+    @location(1) tex_coords: vec2<f32>,
+};
+
 struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
+    @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
+};
+
+struct InstanceData {
+    @location(2) position: vec3<f32>,   // мировая позиция спрайта
+    @location(3) rotation: f32,         // поворот вокруг оси Z (радианы)
+    @location(4) scale: vec3<f32>,      // масштаб по осям X, Y, Z
+    @location(5) _pad: f32,             // паддинг до 32 байт
 };
 
 struct Globals {
@@ -9,33 +21,41 @@ struct Globals {
     _padding: vec3<f32>,
 };
 
-// Globals (view_proj matrix)
 @group(0) @binding(0) var<uniform> globals: Globals;
-
-// Sprite texture
 @group(0) @binding(1) var t_diffuse: texture_2d<f32>;
 @group(0) @binding(2) var s_sampler: sampler;
 
 @vertex
 fn vs_main(
-    @location(0) a_position: vec3<f32>,
-    @location(1) a_tex_coords: vec2<f32>
+    vertex: VertexInput,
+    instance: InstanceData,
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    // Корректируем X-координату для сохранения квадратных пикселей (как в оригинальном 2D варианте)
-    let corrected_position = vec3<f32>(
-        a_position.x * globals.aspect,
-        a_position.y,
-        a_position.z
-    );
+    // === 1. Применяем 2D-поворот вокруг оси Z ===
+    let cos_a = cos(instance.rotation);
+    let sin_a = sin(instance.rotation);
 
-    // Преобразуем 3D позицию в 4D для матричного умножения
-    let position_4d = vec4<f32>(corrected_position, 1.0);
+    let rotated_x = vertex.position.x * cos_a - vertex.position.y * sin_a;
+    let rotated_y = vertex.position.x * sin_a + vertex.position.y * cos_a;
 
-    // Используем view_proj как единую матрицу (уже содержит и проекцию, и вид)
-    out.position = globals.view_proj * position_4d;
-    out.tex_coords = a_tex_coords;
+    // === 2. Применяем масштаб ===
+    let scaled_x = rotated_x * instance.scale.x;
+    let scaled_y = rotated_y * instance.scale.y;
+    let scaled_z = vertex.position.z * instance.scale.z; // обычно 0.0 для спрайтов
+
+    // === 3. Добавляем мировую позицию инстанса ===
+    let world_x = scaled_x + instance.position.x;
+    let world_y = scaled_y + instance.position.y;
+    let world_z = scaled_z + instance.position.z;
+
+    // === 4. Коррекция аспекта для пиксель-перфект рендеринга ===
+    let corrected_x = world_x * globals.aspect;
+
+    // === 5. Преобразуем в клип-пространство ===
+    out.clip_position = globals.view_proj * vec4<f32>(corrected_x, world_y, world_z, 1.0);
+    out.tex_coords = vertex.tex_coords;
+
     return out;
 }
 

@@ -1,7 +1,7 @@
-use glam::Vec3;
 use runa_core::components::CursorInteractable;
 use runa_core::components::SpriteRenderer;
 use runa_core::components::Transform;
+use runa_core::glam::Vec3;
 use runa_core::input_system::*;
 use runa_core::ocs::Object;
 use runa_core::ocs::Script;

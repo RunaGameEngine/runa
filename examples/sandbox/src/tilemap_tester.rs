@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::USizeVec2;
+use runa_core::glam::USizeVec2;
 use runa_core::{
     components::{Rect, Tile, Tilemap, TilemapLayer, TilemapRenderer, Transform},
     ocs::Script,

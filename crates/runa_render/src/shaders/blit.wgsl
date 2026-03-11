@@ -1,4 +1,4 @@
-// Вершинный шейдер
+// Vertex shader
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -7,13 +7,13 @@ struct VertexOutput {
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var pos = array<vec2<f32>, 6>(
-        vec2<f32>(-1.0, -1.0), // левый-нижний
-        vec2<f32>(3.0, -1.0),  // правый-нижний
-        vec2<f32>(-1.0, 3.0),  // левый-верхний
+        vec2<f32>(-1.0, -1.0), // left-bottom
+        vec2<f32>(3.0, -1.0),  // right-bottom
+        vec2<f32>(-1.0, 3.0),  // left-top
 
-        vec2<f32>(-1.0, 3.0),  // левый-верхний
-        vec2<f32>(3.0, -1.0),  // правый-нижний
-        vec2<f32>(3.0, 3.0)    // правый-верхний
+        vec2<f32>(-1.0, 3.0),  // left-top
+        vec2<f32>(3.0, -1.0),  // right-bottom
+        vec2<f32>(3.0, 3.0)    // right-top
     );
 
     var uv = array<vec2<f32>, 6>(
@@ -32,7 +32,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return out;
 }
 
-// Фрагментный шейдер
+// Fragment shader
 @group(0) @binding(0) var t_render_target: texture_2d<f32>;
 @group(0) @binding(1) var s_sampler: sampler;
 

@@ -1,17 +1,26 @@
-use std::time::Instant;
+//use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     font::FontManager, pipelines::MeshPipeline, pipelines::SpritePipeline,
     resources::texture::GpuTexture,
 };
-use glam::{Vec2, Vec3};
+use glam::Vec2;
 use runa_asset::TextureAsset;
 use runa_render_api::{RenderCommands, RenderQueue};
 use wgpu::util::DeviceExt;
 use wgpu::{MemoryHints::Performance, Trace};
 use wgpu::{Texture, TextureView};
 use winit::window::Window;
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct InstanceData {
+    pub position: [f32; 3], // x, y, z
+    pub rotation: f32,      // radians
+    pub scale: [f32; 3],    // x, y, z
+    pub _pad: [f32; 1],
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -53,6 +62,10 @@ pub struct Renderer<'window> {
 
     depth_view: TextureView,
     depth_texture: Texture,
+
+    quad_buffer: wgpu::Buffer,     // базовый квад (6 вершин, не меняется)
+    instance_buffer: wgpu::Buffer, // буфер инстансов
+    max_instances: usize,
 }
 
 impl<'window> Renderer<'window> {
@@ -170,6 +183,48 @@ impl<'window> Renderer<'window> {
             wgpu::TextureFormat::Depth32Float,
         );
 
+        const QUAD_VERTICES: &[Vertex] = &[
+            Vertex {
+                position: [-0.5, -0.5, 0.0],
+                tex_coords: [0.0, 1.0],
+            },
+            Vertex {
+                position: [0.5, -0.5, 0.0],
+                tex_coords: [1.0, 1.0],
+            },
+            Vertex {
+                position: [-0.5, 0.5, 0.0],
+                tex_coords: [0.0, 0.0],
+            },
+            Vertex {
+                position: [0.5, -0.5, 0.0],
+                tex_coords: [1.0, 1.0],
+            },
+            Vertex {
+                position: [0.5, 0.5, 0.0],
+                tex_coords: [1.0, 0.0],
+            },
+            Vertex {
+                position: [-0.5, 0.5, 0.0],
+                tex_coords: [0.0, 0.0],
+            },
+        ];
+
+        let quad_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Quad Vertex Buffer"),
+            contents: bytemuck::cast_slice(QUAD_VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        // Инстанс-буфер (максимум 1000 спрайтов)
+        const MAX_INSTANCES: usize = 1000;
+        let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Instance Buffer"),
+            size: (std::mem::size_of::<InstanceData>() * MAX_INSTANCES) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         Self {
             surface,
             surface_config,
@@ -187,6 +242,9 @@ impl<'window> Renderer<'window> {
             bind_group_cache: HashMap::new(),
             depth_view,
             depth_texture,
+            quad_buffer,
+            instance_buffer,
+            max_instances: MAX_INSTANCES,
         }
     }
 
@@ -226,7 +284,7 @@ impl<'window> Renderer<'window> {
             Err(_) => return,
         };
 
-        let t0 = Instant::now();
+        //let t0 = Instant::now();
 
         let view = surface_texture
             .texture
@@ -250,9 +308,8 @@ impl<'window> Renderer<'window> {
         // ===== ШАГ 1: СБОРКА ВЕРШИН ПО ТЕКСТУРАМ =====
         let mut all_vertices = Vec::new();
         let mut draw_calls = Vec::new();
-
-        let t1 = Instant::now();
-        // println!("📦 Commands this frame: {}", queue.commands.len());
+        let mut all_instances = Vec::new();
+        let mut batches = Vec::new();
 
         for cmd in &queue.commands {
             match cmd {
@@ -264,65 +321,24 @@ impl<'window> Renderer<'window> {
                 } => {
                     let tex_width = texture.width as f32;
                     let tex_height = texture.height as f32;
+                    let world_scale_x = scale.x * (tex_width / 16.0);
+                    let world_scale_y = scale.y * (tex_height / 16.0);
 
-                    let world_width = (tex_width / 16.0) * scale.x;
-                    let world_height = (tex_height / 16.0) * scale.y;
+                    let instance = InstanceData {
+                        position: [position.x, position.y, position.z],
+                        rotation: rotation.z,
+                        scale: [world_scale_x, world_scale_y, 1.0],
+                        _pad: [0.0],
+                    };
 
-                    let sprite_vertices: [Vertex; 6] = [
-                        Vertex {
-                            position: [-world_width * 0.5, -world_height * 0.5, 0.0],
-                            tex_coords: [0.0, 1.0],
-                        },
-                        Vertex {
-                            position: [world_width * 0.5, -world_height * 0.5, 0.0],
-                            tex_coords: [1.0, 1.0],
-                        },
-                        Vertex {
-                            position: [-world_width * 0.5, world_height * 0.5, 0.0],
-                            tex_coords: [0.0, 0.0],
-                        },
-                        Vertex {
-                            position: [world_width * 0.5, -world_height * 0.5, 0.0],
-                            tex_coords: [1.0, 1.0],
-                        },
-                        Vertex {
-                            position: [world_width * 0.5, world_height * 0.5, 0.0],
-                            tex_coords: [1.0, 0.0],
-                        },
-                        Vertex {
-                            position: [-world_width * 0.5, world_height * 0.5, 0.0],
-                            tex_coords: [0.0, 0.0],
-                        },
-                    ];
-
-                    let transformed_vertices: Vec<Vertex> = sprite_vertices
-                        .iter()
-                        .map(|v| {
-                            let pos_3d = Vec3::new(v.position[0], v.position[1], v.position[2]);
-                            let scaled = pos_3d * scale;
-                            let rotated = rotation * scaled;
-                            let final_pos = Vec3::new(
-                                position.x + rotated.x,
-                                position.y + rotated.y,
-                                position.z + rotated.z,
-                            );
-
-                            Vertex {
-                                position: [final_pos.x, final_pos.y, final_pos.z],
-                                tex_coords: v.tex_coords,
-                            }
-                        })
-                        .collect();
-
-                    let vertex_count = transformed_vertices.len();
-                    let vertex_offset = all_vertices.len();
-                    all_vertices.extend(transformed_vertices);
-
-                    let key = Arc::as_ptr(&texture) as usize;
+                    let key = Arc::as_ptr(texture) as usize;
                     if !self.textures_cache.contains_key(&key) {
                         self.textures_cache.insert(key, texture.clone());
                     }
-                    draw_calls.push((key, vertex_offset, vertex_count));
+
+                    let offset = all_instances.len();
+                    all_instances.push(instance);
+                    batches.push((key, offset, 1)); // 1 инстанс на спрайт
                 }
                 RenderCommands::Tile {
                     texture,
@@ -494,7 +510,16 @@ impl<'window> Renderer<'window> {
             }
         }
 
-        let t2 = Instant::now();
+        // Записываем ВСЕ инстансы ОДИН раз
+        if !all_instances.is_empty() {
+            self.queue.write_buffer(
+                &self.instance_buffer,
+                0,
+                bytemuck::cast_slice(&all_instances[..all_instances.len().min(self.max_instances)]),
+            );
+        }
+
+        //let t2 = Instant::now();
 
         if all_vertices.len() > self.max_vertices {
             eprintln!("Too many vertices! Max: {}", self.max_vertices);
@@ -527,18 +552,15 @@ impl<'window> Renderer<'window> {
             ..Default::default()
         });
 
-        let mut last_texture_key: Option<usize> = None;
-
-        for (texture_key, vertex_offset, vertex_count) in draw_calls {
-            // Получаем/создаём текстуру
+        // Устанавливаем бинд-группу (берём первую текстуру из кэша)
+        // ===== ШАГ 2: РЕНДЕРИНГ СПРАЙТОВ (ИНСТАНСИНГ) =====
+        for (texture_key, instance_offset, instance_count) in batches {
             let gpu_texture = self.textures.entry(texture_key).or_insert_with(|| {
                 let texture = self.textures_cache.get(&texture_key).unwrap();
                 GpuTexture::from_asset(&self.device, &self.queue, texture)
             });
 
-            // Кэшируем бинд-группу (создаётся ОДИН раз на текстуру)
             let bind_group = self.bind_group_cache.entry(texture_key).or_insert_with(|| {
-                println!("⚠️  CREATING NEW BIND_GROUP for texture {}", texture_key);
                 self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     layout: &self.sprite_pipeline.bind_group_layout,
                     entries: &[
@@ -555,33 +577,29 @@ impl<'window> Renderer<'window> {
                             resource: wgpu::BindingResource::Sampler(&self.nearest_sampler),
                         },
                     ],
-                    label: Some("Cached BindGroup"),
+                    label: Some("BindGroup"),
                 })
             });
 
-            // ← ЯВНОЕ ПРЕОБРАЗОВАНИЕ для совместимости с set_bind_group
-            let bind_group_ref: &wgpu::BindGroup = &*bind_group;
-
-            // Оптимизация: избегаем лишних вызовов set_bind_group
-            if last_texture_key != Some(texture_key) {
-                rpass.set_pipeline(&self.sprite_pipeline.pipeline);
-                rpass.set_bind_group(0, bind_group_ref, &[]);
-                last_texture_key = Some(texture_key);
-            }
-
-            let vertex_offset_bytes = (vertex_offset * std::mem::size_of::<Vertex>()) as u64;
-            rpass.set_vertex_buffer(0, self.vertex_buffer.slice(vertex_offset_bytes..));
-            rpass.draw(0..vertex_count as u32, 0..1);
+            rpass.set_pipeline(&self.sprite_pipeline.pipeline);
+            rpass.set_bind_group(0, &*bind_group, &[]);
+            rpass.set_vertex_buffer(0, self.quad_buffer.slice(..));
+            rpass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            // ← КЛЮЧЕВОЕ: рендерим инстансы с правильным смещением
+            rpass.draw(
+                0..6,
+                instance_offset as u32..(instance_offset + instance_count) as u32,
+            );
         }
 
-        let t3 = Instant::now();
+        //let t3 = Instant::now();
 
-        println!(
-            "Prep: {:.2}ms | Write (cmd): {:.2}ms | Render: {:.2}ms",
-            (t1 - t0).as_secs_f32() * 1000.,
-            (t2 - t1).as_secs_f32() * 1000.,
-            (t3 - t2).as_secs_f32() * 1000.
-        );
+        // println!(
+        //     "Prep: {:.2}ms | Write (cmd): {:.2}ms | Render: {:.2}ms",
+        //     (t1 - t0).as_secs_f32() * 1000.,
+        //     (t2 - t1).as_secs_f32() * 1000.,
+        //     (t3 - t2).as_secs_f32() * 1000.
+        // );
 
         drop(rpass);
         self.queue.submit(Some(encoder.finish()));
