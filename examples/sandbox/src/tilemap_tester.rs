@@ -18,25 +18,30 @@ impl Script for TilemapTester {
     fn construct(&self, _object: &mut runa_core::ocs::Object) {
         _object.add_component(Transform::default());
         _object.add_component({
-            let mut tilemap = Tilemap::centered(25, 25, USizeVec2::new(2, 2));
-            let mut layer = TilemapLayer::new("Test".into(), 25, 25);
+            let tilesize = 10;
+            let mut tilemap = Tilemap::centered(tilesize, tilesize, USizeVec2::new(2, 2));
+            let mut layer = TilemapLayer::new("Test".into(), tilesize, tilesize);
+            let mut layer2 = TilemapLayer::new("Test2".into(), tilesize, tilesize);
 
             let grass_texture = runa_asset::loader::load_image("assets/TilemapTest.png");
-            let dirt_texture = runa_asset::loader::load_image("assets/TilemapTest2.png");
+            let trans_tile_texture = runa_asset::loader::load_image("assets/TilemapTestTrans.png");
 
-            for y in 0..25 {
-                for x in 0..25 {
-                    let texture = if (x + y) % 2 == 0 {
-                        grass_texture.clone()
-                    } else {
-                        dirt_texture.clone()
-                    };
-
-                    let tile = Tile::new(Arc::from(texture), Rect::new(0.0, 0.0, 1.0, 1.0));
-                    layer.set_tile(x, y, 10, tile);
+            for y in 0..tilesize {
+                for x in 0..tilesize {
+                    let tile = Tile::new(
+                        Arc::from(grass_texture.clone()),
+                        Rect::new(0.0, 0.0, 1.0, 1.0),
+                    );
+                    let tile2 = Tile::new(
+                        Arc::from(trans_tile_texture.clone()),
+                        Rect::new(0.0, 0.0, 1.0, 1.0),
+                    );
+                    layer.set_tile(x, y, tile);
+                    layer2.set_tile(x, y, tile2);
                 }
             }
             tilemap.add_layer(layer);
+            tilemap.add_layer(layer2);
             tilemap
         });
 

@@ -98,7 +98,10 @@ impl World {
 
                     for y in tilemap.offset.y..(tilemap.offset.y + tilemap.height as i32) {
                         for x in tilemap.offset.x..(tilemap.offset.x + tilemap.width as i32) {
-                            if let Some(tile) = tilemap.get_tile(x, y) {
+                            let array_x = (x - tilemap.offset.x) as u32;
+                            let array_y = (y - tilemap.offset.y) as u32;
+
+                            if let Some(tile) = layer.get_tile(array_x as u32, array_y as u32) {
                                 if tile.texture.is_none() {
                                     continue;
                                 }

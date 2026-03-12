@@ -8,17 +8,17 @@ use runa_core::{
     ocs::Script,
 };
 
-use crate::tilemap_tester::TilemapTester;
-
 mod tester1;
 mod tilemap_tester;
+
+use tilemap_tester::TilemapTester;
 
 fn main() {
     // Create a new empty world to hold game objects and systems
     let mut world = World::default();
 
     // Spawn the player object (managed via its Script implementation)
-    // world.spawn(Box::new(TilemapTester::new()));
+    world.spawn(Box::new(TilemapTester::new()));
     world.spawn(Box::new(tester1::RotatingSprite1::new()));
     world.spawn(Box::new(Player::new()));
 

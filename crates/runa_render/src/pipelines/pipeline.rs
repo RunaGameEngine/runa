@@ -9,26 +9,7 @@ pub struct Vertex {
     pub tex_coords: [f32; 2],
 }
 
-impl Vertex {
-    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as u64,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0, // pos
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: 12,         // смещение после pos ([f32;3] = 12 байт)
-                    shader_location: 1, // tex_coords
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-            ],
-        }
-    }
-}
+impl Vertex {}
 
 pub struct SpritePipeline {
     pub pipeline: wgpu::RenderPipeline,
@@ -56,8 +37,11 @@ impl SpritePipeline {
                 attributes: &wgpu::vertex_attr_array![
                     2 => Float32x3, // position
                     3 => Float32,   // rotation
-                    4 => Float32x2, // scale
-                    5 => Float32,   // _pad
+                    4 => Float32x3, // scale
+                    5 => Float32x2,
+                    6 => Float32x2,
+                    7 => Uint32,
+                    8 => Float32,   // _pad
                 ],
             },
         ];

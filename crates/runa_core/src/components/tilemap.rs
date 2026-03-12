@@ -55,6 +55,8 @@ impl Tile {
 #[derive(Clone)]
 pub struct TilemapLayer {
     pub name: String,
+    pub width: u32,
+    pub height: u32,
     pub tiles: Vec<Tile>, // width * height элементов
     pub visible: bool,
     pub opacity: f32,
@@ -64,21 +66,23 @@ impl TilemapLayer {
     pub fn new(name: String, width: u32, height: u32) -> Self {
         Self {
             name,
+            width,
+            height,
             tiles: vec![Tile::empty(); (width * height) as usize],
             visible: true,
             opacity: 1.0,
         }
     }
 
-    pub fn set_tile(&mut self, x: u32, y: u32, width: u32, tile: Tile) {
-        let index = (y * width + x) as usize;
+    pub fn set_tile(&mut self, x: u32, y: u32, tile: Tile) {
+        let index = (y * self.width + x) as usize;
         if index < self.tiles.len() {
             self.tiles[index] = tile;
         }
     }
 
-    pub fn get_tile(&self, x: u32, y: u32, width: u32) -> Option<&Tile> {
-        let index = (y * width + x) as usize;
+    pub fn get_tile(&self, x: u32, y: u32) -> Option<&Tile> {
+        let index = (y * self.width + x) as usize;
         self.tiles.get(index)
     }
 }
@@ -126,20 +130,8 @@ impl Tilemap {
         // Проверка границ
         if array_x < self.width && array_y < self.height {
             for layer in &mut self.layers {
-                layer.set_tile(array_x, array_y, self.width, tile.clone());
+                layer.set_tile(array_x, array_y, tile.clone());
             }
-        }
-    }
-
-    /// Получить тайл по мировым координатам
-    pub fn get_tile(&self, world_x: i32, world_y: i32) -> Option<&Tile> {
-        let array_x = (world_x - self.offset.x) as u32;
-        let array_y = (world_y - self.offset.y) as u32;
-
-        if array_x < self.width && array_y < self.height {
-            self.layers.first()?.get_tile(array_x, array_y, self.width)
-        } else {
-            None
         }
     }
 

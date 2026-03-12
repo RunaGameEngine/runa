@@ -12,7 +12,10 @@ struct InstanceData {
     @location(2) position: vec3<f32>,   // мировая позиция спрайта
     @location(3) rotation: f32,         // поворот вокруг оси Z (радианы)
     @location(4) scale: vec3<f32>,      // масштаб по осям X, Y, Z
-    @location(5) _pad: f32,             // паддинг до 32 байт
+    @location(5) uv_offset: vec2<f32>,
+    @location(6) uv_size: vec2<f32>,
+    @location(7) flip: u32,
+    @location(8) _pad: f32,             // паддинг до 32 байт
 };
 
 struct Globals {
@@ -54,8 +57,20 @@ fn vs_main(
 
     // === 5. Преобразуем в клип-пространство ===
     out.clip_position = globals.view_proj * vec4<f32>(corrected_x, world_y, world_z, 1.0);
-    out.tex_coords = vertex.tex_coords;
 
+    // Базовые UV от вершины (0..1)
+    var uv = vertex.tex_coords;
+
+    // Флип
+    if (instance.flip & 1u) != 0u { uv.x = 1.0 - uv.x; }
+    if (instance.flip & 2u) != 0u { uv.y = 1.0 - uv.y; }
+
+    // ✅ КЛЮЧЕВАЯ СТРОКА: применяем UV-rect
+    let final_uv = instance.uv_offset + uv * instance.uv_size;
+
+    out.tex_coords = final_uv;  // ← Передаём в фрагментный шейдер
+
+    // ... остальная логика позиции ...
     return out;
 }
 

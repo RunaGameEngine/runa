@@ -16,10 +16,13 @@ use winit::window::Window;
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceData {
-    pub position: [f32; 3], // x, y, z
-    pub rotation: f32,      // radians
-    pub scale: [f32; 3],    // x, y, z
-    pub _pad: [f32; 1],
+    pub position: [f32; 3],  // x, y, z
+    pub rotation: f32,       // radians
+    pub scale: [f32; 3],     // x, y, z
+    pub uv_offset: [f32; 2], // left-bottom UV
+    pub uv_size: [f32; 2],   // size UV-quad
+    pub flip: u32,           // 0 = flip_x, 1 = flip_y
+    pub _pad: f32,
 }
 
 #[repr(C)]
@@ -307,7 +310,6 @@ impl<'window> Renderer<'window> {
 
         // ===== ШАГ 1: СБОРКА ВЕРШИН ПО ТЕКСТУРАМ =====
         let mut all_vertices = Vec::new();
-        let mut draw_calls = Vec::new();
         let mut all_instances = Vec::new();
         let mut batches = Vec::new();
 
@@ -328,7 +330,11 @@ impl<'window> Renderer<'window> {
                         position: [position.x, position.y, position.z],
                         rotation: rotation.z,
                         scale: [world_scale_x, world_scale_y, 1.0],
-                        _pad: [0.0],
+
+                        uv_offset: [0.0, 0.0], // начинаем с левого-нижнего угла
+                        uv_size: [1.0, 1.0],   // используем полный размер
+                        flip: 0,               // без флипа
+                        _pad: 0.0,
                     };
 
                     let key = Arc::as_ptr(texture) as usize;
@@ -338,102 +344,37 @@ impl<'window> Renderer<'window> {
 
                     let offset = all_instances.len();
                     all_instances.push(instance);
-                    batches.push((key, offset, 1)); // 1 инстанс на спрайт
+                    batches.push((key, offset, 1));
                 }
                 RenderCommands::Tile {
                     texture,
                     position,
                     size,
-                    uv_rect,
+                    uv_rect, // [x, y, w, h] в 0..1
                     flip_x,
                     flip_y,
                     color: _,
                 } => {
-                    // Вычисляем углы текстуры с учётом флипа
-                    let u0 = if *flip_x {
-                        uv_rect[0] + uv_rect[2]
-                    } else {
-                        uv_rect[0]
-                    };
-                    let u1 = if *flip_x {
-                        uv_rect[0]
-                    } else {
-                        uv_rect[0] + uv_rect[2]
-                    };
-                    let v_bottom = if *flip_y {
-                        uv_rect[1]
-                    } else {
-                        uv_rect[1] + uv_rect[3]
-                    };
-                    let v_top = if *flip_y {
-                        uv_rect[1] + uv_rect[3]
-                    } else {
-                        uv_rect[1]
+                    let instance = InstanceData {
+                        position: [position.x, position.y, position.z],
+                        rotation: 0.0, // тайлы обычно не вращаются
+                        scale: [size.x as f32, size.y as f32, 1.0],
+
+                        // UV-данные для тайла
+                        uv_offset: [uv_rect[0], uv_rect[1]],
+                        uv_size: [uv_rect[2], uv_rect[3]],
+                        flip: ((*flip_x) as u32) | (((*flip_y) as u32) << 1),
+                        _pad: 0.0,
                     };
 
-                    let half_width = size.x as f32 * 0.5;
-                    let half_height = size.y as f32 * 0.5;
-
-                    let vertices: [Vertex; 6] = [
-                        // Треугольник 1
-                        Vertex {
-                            position: [
-                                position.x - half_width,
-                                position.y + half_height,
-                                position.z,
-                            ],
-                            tex_coords: [u0, v_top],
-                        },
-                        Vertex {
-                            position: [
-                                position.x + half_width,
-                                position.y + half_height,
-                                position.z,
-                            ],
-                            tex_coords: [u1, v_top],
-                        },
-                        Vertex {
-                            position: [
-                                position.x - half_width,
-                                position.y - half_height,
-                                position.z,
-                            ],
-                            tex_coords: [u0, v_bottom],
-                        },
-                        // Треугольник 2
-                        Vertex {
-                            position: [
-                                position.x + half_width,
-                                position.y - half_height,
-                                position.z,
-                            ],
-                            tex_coords: [u1, v_bottom],
-                        },
-                        Vertex {
-                            position: [
-                                position.x + half_width,
-                                position.y + half_height,
-                                position.z,
-                            ],
-                            tex_coords: [u1, v_top],
-                        },
-                        Vertex {
-                            position: [
-                                position.x - half_width,
-                                position.y - half_height,
-                                position.z,
-                            ],
-                            tex_coords: [u0, v_bottom],
-                        },
-                    ];
-
-                    let vertex_offset = all_vertices.len();
-                    all_vertices.extend(vertices);
-                    let key = Arc::as_ptr(&texture) as usize;
+                    let key = Arc::as_ptr(texture) as usize;
                     if !self.textures_cache.contains_key(&key) {
                         self.textures_cache.insert(key, texture.clone());
                     }
-                    draw_calls.push((key, vertex_offset, vertices.len()));
+
+                    let offset = all_instances.len(); // тот же вектор, что и для спрайтов!
+                    all_instances.push(instance);
+                    batches.push((key, offset, 1)); // 1 инстанс = 1 тайл
                 }
                 RenderCommands::DebugRect {
                     position,
