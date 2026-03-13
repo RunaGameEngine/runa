@@ -17,7 +17,7 @@ fn main() {
     // Create a new empty world to hold game objects and systems
     let mut world = World::default();
 
-    // Spawn the player object (managed via its Script implementation)
+    // Spawn the objects (managed via its Script implementation)
     world.spawn(Box::new(TilemapTester::new()));
     world.spawn(Box::new(tester1::RotatingSprite1::new()));
     world.spawn(Box::new(Player::new()));
@@ -58,7 +58,7 @@ impl Script for Player {
         _object
             .add_component(Transform::default())
             .add_component(SpriteRenderer {
-                texture: Some(runa_asset::loader::load_image("assets/Charactert.png")),
+                texture: Some(runa_asset::load_image!("assets/Charactert.png")),
             });
     }
 

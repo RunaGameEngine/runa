@@ -27,7 +27,7 @@ impl Script for RotatingSprite1 {
         _object
             .add_component(Transform::default())
             .add_component(SpriteRenderer {
-                texture: Some(runa_asset::loader::load_image("assets/Tester1.png")),
+                texture: Some(runa_asset::load_image!("assets/Tester1.png")),
             })
             .add_component(interactable); // интерактивная коллизия для курсора
     }
