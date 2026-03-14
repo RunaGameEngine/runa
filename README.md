@@ -52,7 +52,7 @@
 ### Run Example
 
 ```bash
-# Clone (when public)
+# Clone
 git clone https://github.com/AnuranGames/runa-engine
 cd runa-engine
 
