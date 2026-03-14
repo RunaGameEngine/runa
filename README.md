@@ -34,7 +34,7 @@
 - [ ] Animations (sprites, skeletal)
 - [ ] Level editor
 - [ ] Custom shader support
-- [ ] Tilemap
+- [X] Tilemap
 - [ ] **Audio** (basic)
   - [ ] Sound playback via `rodio`
 - [ ] **3D Support** (experimental)
