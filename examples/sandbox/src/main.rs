@@ -18,12 +18,6 @@ fn main() {
     // Create a new empty world to hold game objects and systems
     let mut world = World::default();
 
-    // Initialize audio engine
-    world
-        .audio_engine
-        .initialize()
-        .expect("Failed to initialize audio engine");
-
     // Spawn the objects (managed via its Script implementation)
     world.spawn(Box::new(TilemapTester::new()));
     world.spawn(Box::new(tester1::RotatingSprite1::new()));

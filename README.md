@@ -35,8 +35,8 @@
 - [ ] Level editor
 - [ ] Custom shader support
 - [X] Tilemap
-- [ ] **Audio** (basic)
-  - [ ] Sound playback via `rodio`
+- [x] **Audio** (basic)
+  - [x] Sound playback via `rodio`
 - [ ] **3D Support** (experimental)
   - [ ] Mesh pipeline with depth buffer
   - [ ] Instancing for massive object rendering
@@ -73,7 +73,7 @@ Add dependencies:
 
 ```toml
 [dependencies]
-runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.1.1-alpha.2" }
+runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.1.2-alpha.1" }
 ```
 
 ### Create Your Game with Player Script

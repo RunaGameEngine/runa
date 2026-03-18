@@ -40,6 +40,10 @@ impl World {
     }
 
     pub fn construct(&mut self) {
+        self.audio_engine
+            .initialize()
+            .expect("Failed to initialize audio engine");
+
         for object in &mut self.objects {
             if let Some(script) = object.script.take() {
                 script.construct(object);
