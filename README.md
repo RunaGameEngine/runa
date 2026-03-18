@@ -106,6 +106,8 @@ fn main() {
 		height: 720,
 		fullscreen: false,
 		vsync: true,
+		show_fps_in_title: true,
+        window_icon: None,
 	};
 
 	// Launch the engine with the configured world and window settings
