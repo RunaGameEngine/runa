@@ -23,6 +23,7 @@ pub struct RunaWindowConfig {
     pub fullscreen: bool,
     pub vsync: bool,
     pub show_fps_in_title: bool,
+    pub window_icon: Option<String>,
 }
 
 impl Default for RunaWindowConfig {
@@ -34,6 +35,7 @@ impl Default for RunaWindowConfig {
             fullscreen: false,
             vsync: true,
             show_fps_in_title: false,
+            window_icon: None,
         }
     }
 }
@@ -119,6 +121,36 @@ impl<'window> ApplicationHandler for App<'window> {
                     .create_window(win_attr)
                     .expect("create window err."),
             );
+
+            if let Some(icon_path) = &self.config.window_icon {
+                match runa_asset::load_window_icon(icon_path) {
+                    Ok(icon) => {
+                        window.set_window_icon(Some(icon));
+                        println!("✅ Window icon loaded: {}", icon_path);
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to load window icon '{}': {}", icon_path, e);
+                    }
+                }
+            } else {
+                match runa_asset::load_window_icon(
+                    "D:/coding/projects/runa-engine/crates/runa_app/assets/icon.png",
+                ) {
+                    Ok(icon) => {
+                        window.set_window_icon(Some(icon));
+                    }
+                    Err(e) => {
+                        let yellow = "\x1b[33m";
+                        let clear = "\x1B[0m";
+
+                        eprintln!(
+                            "{}runa_warning{}: Failed to load window icon: {}",
+                            yellow, clear, e
+                        );
+                    }
+                }
+            }
+
             if self.config.fullscreen {
                 // Open fullscreen
                 let fullscreen = Some(Fullscreen::Borderless(window.current_monitor()));

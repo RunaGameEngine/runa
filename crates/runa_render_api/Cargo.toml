@@ -8,3 +8,4 @@ authors.workspace = true
 [dependencies]
 runa_asset = { path = "../runa_asset" }
 glam.workspace = true
+bytemuck = { version = "1.25.0", features = ["derive"] }

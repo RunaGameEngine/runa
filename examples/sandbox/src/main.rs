@@ -30,6 +30,7 @@ fn main() {
         fullscreen: false,
         vsync: false,
         show_fps_in_title: true,
+        window_icon: None,
     };
 
     // Launch the engine with the configured world and window settings

@@ -14,7 +14,7 @@ impl RenderQueue {
         }
     }
 
-    pub fn draw_sprite(
+    pub fn push_sprite(
         &mut self,
         texture: std::sync::Arc<TextureAsset>,
         position: Vec3,

@@ -8,7 +8,7 @@ pub struct Camera2D {
     pub position: Vec2,
     /// Scale: 1.0 = 1:1, >1 = increase; <1 = decrease
     pub zoom: f32,
-    /// Virtual size/camera render size (for example 320x180)
+    /// Virtual size/camera render size (for example 320 x 180)
     pub virtual_size: Vec2,
     // pub pixel_perfect: bool, // ← новый флаг
     pub viewport_size: (u32, u32),

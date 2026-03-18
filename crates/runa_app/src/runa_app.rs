@@ -22,6 +22,7 @@ impl RunaApp {
         let event_loop = EventLoop::new().unwrap();
         event_loop.set_control_flow(ControlFlow::Poll);
 
+        // Initialize input
         runa_core::input::InputState::initialize();
         let interaction_system = InteractionSystem::new();
 

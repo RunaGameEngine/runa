@@ -80,7 +80,7 @@ impl World {
                 let interpolated_rotation = transform.previous_rotation
                     + (transform.rotation - transform.previous_rotation) * interpolation_factor;
 
-                render_queue.draw_sprite(
+                render_queue.push_sprite(
                     Arc::from(sprite.get_texture_handle()),
                     interpolated_position,
                     interpolated_rotation,

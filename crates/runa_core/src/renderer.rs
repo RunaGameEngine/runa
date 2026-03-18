@@ -22,7 +22,7 @@ impl CoreRenderer {
     }
 
     pub fn submit_sprite(&mut self, sprite: &Sprite, transform: &Transform) {
-        self.queue.draw_sprite(
+        self.queue.push_sprite(
             Arc::from(sprite.texture.clone()),
             transform.position,
             transform.rotation,
