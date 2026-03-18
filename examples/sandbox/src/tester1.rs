@@ -27,7 +27,7 @@ impl Script for RotatingSprite1 {
         _object
             .add_component(Transform::default())
             .add_component(SpriteRenderer {
-                texture: Some(runa_asset::load_image!("assets/Tester1.png")),
+                texture: Some(runa_asset::load_image!("assets/art/Tester1.png")),
             })
             .add_component(interactable); // интерактивная коллизия для курсора
     }
@@ -42,7 +42,7 @@ impl Script for RotatingSprite1 {
         }
     }
 
-    fn update(&mut self, _object: &mut Object, _dt: f32) {
+    fn update(&mut self, _object: &mut Object, _dt: f32, _world: &mut runa_core::World) {
         if let Some(ci) = &_object.get_component::<CursorInteractable>() {
             if ci.is_hovered && Input::is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(transform) = _object.get_component_mut::<Transform>() {

@@ -1,5 +1,3 @@
-// runa-core/src/components/mesh.rs
-use glam::{Quat, Vec3};
 use runa_asset::TextureAsset;
 
 #[repr(C)]

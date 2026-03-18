@@ -1,40 +1,42 @@
+use runa_asset::AudioAsset;
 use std::sync::Arc;
 
+/// Audio source component — attaches audio to a game object
+#[derive(Clone)]
 pub struct AudioSource {
-    pub sound_data: Arc<Vec<u8>>,
-    /// min = 0.0, max = 1.0
+    /// Cached audio asset (decoded PCM samples)
+    pub audio_asset: Option<Arc<AudioAsset>>,
+    /// Playback volume (0.0 to 1.0)
     pub volume: f32,
-    pub is_3d: bool,
+    /// Loop playback
     pub looped: bool,
+    /// Is currently playing
+    pub playing: bool,
 }
 
 impl AudioSource {
-    pub fn new2d(sound_data: Vec<u8>) -> Self {
+    /// Create empty audio source (2D sound)
+    pub fn new2d() -> Self {
         Self {
-            sound_data: Arc::new(sound_data),
+            audio_asset: None,
             volume: 1.0,
             looped: false,
-            is_3d: false,
-        }
-    }
-    pub fn new3d(sound_data: Vec<u8>) -> Self {
-        Self {
-            sound_data: Arc::new(sound_data),
-            volume: 1.0,
-            looped: false,
-            is_3d: true,
+            playing: false,
         }
     }
 
-    /// Sets the volume (0.0 to 1.0)
-    pub fn with_volume(mut self, volume: f32) -> Self {
-        self.volume = volume.clamp(0.0, 1.0);
-        self
+    /// Create audio source with pre-loaded asset
+    pub fn with_asset(audio_asset: Arc<AudioAsset>) -> Self {
+        Self {
+            audio_asset: Some(audio_asset),
+            volume: 1.0,
+            looped: false,
+            playing: false,
+        }
     }
 
-    /// Sets whether the sound should loop
-    pub fn with_loop(mut self, looped: bool) -> Self {
-        self.looped = looped;
-        self
+    /// Set audio asset
+    pub fn set_asset(&mut self, audio_asset: Arc<AudioAsset>) {
+        self.audio_asset = Some(audio_asset);
     }
 }

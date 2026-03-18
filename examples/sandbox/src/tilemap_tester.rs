@@ -23,8 +23,8 @@ impl Script for TilemapTester {
             let mut layer = TilemapLayer::new("Test".into(), tilesize, tilesize);
             let mut layer2 = TilemapLayer::new("Test2".into(), tilesize, tilesize);
 
-            let grass_texture = runa_asset::load_image!("assets/TilemapTest.png");
-            let trans_tile_texture = runa_asset::load_image!("assets/TilemapTestTrans.png");
+            let grass_texture = runa_asset::load_image!("assets/art/TilemapTest.png");
+            let trans_tile_texture = runa_asset::load_image!("assets/art/TilemapTestTrans.png");
 
             for y in 0..tilesize {
                 for x in 0..tilesize {
@@ -50,5 +50,11 @@ impl Script for TilemapTester {
 
     fn start(&mut self, _object: &mut runa_core::ocs::Object) {}
 
-    fn update(&mut self, _object: &mut runa_core::ocs::Object, _dt: f32) {}
+    fn update(
+        &mut self,
+        _object: &mut runa_core::ocs::Object,
+        _dt: f32,
+        _world: &mut runa_core::World,
+    ) {
+    }
 }

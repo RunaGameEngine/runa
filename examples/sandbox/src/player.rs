@@ -45,7 +45,12 @@ impl Script for Player {
         }
     }
 
-    fn update(&mut self, _object: &mut runa_core::ocs::Object, _dt: f32) {
+    fn update(
+        &mut self,
+        _object: &mut runa_core::ocs::Object,
+        _dt: f32,
+        _world: &mut runa_core::World,
+    ) {
         if let Some(transform) = _object.get_component_mut::<Transform>() {
             self.direction = Vec3::ZERO;
             // реализована система ввода с кливиатуры пользователя.

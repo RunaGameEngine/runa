@@ -4,7 +4,8 @@ use glam::Vec3;
 use runa_render_api::RenderQueue;
 
 use crate::{
-    components::{SpriteRenderer, Tilemap, Transform},
+    audio::{AudioEngine, SoundId},
+    components::{AudioSource, SpriteRenderer, Tilemap, Transform},
     debug_renderer::DebugRenderer,
     ocs::{Object, Script},
 };
@@ -13,13 +14,20 @@ use crate::{
 pub struct World {
     pub objects: Vec<Object>,
     debug_renderer: DebugRenderer,
+    pub audio_engine: AudioEngine,
 }
 
 impl World {
+    /// Play a sound through the audio engine
+    pub fn play_sound(&mut self, audio_source: &AudioSource) -> Option<SoundId> {
+        self.audio_engine.play(audio_source)
+    }
+
     pub fn default() -> Self {
         Self {
             objects: Vec::new(),
             debug_renderer: DebugRenderer::new(),
+            audio_engine: AudioEngine::default(),
         }
     }
 
@@ -56,12 +64,21 @@ impl World {
             }
         }
 
-        for object in &mut self.objects {
-            if let Some(mut script) = object.script.take() {
-                script.update(object, dt);
-                object.script = Some(script);
+        // Update scripts - pass world reference for audio and other systems
+        // Use raw pointers to work around borrow checker (safe because script.update doesn't outlive the call)
+        let world_ptr = self as *mut World;
+        let object_count = self.objects.len();
+        for i in 0..object_count {
+            if let Some(mut script) = self.objects[i].script.take() {
+                unsafe {
+                    script.update(&mut self.objects[i], dt, &mut *world_ptr);
+                }
+                self.objects[i].script = Some(script);
             }
         }
+
+        // Cleanup finished sounds
+        self.audio_engine.cleanup();
     }
 
     pub fn render(&self, render_queue: &mut RenderQueue, interpolation_factor: f32) {

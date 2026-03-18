@@ -55,6 +55,8 @@ pub fn load_window_icon<P: AsRef<Path>>(path: P) -> Result<Icon, String> {
 /// ])?;
 /// window.set_window_icon(icons.first().cloned()); // winit использует первую подходящую
 /// ```
+
+#[allow(dead_code)]
 pub fn load_window_icons<P: AsRef<Path>>(paths: &[P]) -> Result<Vec<Icon>, String> {
     let mut icons = Vec::new();
 

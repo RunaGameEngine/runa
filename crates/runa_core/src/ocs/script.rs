@@ -1,4 +1,4 @@
-use crate::ocs::Object;
+use crate::ocs::{Object, World};
 
 /// Script component that adds custom behavior to an object.
 ///
@@ -27,7 +27,7 @@ use crate::ocs::Object;
 ///         println!("Player spawned at {:?}", object.get_component::<Transform>().unwrap().position);
 ///     }
 ///
-///     fn update(&mut self, object: &mut Object, dt: f32) {
+///     fn update(&mut self, object: &mut Object, dt: f32, world: &mut World) {
 ///         // Game logic runs every tick
 ///         if Input::is_key_pressed(KeyCode::W) {
 ///             let transform = object.get_component_mut::<Transform>().unwrap();
@@ -65,8 +65,10 @@ pub trait Script: 'static {
     /// - Movement and animation
     /// - AI behavior and decision making
     /// - Physics updates (use fixed timestep for determinism)
+    /// - Audio playback via `world.play_sound()`
     ///
     /// Parameters:
     /// - `dt`: Delta time in seconds since last frame (use for frame-rate independent movement)
-    fn update(&mut self, _object: &mut Object, _dt: f32) {}
+    /// - `world`: Mutable reference to the world for accessing systems and playing sounds
+    fn update(&mut self, _object: &mut Object, _dt: f32, _world: &mut World) {}
 }
