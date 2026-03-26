@@ -118,14 +118,14 @@ impl UIPipeline {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("UI Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: Default::default(),
         });
 
         let textured_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("UI Textured Pipeline Layout"),
-                bind_group_layouts: &[&textured_bind_group_layout],
+                bind_group_layouts: &[Some(&textured_bind_group_layout)],
                 immediate_size: Default::default(),
             });
 
