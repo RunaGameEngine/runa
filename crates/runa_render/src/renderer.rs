@@ -321,8 +321,9 @@ impl<'window> Renderer<'window> {
     /// Renders the current frame using the provided render queue and camera matrix.
     pub fn draw(&mut self, queue: &RenderQueue, camera_matrix: glam::Mat4, virtual_size: Vec2) {
         let surface_texture = match self.surface.get_current_texture() {
-            Ok(tex) => tex,
-            Err(_) => return,
+            wgpu::CurrentSurfaceTexture::Success(tex)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
+            _ => return, // Surface lost, timeout, etc.
         };
 
         let view = surface_texture
