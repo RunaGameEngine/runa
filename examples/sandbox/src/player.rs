@@ -1,5 +1,5 @@
 use runa_core::{
-    components::{SpriteRenderer, Transform},
+    components::{ActiveCamera, Camera, SpriteRenderer, Transform},
     glam::Vec3,
     input_system::*,
     ocs::Script,
@@ -24,6 +24,8 @@ impl Script for Player {
         // конструктор объекта
         _object
             .add_component(Transform::default())
+            .add_component(Camera::new_ortho(320.0, 180.0, (1280, 720)))
+            .add_component(ActiveCamera)
             .add_component(SpriteRenderer {
                 texture: Some(runa_asset::load_image!("assets/art/Charactert.png")), // загрузка спрайта
             });

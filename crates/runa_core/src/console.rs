@@ -7,7 +7,7 @@
 
 use std::collections::VecDeque;
 
-use crate::components::Camera2D;
+use crate::components::Camera;
 use runa_asset::Handle;
 use runa_asset::TextureAsset;
 use runa_render_api::RenderCommands;
@@ -82,7 +82,7 @@ impl Console {
     }
 
     /// Renders the console overlay if visible
-    pub fn render(&self, queue: &mut RenderQueue, camera: &Camera2D) {
+    pub fn render(&self, queue: &mut RenderQueue, camera: &Camera) {
         if !self.is_visible {
             return;
         }
@@ -225,7 +225,6 @@ impl Console {
                     self.history_index = Some(new_index);
                     if let Some(cmd) = self.history.get(new_index) {
                         self.input_buffer = cmd.clone();
-                        
                     }
                 }
                 return;

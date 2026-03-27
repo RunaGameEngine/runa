@@ -1,8 +1,8 @@
-use runa_core::components::{SpriteRenderer, Transform};
+use runa_core::components::{Mesh, MeshRenderer, Transform};
 use runa_core::glam::{Quat, Vec3};
 use runa_core::ocs::{Object, Script};
 
-/// Simple test sprite to verify rendering works
+/// Simple 3D cube to verify mesh rendering works
 pub struct RotatingCube {
     rotation_speed: f32,
 }
@@ -26,10 +26,9 @@ impl Script for RotatingCube {
             previous_rotation: Quat::IDENTITY,
         });
 
-        // Add a simple sprite (white texture will be visible)
-        object.add_component(SpriteRenderer {
-            texture: Some(runa_asset::load_image!("assets/art/Tester1.png")),
-        });
+        // Add 3D mesh (cube)
+        let mesh = Mesh::cube(2.0);
+        object.add_component(MeshRenderer::new(mesh));
     }
 
     fn update(&mut self, object: &mut Object, dt: f32) {

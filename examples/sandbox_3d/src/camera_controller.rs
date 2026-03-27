@@ -1,4 +1,4 @@
-use runa_core::components::{ActiveCamera, Camera3D};
+use runa_core::components::{ActiveCamera, Camera};
 use runa_core::glam::Vec3;
 use runa_core::input_system;
 use runa_core::input_system::get_mouse_delta;
@@ -49,15 +49,15 @@ impl CameraController {
 
 impl Script for CameraController {
     fn construct(&self, object: &mut Object) {
-        object.add_component(Camera3D {
-            position: self.position,
-            target: self.position + Vec3::Z,
-            up: Vec3::Y,
-            fov: 75.0_f32.to_radians(),
-            near: 0.1,
-            far: 1000.0,
-            viewport_size: (1280, 720),
-        });
+        object.add_component(Camera::new_perspective(
+            self.position,
+            self.position + Vec3::Z,
+            Vec3::Y,
+            75.0_f32.to_radians(),
+            0.1,
+            1000.0,
+            (1280, 720),
+        ));
 
         // Mark this object as the active camera
         object.add_component(ActiveCamera);
@@ -129,7 +129,7 @@ impl Script for CameraController {
             );
 
         // Update camera component
-        if let Some(camera) = object.get_component_mut::<Camera3D>() {
+        if let Some(camera) = object.get_component_mut::<Camera>() {
             camera.position = self.position;
             camera.target = target;
             camera.up = Vec3::Y;

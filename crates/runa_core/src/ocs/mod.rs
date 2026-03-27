@@ -1,4 +1,3 @@
-mod context;
 mod object;
 mod script;
 mod serializable_object;

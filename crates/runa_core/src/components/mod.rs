@@ -1,6 +1,7 @@
 pub mod active_camera;
 pub mod audio_listener;
 pub mod audio_source;
+mod camera;
 mod camera2d;
 mod camera3d;
 mod component;
@@ -14,6 +15,7 @@ mod transform;
 pub use active_camera::ActiveCamera;
 pub use audio_listener::AudioListener;
 pub use audio_source::AudioSource;
+pub use camera::Camera;
 pub use camera2d::Camera2D;
 pub use camera3d::Camera3D;
 pub use component::Component;

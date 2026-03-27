@@ -1,6 +1,10 @@
 use glam::{Mat4, Vec2, Vec3};
 
-/// Camera component
+/// Camera component (2D orthographic)
+///
+/// # Deprecated
+/// Use [`Camera`](crate::components::Camera) instead with `new_ortho()` for 2D cameras.
+#[deprecated(note = "Use `Camera::new_ortho()` instead")]
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Camera2D {
     /// Local position.

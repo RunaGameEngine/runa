@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use runa_core::components::Camera2D;
+use runa_core::components::Camera;
 use runa_core::input::InputState;
 use runa_core::ocs::World;
 use runa_core::systems::InteractionSystem;
@@ -45,7 +45,7 @@ pub struct App<'window> {
     pub renderer: Option<Renderer<'window>>,
 
     pub queue: RenderQueue,
-    pub camera: Camera2D,
+    pub camera: Camera,
     pub camera_matrix_override: Option<glam::Mat4>, // For Camera3D
     pub active_camera_set: bool,                    // True if ActiveCamera was manually set
     pub world: World,
@@ -95,7 +95,21 @@ impl<'window> App<'window> {
             let camera_matrix = self
                 .camera_matrix_override
                 .unwrap_or_else(|| self.camera.matrix());
-            renderer.draw(&self.queue, camera_matrix, self.camera.virtual_size);
+
+            // Get ortho_size from active camera if available, otherwise use default camera
+            let ortho_size = if self.active_camera_set {
+                // Try to get ortho_size from the active camera object
+                self.world
+                    .objects
+                    .iter()
+                    .find_map(|obj| obj.get_component::<Camera>())
+                    .map(|cam| cam.ortho_size)
+                    .unwrap_or(self.camera.ortho_size)
+            } else {
+                self.camera.ortho_size
+            };
+
+            renderer.draw(&self.queue, camera_matrix, ortho_size);
 
             // Update FPS
             self.frame_count += 1;
@@ -118,45 +132,49 @@ impl<'window> App<'window> {
     }
 
     /// Sync camera - finds ActiveCamera or first available camera
-    fn sync_camera3d(&mut self) {
-        use runa_core::components::{ActiveCamera, Camera3D};
+    fn sync_camera(&mut self) {
+        use runa_core::components::{ActiveCamera, Camera};
 
         // Reset state
         self.camera_matrix_override = None;
         self.active_camera_set = false;
 
         // First pass: Look for ActiveCamera marker
-        for object in &self.world.objects {
+        for object in &mut self.world.objects {
             if object.get_component::<ActiveCamera>().is_some() {
                 // This object is marked as active camera
-                if let Some(camera3d) = object.get_component::<Camera3D>() {
-                    // Create 3D matrix
-                    let aspect = camera3d.viewport_size.0 as f32 / camera3d.viewport_size.1 as f32;
-                    let proj = glam::Mat4::perspective_rh(
-                        camera3d.fov,
-                        aspect,
-                        camera3d.near,
-                        camera3d.far,
-                    );
-                    let view =
-                        glam::Mat4::look_at_rh(camera3d.position, camera3d.target, camera3d.up);
-                    self.camera_matrix_override = Some(proj * view);
+                if let Some(camera) = object.get_component::<Camera>() {
+                    self.camera_matrix_override = Some(camera.matrix());
                     self.active_camera_set = true;
+
+                    // Update camera viewport size to match window
+                    if let Some(renderer) = &self.renderer {
+                        let w = renderer.surface_config.width.max(1);
+                        let h = renderer.surface_config.height.max(1);
+                        if let Some(cam) = object.get_component_mut::<Camera>() {
+                            cam.viewport_size = (w, h);
+                        }
+                    }
                     return;
                 }
-                // ActiveCamera exists but no Camera3D
+                // ActiveCamera exists but no Camera
                 break;
             }
         }
 
-        // Second pass: Use first available Camera3D
-        for object in &self.world.objects {
-            if let Some(camera3d) = object.get_component::<Camera3D>() {
-                let aspect = camera3d.viewport_size.0 as f32 / camera3d.viewport_size.1 as f32;
-                let proj =
-                    glam::Mat4::perspective_rh(camera3d.fov, aspect, camera3d.near, camera3d.far);
-                let view = glam::Mat4::look_at_rh(camera3d.position, camera3d.target, camera3d.up);
-                self.camera_matrix_override = Some(proj * view);
+        // Second pass: Use first available Camera
+        for object in &mut self.world.objects {
+            if let Some(camera) = object.get_component::<Camera>() {
+                self.camera_matrix_override = Some(camera.matrix());
+
+                // Update camera viewport size to match window
+                if let Some(renderer) = &self.renderer {
+                    let w = renderer.surface_config.width.max(1);
+                    let h = renderer.surface_config.height.max(1);
+                    if let Some(cam) = object.get_component_mut::<Camera>() {
+                        cam.viewport_size = (w, h);
+                    }
+                }
                 return;
             }
         }
@@ -244,25 +262,32 @@ impl<'window> ApplicationHandler for App<'window> {
         while self.accumulator >= FIXED_TIMESTEP {
             {
                 let mut input_state = InputState::current_mut();
-                input_state.camera = Some(self.camera.clone());
+                // Use active camera from world if available, otherwise use default camera
+                let camera_to_use = if self.active_camera_set {
+                    self.world
+                        .objects
+                        .iter()
+                        .find_map(|obj| obj.get_component::<Camera>())
+                        .cloned()
+                        .unwrap_or(self.camera)
+                } else {
+                    self.camera
+                };
+                input_state.camera = Some(camera_to_use);
             } // Release the lock immediately after setting the camera
+
+            // Update interaction system BEFORE world update so scripts can use hover state
+            if !self.console.is_visible() {
+                self.interaction_system.update(&mut self.world);
+            }
 
             self.world.update(FIXED_TIMESTEP);
             InputState::update_frame();
 
-            // Sync Camera2D with Camera3D if present
-            self.sync_camera3d();
+            // Sync camera
+            self.sync_camera();
 
             self.accumulator -= FIXED_TIMESTEP;
-        }
-
-        // Only process world input if console is not visible
-        if !self.console.is_visible() {
-            // Process interaction system
-            self.interaction_system.update(&mut self.world);
-        } else {
-            // When console is visible, still process input for the world
-            // but scripts can check if console is visible and decide whether to respond
         }
 
         // Запрашиваем перерисовку
@@ -286,8 +311,7 @@ impl<'window> ApplicationHandler for App<'window> {
                     (self.renderer.as_mut(), self.window.as_ref())
                 {
                     wgpu_ctx.resize((new_size.width, new_size.height));
-                    self.camera.viewport_size = (new_size.width, new_size.height);
-                    self.camera.update_aspect_correction();
+                    self.camera.resize(new_size.width, new_size.height);
                     window.request_redraw();
                 }
             }

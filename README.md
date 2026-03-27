@@ -37,7 +37,7 @@
 - [x] Tilemap
 - [x] **Audio** (basic)
   - [x] Sound playback via `rodio`
-- [ ] **3D Support** (experimental) <progress value="1" max="4"></progress>
+- [ ] **3D Support** (experimental)
   - [ ] Mesh pipeline with depth buffer
   - [ ] Instancing for massive object rendering
   - [ ] Basic lighting (diffuse + ambient)

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use runa_core::{components::Camera2D, systems::InteractionSystem, Console, World};
+use runa_core::{components::Camera, systems::InteractionSystem, Console, World};
 use winit::{
     error::EventLoopError,
     event_loop::{ControlFlow, EventLoop},
@@ -27,7 +27,7 @@ impl RunaApp {
         let interaction_system = InteractionSystem::new();
 
         // Default camera (will be overridden by world cameras if present)
-        let camera = Camera2D::default();
+        let camera = Camera::default();
 
         world.construct();
         world.start();
@@ -69,7 +69,7 @@ impl RunaApp {
         let interaction_system = InteractionSystem::new();
 
         // Default camera (will be overridden by world cameras if present)
-        let camera = Camera2D::default();
+        let camera = Camera::default();
 
         world.construct();
         world.start();

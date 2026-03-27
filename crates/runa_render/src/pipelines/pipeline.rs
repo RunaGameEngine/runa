@@ -17,7 +17,7 @@ pub struct SpritePipeline {
 }
 
 impl SpritePipeline {
-    pub fn new(device: &Device, format: TextureFormat) -> Self {
+    pub fn new(device: &Device, format: TextureFormat, depth_format: TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Sprite Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
@@ -108,7 +108,13 @@ impl SpritePipeline {
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: depth_format,
+                depth_write_enabled: Some(false), // Sprites don't write to depth
+                depth_compare: Some(wgpu::CompareFunction::Always), // Always pass depth test
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview_mask: None,
             cache: None,

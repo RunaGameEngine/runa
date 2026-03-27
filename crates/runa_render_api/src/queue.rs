@@ -60,7 +60,7 @@ impl RenderQueue {
         });
     }
 
-    pub fn draw_mesh3D(
+    pub fn draw_mesh_3d(
         &mut self,
         vertices: Vec<Vertex3D>,
         indices: Vec<u32>,

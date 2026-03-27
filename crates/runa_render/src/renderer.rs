@@ -1,8 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    font::FontManager, pipelines::MeshPipeline, pipelines::SpritePipeline, pipelines::UIPipeline,
-    pipelines::UITexturedVertex, pipelines::UIUniforms, pipelines::UIVertex,
+    font::FontManager, pipelines::MeshPipeline, pipelines::MeshUniforms, pipelines::SpritePipeline,
+    pipelines::UIPipeline, pipelines::UITexturedVertex, pipelines::UIUniforms, pipelines::UIVertex,
     resources::texture::GpuTexture,
 };
 use glam::Vec2;
@@ -47,7 +47,7 @@ pub struct Globals {
 /// Main renderer struct managing GPU resources and rendering.
 pub struct Renderer<'window> {
     pub surface: wgpu::Surface<'window>,
-    surface_config: wgpu::SurfaceConfiguration,
+    pub surface_config: wgpu::SurfaceConfiguration,
     device: wgpu::Device,
     queue: wgpu::Queue,
 
@@ -140,7 +140,11 @@ impl<'window> Renderer<'window> {
 
         surface.configure(&device, &surface_config);
 
-        let sprite_pipeline = SpritePipeline::new(&device, surface_config.format);
+        let sprite_pipeline = SpritePipeline::new(
+            &device,
+            surface_config.format,
+            wgpu::TextureFormat::Depth32Float,
+        );
 
         let identity_mat = glam::Mat4::IDENTITY.to_cols_array_2d();
         let globals = Globals {
@@ -318,24 +322,6 @@ impl<'window> Renderer<'window> {
             .write_buffer(&self.ui_uniform_buffer, 0, bytemuck::bytes_of(&ui_uniforms));
     }
 
-    /// Renders a 3D mesh with the given vertices and indices
-    fn render_mesh3D(
-        &mut self,
-        _vertices: &[runa_render_api::Vertex3D],
-        _indices: &[u32],
-        _model_matrix: glam::Mat4,
-        _color: [f32; 4],
-        _view: &wgpu::TextureView,
-    ) {
-        // TODO: Implement proper 3D mesh rendering with bind groups
-        // For now, just log that we received the call
-        eprintln!(
-            "3D Mesh render call received (vertices: {}, indices: {})",
-            _vertices.len(),
-            _indices.len()
-        );
-    }
-
     /// Renders the current frame using the provided render queue and camera matrix.
     pub fn draw(&mut self, queue: &RenderQueue, camera_matrix: glam::Mat4, virtual_size: Vec2) {
         let surface_texture = match self.surface.get_current_texture() {
@@ -362,19 +348,6 @@ impl<'window> Renderer<'window> {
                 _padding: [0.0; 7],
             }),
         );
-
-        // First pass: Render 3D meshes (before 2D sprites)
-        for cmd in &queue.commands {
-            if let RenderCommands::Mesh3D {
-                vertices,
-                indices,
-                model_matrix,
-                color,
-            } = cmd
-            {
-                self.render_mesh3D(vertices, indices, *model_matrix, *color, &view);
-            }
-        }
 
         // Collect sprite instances and UI vertices
         let mut all_instances = Vec::new();
@@ -589,6 +562,7 @@ impl<'window> Renderer<'window> {
                 label: Some("Render Encoder"),
             });
 
+        // Always use depth attachment for sprite pipeline compatibility
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -600,8 +574,81 @@ impl<'window> Renderer<'window> {
                 },
                 depth_slice: None,
             })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             ..Default::default()
         });
+
+        // First: Render 3D meshes
+        // camera_matrix = projection * view, so we need: camera_matrix * model_matrix
+        for cmd in &queue.commands {
+            if let RenderCommands::Mesh3D {
+                vertices,
+                indices,
+                model_matrix,
+                color,
+            } = cmd
+            {
+                // Update mesh uniforms with MVP matrix
+                let mvp_matrix = camera_matrix * model_matrix;
+                let mesh_uniforms = MeshUniforms {
+                    view_proj: mvp_matrix.to_cols_array_2d(),
+                    view: glam::Mat4::IDENTITY.to_cols_array_2d(),
+                    color: *color,
+                    _padding: [0.0; 28],
+                };
+                self.queue.write_buffer(
+                    &self.mesh_pipeline.uniform_buffer,
+                    0,
+                    bytemuck::bytes_of(&mesh_uniforms),
+                );
+
+                // Create bind group for mesh
+                let mesh_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &self.mesh_pipeline.bind_group_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.mesh_pipeline.uniform_buffer.as_entire_binding(),
+                    }],
+                    label: Some("Mesh Bind Group"),
+                });
+
+                // Create vertex and index buffers
+                let vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Mesh Vertex Buffer"),
+                    size: (vertices.len() * std::mem::size_of::<runa_render_api::Vertex3D>())
+                        as u64,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                self.queue
+                    .write_buffer(&vertex_buffer, 0, bytemuck::cast_slice(vertices));
+
+                let index_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Mesh Index Buffer"),
+                    size: (indices.len() * 4) as u64,
+                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                self.queue
+                    .write_buffer(&index_buffer, 0, bytemuck::cast_slice(indices));
+
+                // Set pipeline and buffers
+                rpass.set_pipeline(&self.mesh_pipeline.pipeline);
+                rpass.set_bind_group(0, &mesh_bind_group, &[]);
+                rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+
+                // Draw indexed
+                rpass.draw_indexed(0..indices.len() as u32, 0, 0..1);
+            }
+        }
 
         // Render sprite batches
         for (texture_key, instance_offset, instance_count) in batches {

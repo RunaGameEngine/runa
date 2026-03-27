@@ -1,5 +1,10 @@
 use glam::{Mat4, Vec3};
 
+/// Camera component (3D perspective)
+///
+/// # Deprecated
+/// Use [`Camera`](crate::components::Camera) instead with `new_perspective()` for 3D cameras.
+#[deprecated(note = "Use `Camera::new_perspective()` instead")]
 pub struct Camera3D {
     pub position: Vec3,
     pub target: Vec3,

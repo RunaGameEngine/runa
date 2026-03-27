@@ -3,7 +3,7 @@
 use runa_app::{RunaApp, RunaWindowConfig};
 use runa_core::World;
 
-use runa_core::components::AudioListener;
+use runa_core::components::{ActiveCamera, AudioListener, Camera};
 use runa_core::Vec3;
 use runa_core::{
     components::{SpriteRenderer, Transform},
@@ -76,6 +76,8 @@ impl Script for Player {
         _object
             .add_component(Transform::default())
             .add_component(AudioListener::new()) // Player hears 3D sounds
+            .add_component(Camera::new_ortho(320.0, 180.0, (1280, 720)))
+            .add_component(ActiveCamera)
             .add_component(SpriteRenderer {
                 texture: Some(runa_asset::load_image!("assets/art/Charactert.png")),
             });

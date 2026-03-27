@@ -5,7 +5,7 @@ use runa_render_api::RenderQueue;
 
 use crate::{
     audio::{AudioEngine, SoundId},
-    components::{AudioListener, AudioSource, SpriteRenderer, Tilemap, Transform},
+    components::{AudioListener, AudioSource, MeshRenderer, SpriteRenderer, Tilemap, Transform},
     debug_renderer::DebugRenderer,
     ocs::{Object, Script},
 };
@@ -168,6 +168,38 @@ impl World {
 
     pub fn render(&self, render_queue: &mut RenderQueue, interpolation_factor: f32) {
         for object in &self.objects {
+            // 3D Mesh rendering
+            if let (Some(transform), Some(mesh_renderer)) = (
+                object.get_component::<Transform>(),
+                object.get_component::<MeshRenderer>(),
+            ) {
+                // Convert Mesh vertices to render_api Vertex3D
+                let vertices: Vec<runa_render_api::command::Vertex3D> = mesh_renderer
+                    .mesh
+                    .vertices
+                    .iter()
+                    .map(|v| runa_render_api::command::Vertex3D {
+                        position: v.position,
+                        normal: v.normal,
+                        uv: v.uv,
+                    })
+                    .collect();
+
+                // Create model matrix
+                let model_matrix = glam::Mat4::from_scale_rotation_translation(
+                    transform.scale,
+                    transform.rotation,
+                    transform.position,
+                );
+
+                render_queue.draw_mesh_3d(
+                    vertices,
+                    mesh_renderer.mesh.indices.clone(),
+                    model_matrix,
+                    mesh_renderer.color,
+                );
+            }
+
             // 2D Sprite rendering
             if let (Some(transform), Some(sprite)) = (
                 object.get_component::<Transform>(),

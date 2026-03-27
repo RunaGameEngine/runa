@@ -6,7 +6,7 @@ use std::{
 use winit::window::{CursorGrabMode, Window};
 use winit::{event::MouseButton, keyboard::KeyCode};
 
-use crate::components::Camera2D;
+use crate::components::Camera;
 
 static INPUT_STATE: OnceLock<Mutex<InputState>> = OnceLock::new();
 static WINDOW_HANDLE: OnceLock<Mutex<Weak<Window>>> = OnceLock::new();
@@ -24,7 +24,7 @@ pub struct InputState {
     // pub mouse_buttons_just_released: HashSet<MouseButton>,
     pub mouse_wheel_delta: f32,
 
-    pub camera: Option<Camera2D>,
+    pub camera: Option<Camera>,
 }
 
 impl InputState {
