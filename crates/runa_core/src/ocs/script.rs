@@ -17,17 +17,17 @@ use crate::ocs::Object;
 /// }
 ///
 /// impl Script for Player {
-///     fn construct(&self, object: &mut Object) {
+///     fn construct(&self, _object: &mut Object) {
 ///         // Initialize components before object enters world
 ///         object.add_component(Transform::new());
 ///     }
 ///
-///     fn start(&mut self, object: &mut Object) {
+///     fn start(&mut self, _object: &mut Object) {
 ///         // Access components after object is in world
 ///         println!("Player spawned at {:?}", object.get_component::<Transform>().unwrap().position);
 ///     }
 ///
-///     fn update(&mut self, object: &mut Object, dt: f32) {
+///     fn update(&mut self, _object: &mut Object, dt: f32) {
 ///         // Game logic runs every tick
 ///         if Input::is_key_pressed(KeyCode::W) {
 ///             let transform = object.get_component_mut::<Transform>().unwrap();

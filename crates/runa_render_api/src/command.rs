@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use glam::USizeVec2;
 use glam::{Mat4, Quat, Vec2, Vec3};
 
@@ -9,6 +11,13 @@ pub struct Vertex3D {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub uv: [f32; 2],
+}
+
+pub struct UiRect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
 
 pub enum RenderCommands {
@@ -30,7 +39,7 @@ pub enum RenderCommands {
         color: [f32; 4],
     },
     Tile {
-        texture: std::sync::Arc<TextureAsset>,
+        texture: Arc<TextureAsset>,
         position: Vec3,
         size: USizeVec2,
         uv_rect: [f32; 4],
@@ -43,5 +52,25 @@ pub enum RenderCommands {
         indices: Vec<u32>,
         model_matrix: Mat4,
         color: [f32; 4],
+    },
+    // IU
+    UiRect {
+        rect: UiRect,
+        color: [f32; 4],
+        z_index: i16,
+    },
+    UiImage {
+        texture: Arc<TextureAsset>,
+        rect: UiRect,
+        tint: [f32; 4],
+        uv_rect: [f32; 4],
+        z_index: i16,
+    },
+    UiText {
+        text: String,
+        rect: UiRect,
+        color: [f32; 4],
+        font_size: u16,
+        z_index: i16,
     },
 }

@@ -80,6 +80,7 @@ impl Script for Player {
             .add_component(ActiveCamera)
             .add_component(SpriteRenderer {
                 texture: Some(runa_asset::load_image!("assets/art/Charactert.png")),
+                texture_path: Some("assets/art/Charactert.png".to_string()),
             });
     }
 

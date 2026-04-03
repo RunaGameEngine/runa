@@ -7,6 +7,8 @@ use std::sync::Arc;
 pub struct AudioSource {
     /// Cached audio asset (decoded PCM samples)
     pub audio_asset: Option<Arc<AudioAsset>>,
+    /// Relative asset path used to reload this source in editor/runtime
+    pub source_path: Option<String>,
     /// Playback volume (0.0 to 1.0)
     pub volume: f32,
     /// Loop playback
@@ -34,6 +36,7 @@ impl AudioSource {
     pub fn new2d() -> Self {
         Self {
             audio_asset: None,
+            source_path: None,
             volume: 1.0,
             looped: false,
             playing: false,
@@ -51,6 +54,7 @@ impl AudioSource {
     pub fn new3d() -> Self {
         Self {
             audio_asset: None,
+            source_path: None,
             volume: 1.0,
             looped: false,
             playing: false,
@@ -68,6 +72,7 @@ impl AudioSource {
     pub fn with_asset(audio_asset: Arc<AudioAsset>) -> Self {
         Self {
             audio_asset: Some(audio_asset),
+            source_path: None,
             volume: 1.0,
             looped: false,
             playing: false,
@@ -85,6 +90,7 @@ impl AudioSource {
     pub fn with_asset_3d(audio_asset: Arc<AudioAsset>) -> Self {
         Self {
             audio_asset: Some(audio_asset),
+            source_path: None,
             volume: 1.0,
             looped: false,
             playing: false,
@@ -101,6 +107,15 @@ impl AudioSource {
     /// Set audio asset
     pub fn set_asset(&mut self, audio_asset: Arc<AudioAsset>) {
         self.audio_asset = Some(audio_asset);
+    }
+
+    pub fn set_asset_with_path(
+        &mut self,
+        audio_asset: Option<Arc<AudioAsset>>,
+        source_path: Option<String>,
+    ) {
+        self.audio_asset = audio_asset;
+        self.source_path = source_path;
     }
 
     /// Request playback. The sound will be played on the next world update.

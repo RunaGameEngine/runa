@@ -1,4 +1,6 @@
-use crate::command::Vertex3D;
+use std::sync::Arc;
+
+use crate::command::{UiRect, Vertex3D};
 use crate::RenderCommands;
 use glam::{Mat4, Quat, USizeVec2, Vec2, Vec3};
 use runa_asset::TextureAsset;
@@ -41,7 +43,7 @@ impl RenderQueue {
 
     pub fn draw_tile(
         &mut self,
-        texture: std::sync::Arc<TextureAsset>,
+        texture: Arc<TextureAsset>,
         position: Vec3,
         size: USizeVec2,
         uv_rect: [f32; 4],
@@ -72,6 +74,49 @@ impl RenderQueue {
             indices,
             model_matrix,
             color,
+        });
+    }
+
+    // UI
+    pub fn draw_ui_rect(&mut self, rect: UiRect, color: [f32; 4], z_index: i16) {
+        self.commands.push(RenderCommands::UiRect {
+            rect,
+            color,
+            z_index,
+        });
+    }
+
+    pub fn draw_ui_image(
+        &mut self,
+        texture: Arc<TextureAsset>,
+        rect: UiRect,
+        tint: [f32; 4],
+        uv_rect: [f32; 4],
+        z_index: i16,
+    ) {
+        self.commands.push(RenderCommands::UiImage {
+            texture,
+            rect,
+            tint,
+            uv_rect,
+            z_index,
+        });
+    }
+
+    pub fn draw_ui_text(
+        &mut self,
+        text: String,
+        rect: UiRect,
+        color: [f32; 4],
+        font_size: u16,
+        z_index: i16,
+    ) {
+        self.commands.push(RenderCommands::UiText {
+            text,
+            rect,
+            color,
+            font_size,
+            z_index,
         });
     }
 

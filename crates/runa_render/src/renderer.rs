@@ -138,7 +138,21 @@ impl<'window> Renderer<'window> {
             .formats
             .iter()
             .copied()
-            .find(|format| *format == wgpu::TextureFormat::Rgba8Unorm)
+            .find(|format| *format == wgpu::TextureFormat::Rgba8UnormSrgb)
+            .or_else(|| {
+                capabilities
+                    .formats
+                    .iter()
+                    .copied()
+                    .find(|format| *format == wgpu::TextureFormat::Bgra8UnormSrgb)
+            })
+            .or_else(|| {
+                capabilities
+                    .formats
+                    .iter()
+                    .copied()
+                    .find(|format| *format == wgpu::TextureFormat::Rgba8Unorm)
+            })
             .or_else(|| {
                 capabilities
                     .formats
@@ -618,6 +632,25 @@ impl<'window> Renderer<'window> {
                         x += char_w;
                     }
                 }
+                RenderCommands::UiRect {
+                    rect,
+                    color,
+                    z_index,
+                } => todo!(),
+                RenderCommands::UiImage {
+                    texture,
+                    rect,
+                    tint,
+                    uv_rect,
+                    z_index,
+                } => todo!(),
+                RenderCommands::UiText {
+                    text,
+                    rect,
+                    color,
+                    font_size,
+                    z_index,
+                } => todo!(),
             }
         }
 
@@ -677,17 +710,19 @@ impl<'window> Renderer<'window> {
                     color: *color,
                     _padding: [0.0; 28],
                 };
-                self.queue.write_buffer(
-                    &self.mesh_pipeline.uniform_buffer,
-                    0,
-                    bytemuck::bytes_of(&mesh_uniforms),
-                );
+                let mesh_uniform_buffer =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Mesh Uniform Buffer"),
+                            contents: bytemuck::bytes_of(&mesh_uniforms),
+                            usage: wgpu::BufferUsages::UNIFORM,
+                        });
 
                 let mesh_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     layout: &self.mesh_pipeline.bind_group_layout,
                     entries: &[wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: self.mesh_pipeline.uniform_buffer.as_entire_binding(),
+                        resource: mesh_uniform_buffer.as_entire_binding(),
                     }],
                     label: Some("Mesh Bind Group"),
                 });

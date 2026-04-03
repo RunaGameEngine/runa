@@ -1,4 +1,4 @@
-use wgpu::{include_wgsl, util::DeviceExt, BindGroupLayout, Device, RenderPipeline, TextureFormat};
+use wgpu::{include_wgsl, BindGroupLayout, Device, RenderPipeline, TextureFormat};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -12,7 +12,6 @@ pub struct MeshUniforms {
 pub struct MeshPipeline {
     pub pipeline: RenderPipeline,
     pub bind_group_layout: BindGroupLayout,
-    pub uniform_buffer: wgpu::Buffer,
 }
 
 impl MeshPipeline {
@@ -22,17 +21,6 @@ impl MeshPipeline {
         depth_format: TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(include_wgsl!("../shaders/mesh.wgsl"));
-
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Mesh Uniform Buffer"),
-            contents: bytemuck::bytes_of(&MeshUniforms {
-                view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
-                view: glam::Mat4::IDENTITY.to_cols_array_2d(),
-                color: [1.0, 1.0, 1.0, 1.0],
-                _padding: [0.0; 28],
-            }),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -88,7 +76,7 @@ impl MeshPipeline {
                 entry_point: "fs_main".into(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: Default::default(),
@@ -117,27 +105,7 @@ impl MeshPipeline {
         Self {
             pipeline,
             bind_group_layout,
-            uniform_buffer,
         }
-    }
-
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        view_proj: &[[f32; 4]; 4],
-        view: &[[f32; 4]; 4],
-        color: [f32; 4],
-    ) {
-        queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::bytes_of(&MeshUniforms {
-                view_proj: *view_proj,
-                view: *view,
-                color,
-                _padding: [0.0; 28],
-            }),
-        );
     }
 }
 

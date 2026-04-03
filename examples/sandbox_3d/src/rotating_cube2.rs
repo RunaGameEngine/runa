@@ -3,11 +3,11 @@ use runa_core::glam::{Quat, Vec3};
 use runa_core::ocs::{Object, Script};
 
 /// Simple 3D cube to verify mesh rendering works
-pub struct RotatingCube {
+pub struct RotatingCube2 {
     rotation_speed: f32,
 }
 
-impl RotatingCube {
+impl RotatingCube2 {
     pub fn new() -> Self {
         Self {
             rotation_speed: 0.5, // radians per second
@@ -15,13 +15,13 @@ impl RotatingCube {
     }
 }
 
-impl Script for RotatingCube {
+impl Script for RotatingCube2 {
     fn construct(&self, object: &mut Object) {
         // Add transform - position 3 units in front of camera
         object.add_component(Transform {
             position: Vec3::new(0., 0., 0.), // 2 units in front of camera at (0,0,5)
             rotation: Quat::IDENTITY,
-            scale: Vec3::new(1., 1., 1.),
+            scale: Vec3::new(-2.0, 2.0, 2.0),
             previous_position: Vec3::ZERO,
             previous_rotation: Quat::IDENTITY,
         });

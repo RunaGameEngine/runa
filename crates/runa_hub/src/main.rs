@@ -1,5 +1,8 @@
+#![windows_subsystem = "windows"]
+
 use eframe::{egui, App};
 use egui::{TextureHandle, ViewportBuilder};
+use runa_project::create_empty_project;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -7,7 +10,6 @@ use std::sync::Arc;
 
 mod icon_loader;
 
-const TEMPLATES_DIR: &str = "../templates/default";
 const HUB_CONFIG_PATH: &str = ".runa_hub/recent_projects.ron";
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -121,32 +123,37 @@ impl RunaHub {
 
     fn create_project(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let project_path = PathBuf::from(&self.new_project_path);
-        let project_name = &self.new_project_name;
-
-        // Create the project directory
-        fs::create_dir_all(&project_path)?;
-
-        // Copy the template
-        copy_template(TEMPLATES_DIR, &project_path, project_name)?;
+        let project = create_empty_project(&project_path, &self.new_project_name)?;
 
         // Add to recents
         self.recent_projects.push(ProjectEntry {
-            name: project_name.clone(),
-            path: project_path.clone(),
+            name: project.manifest.name.clone(),
+            path: project.manifest_path.clone(),
         });
         save_recent_projects(&self.recent_projects)?;
 
         // Open in the editor
-        self.open_project_in_editor(&project_path);
+        self.open_project_in_editor(&project.manifest_path);
 
         Ok(())
     }
 
     fn open_project_in_editor(&self, project_path: &PathBuf) {
-        // Run: cargo run --bin runa_editor
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let workspace_root = manifest_dir
+            .parent()
+            .and_then(|path| path.parent())
+            .expect("runa_hub must live in crates/runa_hub");
         let status = Command::new("cargo")
-            .args(&["run", "--bin", "runa_editor"])
-            .current_dir(project_path)
+            .args(&[
+                "run",
+                "-p",
+                "runa_editor",
+                "--",
+                "--project",
+                project_path.to_string_lossy().as_ref(),
+            ])
+            .current_dir(workspace_root)
             .spawn();
 
         if let Err(e) = status {
@@ -154,18 +161,23 @@ impl RunaHub {
         }
     }
 
-    fn run_project(&self, project_path: &PathBuf) {
-        let status = Command::new("cargo")
-            .args(&[
-                "run",
-                "--bin",
-                project_path.file_name().unwrap().to_str().unwrap(),
-            ])
-            .current_dir(project_path)
-            .spawn();
+    fn delete_project(&mut self, project_path: &PathBuf) {
+        let Some(project_root) = project_path.parent() else {
+            eprintln!("Failed to delete project: invalid manifest path");
+            return;
+        };
 
-        if let Err(e) = status {
-            eprintln!("Failed to run project: {}", e);
+        match fs::remove_dir_all(project_root) {
+            Ok(()) => {
+                self.recent_projects
+                    .retain(|project| project.path != *project_path);
+                if let Err(error) = save_recent_projects(&self.recent_projects) {
+                    eprintln!("Failed to update recent projects: {}", error);
+                }
+            }
+            Err(error) => {
+                eprintln!("Failed to delete project: {}", error);
+            }
         }
     }
 
@@ -181,7 +193,7 @@ impl RunaHub {
         });
         ui.horizontal(|ui| {
             ui.label("Path:");
-            if ui.button("📁").clicked() {
+            if ui.button("Folder").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.new_project_path = path
                         .join(&self.new_project_name)
@@ -200,16 +212,17 @@ impl RunaHub {
 
         ui.separator();
         ui.label("Recent Projects");
-        for project in &self.recent_projects {
+        let recent_projects = self.recent_projects.clone();
+        for project in recent_projects {
             ui.horizontal(|ui| {
-                if ui.button("📁").clicked() {
+                if ui.button("Folder").clicked() {
                     open_in_file_manager(&project.path);
                 }
                 if ui.button(&project.name).clicked() {
                     self.open_project_in_editor(&project.path);
                 }
-                if ui.button("▶").clicked() {
-                    self.run_project(&project.path);
+                if ui.button("Delete").clicked() {
+                    self.delete_project(&project.path);
                 }
             });
         }
@@ -257,29 +270,6 @@ impl RunaHub {
     }
 }
 
-fn copy_template(
-    template_dir: &str,
-    dest_dir: &PathBuf,
-    project_name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    for entry in fs::read_dir(template_dir)? {
-        let entry = entry?;
-        let src_path = entry.path();
-        let rel_path = src_path.strip_prefix(template_dir)?;
-        let dest_path = dest_dir.join(rel_path);
-
-        if src_path.is_dir() {
-            fs::create_dir_all(&dest_path)?;
-        } else {
-            fs::create_dir_all(dest_path.parent().unwrap())?;
-            let content = fs::read_to_string(&src_path)?;
-            let new_content = content.replace("{{project_name}}", project_name);
-            fs::write(&dest_path, new_content)?;
-        }
-    }
-    Ok(())
-}
-
 fn load_recent_projects() -> Vec<ProjectEntry> {
     let config_path = dirs::home_dir().unwrap().join(HUB_CONFIG_PATH);
     if config_path.exists() {
@@ -301,19 +291,20 @@ fn save_recent_projects(projects: &[ProjectEntry]) -> Result<(), Box<dyn std::er
 }
 
 fn open_in_file_manager(path: &PathBuf) {
+    let directory = path.parent().unwrap_or(path.as_path());
     #[cfg(target_os = "windows")]
     std::process::Command::new("explorer")
-        .args(&[path])
+        .args(&[directory])
         .spawn()
         .ok();
     #[cfg(target_os = "macos")]
     std::process::Command::new("open")
-        .args(&[path])
+        .args(&[directory])
         .spawn()
         .ok();
     #[cfg(target_os = "linux")]
     std::process::Command::new("xdg-open")
-        .args(&[path])
+        .args(&[directory])
         .spawn()
         .ok();
 }

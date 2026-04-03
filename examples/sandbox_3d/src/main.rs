@@ -7,6 +7,7 @@ use runa_core::World;
 
 mod camera_controller;
 mod rotating_cube;
+mod rotating_cube2;
 
 fn main() {
     // Create a new empty world to hold game objects and systems
@@ -17,6 +18,7 @@ fn main() {
 
     // Spawn rotating 3D cube (sprite for now)
     world.spawn(Box::new(rotating_cube::RotatingCube::new()));
+    world.spawn(Box::new(rotating_cube2::RotatingCube2::new()));
 
     // Configure the application window
     let config = RunaWindowConfig {

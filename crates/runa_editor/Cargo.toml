@@ -16,8 +16,14 @@ serde = { version = "1.0", features = ["derive"] }
 ron = "0.8"
 dirs = "5.0"
 image = { version = "0.25", features = ["png"] }
+rfd = "0.14"
 
 runa_core = { path = "../runa_core" }
 runa_render = { path = "../runa_render" }
 runa_render_api = { path = "../runa_render_api" }
 runa_asset = { path = "../runa_asset" }
+runa_project = { path = "../runa_project" }
+
+[build-dependencies]
+image = { version = "0.25", features = ["png", "ico"] }
+winres = "0.1"

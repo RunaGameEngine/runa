@@ -26,6 +26,7 @@ impl Script for Player {
             .add_component(Transform::default())
             .add_component(SpriteRenderer {
                 texture: Some(runa_asset::loader::load_image("assets/Charactert.png")), // Load the sprite
+                texture_path: Some("assets/Charactert.png".to_string()),
             });
     }
 

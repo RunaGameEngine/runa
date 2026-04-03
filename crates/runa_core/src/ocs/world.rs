@@ -5,7 +5,10 @@ use runa_render_api::RenderQueue;
 
 use crate::{
     audio::{AudioEngine, SoundId},
-    components::{AudioListener, AudioSource, MeshRenderer, SpriteRenderer, Tilemap, Transform},
+    components::{
+        ActiveCamera, AudioListener, AudioSource, Camera, Canvas, MeshRenderer, SpriteRenderer,
+        Tilemap, Transform,
+    },
     debug_renderer::DebugRenderer,
     ocs::{Object, Script},
 };
@@ -164,6 +167,29 @@ impl World {
 
         // Cleanup finished sounds
         self.audio_engine.cleanup();
+
+        // UI
+        for object in &mut self.objects {
+            let viewport_size = if let (Some(camera), Some(_active)) = (
+                object.get_component::<Camera>(),
+                object.get_component::<ActiveCamera>(),
+            ) {
+                Some(glam::Vec2::new(
+                    camera.viewport_size.0 as f32,
+                    camera.viewport_size.1 as f32,
+                ))
+            } else {
+                None
+            };
+
+            if let (Some(canvas), Some(viewport_size)) =
+                (object.get_component_mut::<Canvas>(), viewport_size)
+            {
+                if canvas.dirty_layout {
+                    canvas.layout(viewport_size);
+                }
+            }
+        }
     }
 
     pub fn render(&self, render_queue: &mut RenderQueue, interpolation_factor: f32) {
@@ -205,6 +231,10 @@ impl World {
                 object.get_component::<Transform>(),
                 object.get_component::<SpriteRenderer>(),
             ) {
+                let Some(texture) = sprite.texture.clone() else {
+                    continue;
+                };
+
                 // Interpolate position
                 let interpolated_position = Vec3::lerp(
                     transform.previous_position,
@@ -216,12 +246,13 @@ impl World {
                     + (transform.rotation - transform.previous_rotation) * interpolation_factor;
 
                 render_queue.draw_sprite(
-                    Arc::from(sprite.get_texture_handle()),
+                    Arc::from(texture),
                     interpolated_position,
                     interpolated_rotation,
                     transform.scale,
                 );
             }
+
             if let (Some(tilemap), Some(transform)) = (
                 object.get_component::<Tilemap>(),
                 object.get_component::<Transform>(),
@@ -263,6 +294,14 @@ impl World {
                         }
                     }
                 }
+            }
+
+            if let (Some(canvas), Some(_camera), Some(_ac)) = (
+                &mut object.get_component::<Canvas>(),
+                object.get_component::<Camera>(),
+                object.get_component::<ActiveCamera>(),
+            ) {
+                canvas.build_render_commands(render_queue);
             }
         }
 

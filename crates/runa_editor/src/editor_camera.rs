@@ -8,11 +8,12 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{CursorGrabMode, Window};
 
 pub struct EditorCameraController {
+    camera: Option<Camera>,
     position: Vec3,
     yaw: f32,
     pitch: f32,
     speed: f32,
-    boost_speed: f32,
+    fov: f32,
     sensitivity: f32,
     look_active: bool,
     viewport_hovered: bool,
@@ -26,11 +27,12 @@ impl EditorCameraController {
             yaw: 0.0,
             pitch: -0.24,
             speed: 4.0,
-            boost_speed: 10.0,
-            sensitivity: 0.01,
+            sensitivity: 1.,
             look_active: false,
             viewport_hovered: false,
             pressed_keys: HashSet::new(),
+            camera: None,
+            fov: 75.0_f32,
         }
     }
 
@@ -60,8 +62,8 @@ impl EditorCameraController {
         }
 
         if let DeviceEvent::MouseMotion { delta } = event {
-            self.yaw -= delta.0 as f32 * self.sensitivity;
-            self.pitch -= delta.1 as f32 * self.sensitivity;
+            self.yaw -= delta.0 as f32 * self.sensitivity / 100.;
+            self.pitch -= delta.1 as f32 * self.sensitivity / 100.;
             self.pitch = self.pitch.clamp(-1.5, 1.5);
         }
     }
@@ -86,9 +88,7 @@ impl EditorCameraController {
         if self.pressed_keys.contains(&KeyCode::Space) {
             movement += Vec3::Y;
         }
-        if self.pressed_keys.contains(&KeyCode::ControlLeft)
-            || self.pressed_keys.contains(&KeyCode::ControlRight)
-        {
+        if self.pressed_keys.contains(&KeyCode::ControlLeft) {
             movement -= Vec3::Y;
         }
 
@@ -96,7 +96,7 @@ impl EditorCameraController {
             let speed = if self.pressed_keys.contains(&KeyCode::ShiftLeft)
                 || self.pressed_keys.contains(&KeyCode::ShiftRight)
             {
-                self.boost_speed
+                self.speed * 2.
             } else {
                 self.speed
             };
@@ -104,20 +104,51 @@ impl EditorCameraController {
         }
     }
 
-    pub fn camera(&self, viewport_size: (u32, u32)) -> Camera {
-        Camera::new_perspective(
+    pub fn camera(&mut self, viewport_size: (u32, u32)) -> Camera {
+        self.camera = Some(Camera::new_perspective(
             self.position,
             self.position + self.forward(),
             Vec3::Y,
-            75.0_f32.to_radians(),
+            self.fov.to_radians(),
             0.1,
             1000.0,
             viewport_size,
-        )
+        ));
+        self.camera.unwrap()
+    }
+
+    pub fn get_speed(&mut self) -> f32 {
+        self.speed
+    }
+
+    pub fn set_speed(&mut self, new_speed: f32) {
+        self.speed = new_speed;
+    }
+
+    pub fn get_sensitivity(&mut self) -> f32 {
+        self.sensitivity
+    }
+
+    pub fn set_sensitivity(&mut self, new_sens: f32) {
+        self.sensitivity = new_sens;
+    }
+
+    /// Return radians
+    pub fn get_fov(&mut self) -> f32 {
+        self.fov
+    }
+
+    /// In radians
+    pub fn set_fov(&mut self, new_fov: f32) {
+        self.fov = new_fov;
     }
 
     pub fn shutdown(&mut self, window: &Arc<Window>) {
         self.set_look_active(window, false);
+    }
+
+    pub fn is_look_active(&self) -> bool {
+        self.look_active
     }
 
     fn handle_keyboard_input(&mut self, event: &KeyEvent) -> bool {

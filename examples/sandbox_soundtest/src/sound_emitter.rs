@@ -30,6 +30,7 @@ impl Script for SoundEmitter {
     fn construct(&self, object: &mut Object) {
         // Create 3D audio source with play_on_awake
         let mut audio = AudioSource::with_asset_3d(self.audio_asset.clone());
+        audio.source_path = Some("assets/audio/test.ogg".to_string());
         audio.looped = true;
         audio.play_on_awake = true;
         audio.spatial = true;
@@ -41,6 +42,7 @@ impl Script for SoundEmitter {
             .add_component(audio)
             .add_component(SpriteRenderer {
                 texture: Some(runa_asset::load_image!("assets/art/Tester1.png")),
+                texture_path: Some("assets/art/Tester1.png".to_string()),
             });
     }
 
