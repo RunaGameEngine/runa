@@ -240,6 +240,43 @@ pub fn move_window_by(dx: i32, dy: i32) {
     });
 }
 
+pub fn screen_center_position() -> Option<(i32, i32)> {
+    with_window(|window| {
+        let monitor = window.current_monitor()?;
+        let position = monitor.position();
+        let size = monitor.size();
+        let center_x = position.x.saturating_add((size.width / 2) as i32);
+        let center_y = position.y.saturating_add((size.height / 2) as i32);
+        Some((center_x, center_y))
+    })
+    .flatten()
+}
+
+pub fn centered_window_position() -> Option<(i32, i32)> {
+    with_window(|window| {
+        let monitor = window.current_monitor()?;
+        let monitor_position = monitor.position();
+        let monitor_size = monitor.size();
+        let window_size = window.outer_size();
+
+        let x = monitor_position.x.saturating_add(
+            ((monitor_size.width as i64 - window_size.width as i64) / 2) as i32,
+        );
+        let y = monitor_position.y.saturating_add(
+            ((monitor_size.height as i64 - window_size.height as i64) / 2) as i32,
+        );
+
+        Some((x, y))
+    })
+    .flatten()
+}
+
+pub fn center_window() {
+    if let Some((x, y)) = centered_window_position() {
+        set_window_position(x, y);
+    }
+}
+
 /// Show or hide the cursor
 pub fn show_cursor(show: bool) {
     let _ = with_window(|window| {

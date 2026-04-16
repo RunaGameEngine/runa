@@ -10,11 +10,14 @@ pub use console::Console;
 pub use ocs::World;
 
 pub mod input_system {
+    pub use crate::input::center_window;
+    pub use crate::input::centered_window_position;
     pub use crate::input::get_mouse_delta;
     pub use crate::input::initialize_window_state;
     pub use crate::input::is_fullscreen;
     pub use crate::input::lock_cursor;
     pub use crate::input::move_window_by;
+    pub use crate::input::screen_center_position;
     pub use crate::input::set_fullscreen;
     pub use crate::input::set_cursor_mode;
     pub use crate::input::set_window_handle;

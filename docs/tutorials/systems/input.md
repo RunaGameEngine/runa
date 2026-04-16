@@ -82,10 +82,13 @@ toggle_fullscreen();
 set_window_size(1600, 900);
 set_window_position(120, 80);
 move_window_by(16, 0);
+center_window();
 
 let title = window_title();
 let size = window_size();
 let fullscreen = is_fullscreen();
+let screen_center = screen_center_position();
+let centered_window = centered_window_position();
 ```
 
 ## Complete Example: Player Movement
@@ -196,6 +199,9 @@ impl Script for Button {
 | `set_window_size(w, h)`                    | Request a new window size           |
 | `set_window_position(x, y)`                | Move window to an absolute position |
 | `move_window_by(dx, dy)`                   | Move window by an offset            |
+| `screen_center_position()`                 | Center of the current monitor       |
+| `centered_window_position()`               | Centered position for the window    |
+| `center_window()`                          | Move the window to monitor center   |
 
 ## Tips
 
@@ -204,6 +210,7 @@ impl Script for Button {
 - Always multiply movement by `dt` for frame-rate independence
 - Mouse world position requires a camera to be set up
 - Window-control functions affect the main runtime window only
+- Centering helpers use the window's current monitor
 - Multi-window runtime support is not implemented yet
 
 ## Next Steps

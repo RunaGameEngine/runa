@@ -1,4 +1,4 @@
-# Runa Engine
+﻿# Runa Engine
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
@@ -37,6 +37,8 @@ The repository is a workspace, not just a runtime crate. It contains runtime, re
   - toggle/set fullscreen
   - resize the main window
   - move the main window on screen
+  - query the center of the current monitor
+  - center the window on the current monitor
 
 ### Rendering
 
@@ -67,23 +69,23 @@ The repository is a workspace, not just a runtime crate. It contains runtime, re
 
 ```text
 runa-engine/
-+-- crates/
-�   +-- runa_app/         # Runtime app loop and window setup
-�   +-- runa_asset/       # Asset loading helpers
-�   +-- runa_core/        # World, components, scripts, input, audio
-�   +-- runa_editor/      # Experimental editor
-�   +-- runa_engine/      # Umbrella re-export crate
-�   +-- runa_hub/         # Experimental launcher/project hub
-�   +-- runa_project/     # Project manifests, world serialization, scaffolding
-�   +-- runa_render/      # wgpu renderer
-�   L-- runa_render_api/  # Render command layer
-+-- docs/
-+-- examples/
-�   +-- sandbox/
-�   +-- sandbox_3d/
-�   L-- sandbox_soundtest/
-+-- CHANGELOG.md
-L-- Cargo.toml
+├── crates/
+│   ├── runa_app/         # Runtime app loop and window setup
+│   ├── runa_asset/       # Asset loading helpers
+│   ├── runa_core/        # World, components, scripts, input, audio
+│   ├── runa_editor/      # Experimental editor
+│   ├── runa_engine/      # Umbrella re-export crate
+│   ├── runa_hub/         # Experimental launcher/project hub
+│   ├── runa_project/     # Project manifests, world serialization, scaffolding
+│   ├── runa_render/      # wgpu renderer
+│   └── runa_render_api/  # Render command layer
+├── docs/
+├── examples/
+│   ├── sandbox/
+│   ├── sandbox_3d/
+│   └── sandbox_soundtest/
+├── CHANGELOG.md
+└── Cargo.toml
 ```
 
 ## Quick Start
@@ -191,6 +193,10 @@ if Input::is_key_just_pressed(KeyCode::F2) {
 
 if Input::is_key_just_pressed(KeyCode::F3) {
     set_window_size(1600, 900);
+}
+
+if Input::is_key_just_pressed(KeyCode::F4) {
+    center_window();
 }
 
 if Input::is_key_pressed(KeyCode::ArrowRight) {

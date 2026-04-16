@@ -181,8 +181,9 @@ impl<'window> App<'window> {
 impl<'window> ApplicationHandler for App<'window> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() {
-            let win_attr =
-                Window::default_attributes().with_title(&format!("{}", self.config.title));
+            let win_attr = Window::default_attributes()
+                .with_title(&format!("{}", self.config.title))
+                .with_visible(false);
             // use Arc.
             let window = Arc::new(
                 event_loop
@@ -234,6 +235,9 @@ impl<'window> ApplicationHandler for App<'window> {
 
             let renderer = Renderer::new(window.clone(), self.config.vsync);
             self.renderer = Some(renderer);
+            self.sync_camera();
+            window.request_redraw();
+            window.set_visible(true);
         }
     }
 
