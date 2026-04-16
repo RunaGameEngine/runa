@@ -636,21 +636,79 @@ impl<'window> Renderer<'window> {
                     rect,
                     color,
                     z_index,
-                } => todo!(),
+                } => {}
                 RenderCommands::UiImage {
                     texture,
                     rect,
                     tint,
                     uv_rect,
                     z_index,
-                } => todo!(),
+                } => {}
                 RenderCommands::UiText {
                     text,
                     rect,
                     color,
                     font_size,
                     z_index,
-                } => todo!(),
+                } => {
+                    let (char_width, char_height) = self.font_manager.char_size();
+                    let char_w = rect.w * char_width as f32;
+                    let char_h = rect.h * char_height as f32;
+                    let mut x = rect.x;
+                    let y = rect.y;
+
+                    for ch in text.chars() {
+                        if ch == ' ' {
+                            x += char_w;
+                            continue;
+                        }
+
+                        if let Some(char_uv) = self.font_manager.get_char_uv(ch) {
+                            let left = x;
+                            let top = y;
+                            let right = x + char_w;
+                            let bottom = y + char_h;
+
+                            ui_text_vertices.extend_from_slice(&[
+                                UITexturedVertex {
+                                    position: [left, top],
+                                    tex_coords: [char_uv.u, char_uv.v],
+                                    color: *color,
+                                },
+                                UITexturedVertex {
+                                    position: [right, top],
+                                    tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
+                                    color: *color,
+                                },
+                                UITexturedVertex {
+                                    position: [left, bottom],
+                                    tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
+                                    color: *color,
+                                },
+                                UITexturedVertex {
+                                    position: [left, bottom],
+                                    tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
+                                    color: *color,
+                                },
+                                UITexturedVertex {
+                                    position: [right, top],
+                                    tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
+                                    color: *color,
+                                },
+                                UITexturedVertex {
+                                    position: [right, bottom],
+                                    tex_coords: [
+                                        char_uv.u + char_uv.u_width,
+                                        char_uv.v + char_uv.v_height,
+                                    ],
+                                    color: *color,
+                                },
+                            ]);
+                        }
+
+                        x += char_w;
+                    }
+                }
             }
         }
 

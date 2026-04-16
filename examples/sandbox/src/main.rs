@@ -4,9 +4,11 @@ use runa_app::{RunaApp, RunaWindowConfig};
 use runa_core::World;
 
 mod player;
+mod collider_demo;
 mod tester1;
 mod tilemap_tester;
 
+use collider_demo::ColliderDemoBox;
 use tilemap_tester::TilemapTester;
 
 fn main() {
@@ -16,6 +18,7 @@ fn main() {
     // Spawn the objects (managed via its Script implementation)
     world.spawn(Box::new(TilemapTester::new()));
     world.spawn(Box::new(tester1::RotatingSprite1::new()));
+    world.spawn(Box::new(ColliderDemoBox::new()));
     world.spawn(Box::new(player::Player::new()));
 
     // Configure the application window

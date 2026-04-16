@@ -353,72 +353,109 @@ impl<'window> EditorApp<'window> {
         if self.panels.bottom_bar {
             let max_bottom_bar_height = (ctx.content_rect().height() - 140.0).max(120.0);
             self.bottom_bar_height = self.bottom_bar_height.clamp(80.0, max_bottom_bar_height);
-            egui::Panel::bottom("bottom_bar")
-                .resizable(false)
-                .exact_size(self.bottom_bar_height)
+            let content_rect = ctx.content_rect();
+            let side_margin = 12.0;
+            let bottom_gap = 8.0;
+            let overlay_width = (content_rect.width() - side_margin * 2.0).max(240.0);
+            let overlay_pos = egui::pos2(
+                content_rect.left() + side_margin,
+                content_rect.bottom() - bottom_gap - self.bottom_bar_height,
+            );
+            egui::Area::new("bottom_bar_overlay".into())
+                .order(egui::Order::Foreground)
+                .fixed_pos(overlay_pos)
                 .show(ctx, |ui| {
-                    let handle_height = 10.0;
-                    let (handle_rect, handle_response) = ui.allocate_exact_size(
-                        egui::vec2(ui.available_width(), handle_height),
-                        egui::Sense::click_and_drag(),
-                    );
-                    if handle_response.dragged() {
-                        self.bottom_bar_height = (self.bottom_bar_height
-                            - handle_response.drag_delta().y)
-                            .clamp(80.0, max_bottom_bar_height);
-                    }
-                    ui.painter().rect_filled(
-                        handle_rect.shrink2(egui::vec2(48.0, 3.0)),
-                        4.0,
-                        ui.visuals().widgets.inactive.bg_fill,
-                    );
-                    ui.horizontal(|ui| {
-                        let browser_selected = self.bottom_tab == BottomTab::ContentBrowser;
-                        if ui
-                            .selectable_label(browser_selected, "Content Browser")
-                            .clicked()
-                        {
-                            self.bottom_tab = BottomTab::ContentBrowser;
-                        }
-                        let console_selected = self.bottom_tab == BottomTab::Console;
-                        if ui.selectable_label(console_selected, "Console").clicked() {
-                            self.bottom_tab = BottomTab::Console;
-                        }
-                        ui.separator();
-                        match self.bottom_tab {
-                            BottomTab::ContentBrowser => {
-                                if ui.button("Import").clicked() {}
-                                ui.separator();
-                                ui.label(self.content_browser.current_dir_display());
+                    egui::Frame::new()
+                        .fill(ui.visuals().panel_fill)
+                        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                        .corner_radius(egui::CornerRadius::same(style::spacing::CORNER_RADIUS))
+                        .show(ui, |ui| {
+                            ui.set_min_size(egui::vec2(overlay_width, self.bottom_bar_height));
+                            ui.set_max_size(egui::vec2(overlay_width, self.bottom_bar_height));
+
+                            let handle_height = 10.0;
+                            let (handle_rect, handle_response) = ui.allocate_exact_size(
+                                egui::vec2(ui.available_width(), handle_height),
+                                egui::Sense::click_and_drag(),
+                            );
+                            if handle_response.hovered() || handle_response.dragged() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
                             }
-                            BottomTab::Console => {
-                                if ui.button("Clear").clicked() {
-                                    self.output_lines.clear();
+                            if handle_response.dragged() {
+                                self.bottom_bar_height = (self.bottom_bar_height
+                                    - handle_response.drag_delta().y)
+                                    .clamp(80.0, max_bottom_bar_height);
+                            }
+                            let handle_fill = if handle_response.dragged() {
+                                ui.visuals().widgets.active.bg_fill
+                            } else if handle_response.hovered() {
+                                ui.visuals().widgets.hovered.bg_fill
+                            } else {
+                                ui.visuals().widgets.inactive.bg_fill
+                            };
+                            ui.painter().rect_filled(
+                                handle_rect,
+                                4.0,
+                                handle_fill.gamma_multiply(0.35),
+                            );
+                            ui.painter().rect_filled(
+                                handle_rect.shrink2(egui::vec2(48.0, 3.0)),
+                                4.0,
+                                handle_fill,
+                            );
+                            ui.horizontal(|ui| {
+                                let browser_selected = self.bottom_tab == BottomTab::ContentBrowser;
+                                if ui
+                                    .selectable_label(browser_selected, "Content Browser")
+                                    .clicked()
+                                {
+                                    self.bottom_tab = BottomTab::ContentBrowser;
                                 }
-                            }
-                        }
-                    });
-                    ui.separator();
-                    match self.bottom_tab {
-                        BottomTab::ContentBrowser => {
-                            self.content_browser.ui(ui, &self.settings);
-                            if let Some(message) = self.content_browser.take_message() {
-                                self.status_line = message;
-                            }
-                        }
-                        BottomTab::Console => {
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false, false])
-                                .stick_to_bottom(true)
-                                .id_salt("editor_output_scroll")
-                                .show(ui, |ui| {
-                                    ui.set_min_width(ui.available_width());
-                                    for line in &self.output_lines {
-                                        ui.monospace(line);
+                                let console_selected = self.bottom_tab == BottomTab::Console;
+                                if ui.selectable_label(console_selected, "Console").clicked() {
+                                    self.bottom_tab = BottomTab::Console;
+                                }
+                                ui.separator();
+                                match self.bottom_tab {
+                                    BottomTab::ContentBrowser => {
+                                        if ui.button("Import").clicked() {}
+                                        ui.separator();
+                                        ui.label(self.content_browser.current_dir_display());
                                     }
-                                });
-                        }
-                    }
+                                    BottomTab::Console => {
+                                        if ui.button("Clear").clicked() {
+                                            self.output_lines.clear();
+                                        }
+                                    }
+                                }
+                            });
+                            ui.separator();
+                            let body_height = (ui.available_height() - 8.0).max(0.0);
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(ui.available_width(), body_height),
+                                egui::Layout::top_down(egui::Align::Min),
+                                |ui| match self.bottom_tab {
+                                    BottomTab::ContentBrowser => {
+                                        self.content_browser.ui(ui, &self.settings);
+                                        if let Some(message) = self.content_browser.take_message() {
+                                            self.status_line = message;
+                                        }
+                                    }
+                                    BottomTab::Console => {
+                                        egui::ScrollArea::vertical()
+                                            .auto_shrink([false, false])
+                                            .stick_to_bottom(true)
+                                            .id_salt("editor_output_scroll")
+                                            .show(ui, |ui| {
+                                                ui.set_min_width(ui.available_width());
+                                                for line in &self.output_lines {
+                                                    ui.monospace(line);
+                                                }
+                                            });
+                                    }
+                                },
+                            );
+                        });
                 });
         }
 
@@ -1375,11 +1412,17 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
 
         event_loop.set_control_flow(ControlFlow::Poll);
 
+        let window_icon =
+            load_window_icon(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.png")).ok();
+        let taskbar_icon =
+            load_window_icon(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/big_icon.png")).ok();
+
         let window = Arc::new(
             event_loop
                 .create_window(
                     Window::default_attributes()
                         .with_title("Runa Editor")
+                        .with_window_icon(window_icon.clone())
                         .with_inner_size(egui_winit::winit::dpi::LogicalSize::new(1600.0, 960.0))
                         .with_min_inner_size(egui_winit::winit::dpi::LogicalSize::new(
                             1200.0, 720.0,
@@ -1387,13 +1430,11 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
                 )
                 .expect("Failed to create editor window"),
         );
-        if let (Ok(icon), Ok(big_icon)) = (
-            load_window_icon(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.png")),
-            load_window_icon(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/big_icon.png")),
-        ) {
+        if let Some(icon) = window_icon {
             window.set_window_icon(Some(icon));
-            window.set_taskbar_icon(Some(big_icon));
-            // window.set_title_background_color(Some(Color::BLACK));
+        }
+        if let Some(icon) = taskbar_icon {
+            window.set_taskbar_icon(Some(icon));
         }
 
         let renderer = Renderer::new(window.clone(), true);

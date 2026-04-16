@@ -3,6 +3,7 @@ use std::{
     collections::HashSet,
     sync::{Mutex, OnceLock, Weak},
 };
+use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::window::{CursorGrabMode, Window};
 use winit::{event::MouseButton, keyboard::KeyCode};
 
@@ -10,6 +11,24 @@ use crate::components::Camera;
 
 static INPUT_STATE: OnceLock<Mutex<InputState>> = OnceLock::new();
 static WINDOW_HANDLE: OnceLock<Mutex<Weak<Window>>> = OnceLock::new();
+static WINDOW_STATE: OnceLock<Mutex<WindowState>> = OnceLock::new();
+
+#[derive(Clone, Debug)]
+pub struct WindowState {
+    pub title: String,
+    pub fullscreen: bool,
+    pub size: (u32, u32),
+}
+
+impl Default for WindowState {
+    fn default() -> Self {
+        Self {
+            title: "Runa Game".to_string(),
+            fullscreen: false,
+            size: (1280, 720),
+        }
+    }
+}
 
 #[derive(Default, Clone, Debug)]
 pub struct InputState {
@@ -30,6 +49,7 @@ pub struct InputState {
 impl InputState {
     pub fn initialize() {
         INPUT_STATE.set(Mutex::new(InputState::default())).unwrap();
+        let _ = WINDOW_STATE.set(Mutex::new(WindowState::default()));
     }
 
     pub fn current() -> std::sync::MutexGuard<'static, InputState> {
@@ -121,31 +141,122 @@ pub fn set_window_handle(window: &std::sync::Arc<Window>) {
         .ok();
 }
 
-/// Show or hide the cursor
-pub fn show_cursor(show: bool) {
-    if let Some(window_weak) = WINDOW_HANDLE.get() {
-        if let Ok(guard) = window_weak.lock() {
-            if let Some(window) = guard.upgrade() {
-                window.set_cursor_visible(show);
-            }
+pub fn initialize_window_state(title: impl Into<String>, fullscreen: bool, size: (u32, u32)) {
+    let title = title.into();
+    if let Some(state) = WINDOW_STATE.get() {
+        if let Ok(mut state) = state.lock() {
+            state.title = title;
+            state.fullscreen = fullscreen;
+            state.size = size;
         }
     }
 }
 
+fn with_window<R>(f: impl FnOnce(&Window) -> R) -> Option<R> {
+    let window_weak = WINDOW_HANDLE.get()?;
+    let guard = window_weak.lock().ok()?;
+    let window = guard.upgrade()?;
+    Some(f(&window))
+}
+
+fn with_window_state<R>(f: impl FnOnce(&mut WindowState) -> R) -> Option<R> {
+    let state = WINDOW_STATE.get()?;
+    let mut guard = state.lock().ok()?;
+    Some(f(&mut guard))
+}
+
+pub fn window_title() -> Option<String> {
+    let state = WINDOW_STATE.get()?;
+    let guard = state.lock().ok()?;
+    Some(guard.title.clone())
+}
+
+pub fn is_fullscreen() -> Option<bool> {
+    let state = WINDOW_STATE.get()?;
+    let guard = state.lock().ok()?;
+    Some(guard.fullscreen)
+}
+
+pub fn window_size() -> Option<(u32, u32)> {
+    let state = WINDOW_STATE.get()?;
+    let guard = state.lock().ok()?;
+    Some(guard.size)
+}
+
+pub fn set_window_title(title: impl Into<String>) {
+    let title = title.into();
+    let _ = with_window_state(|state| {
+        state.title = title.clone();
+    });
+    let _ = with_window(|window| {
+        window.set_title(&title);
+    });
+}
+
+pub fn set_fullscreen(fullscreen: bool) {
+    let _ = with_window_state(|state| {
+        state.fullscreen = fullscreen;
+    });
+    let _ = with_window(|window| {
+        if fullscreen {
+            window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(
+                window.current_monitor(),
+            )));
+        } else {
+            window.set_fullscreen(None);
+        }
+    });
+}
+
+pub fn toggle_fullscreen() {
+    let current = is_fullscreen().unwrap_or(false);
+    set_fullscreen(!current);
+}
+
+pub fn set_window_size(width: u32, height: u32) {
+    let size = (width.max(1), height.max(1));
+    let _ = with_window_state(|state| {
+        state.size = size;
+    });
+    let _ = with_window(|window| {
+        let _ = window.request_inner_size(PhysicalSize::new(size.0, size.1));
+    });
+}
+
+pub fn set_window_position(x: i32, y: i32) {
+    let _ = with_window(|window| {
+        window.set_outer_position(PhysicalPosition::new(x, y));
+    });
+}
+
+pub fn move_window_by(dx: i32, dy: i32) {
+    let _ = with_window(|window| {
+        if let Ok(position) = window.outer_position() {
+            window.set_outer_position(PhysicalPosition::new(
+                position.x.saturating_add(dx),
+                position.y.saturating_add(dy),
+            ));
+        }
+    });
+}
+
+/// Show or hide the cursor
+pub fn show_cursor(show: bool) {
+    let _ = with_window(|window| {
+        window.set_cursor_visible(show);
+    });
+}
+
 /// Lock or unlock the cursor to/from the window
 pub fn lock_cursor(lock: bool) {
-    if let Some(window_weak) = WINDOW_HANDLE.get() {
-        if let Ok(guard) = window_weak.lock() {
-            if let Some(window) = guard.upgrade() {
-                let grab_mode = if lock {
-                    CursorGrabMode::Locked
-                } else {
-                    CursorGrabMode::None
-                };
-                let _ = window.set_cursor_grab(grab_mode);
-            }
-        }
-    }
+    let _ = with_window(|window| {
+        let grab_mode = if lock {
+            CursorGrabMode::Locked
+        } else {
+            CursorGrabMode::None
+        };
+        let _ = window.set_cursor_grab(grab_mode);
+    });
 }
 
 /// Convenience function to set cursor mode (useful for FPS games)

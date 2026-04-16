@@ -2,8 +2,12 @@
 fn main() {
     use std::path::PathBuf;
 
-    let icon_path = PathBuf::from("assets").join("icon.png");
+    let icon_path = PathBuf::from("assets").join("big_icon.png");
     println!("cargo:rerun-if-changed={}", icon_path.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        PathBuf::from("assets").join("icon.png").display()
+    );
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR must exist"));
     let ico_path = out_dir.join("runa_editor.ico");

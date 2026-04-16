@@ -4,6 +4,7 @@ pub struct TextureAsset {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>, // RGBA8
+    pub path: PathBuf,
 }
 
 impl TextureAsset {
@@ -17,6 +18,7 @@ impl TextureAsset {
             width,
             height,
             pixels: img.into_raw(),
+            path: path.clone(),
         })
     }
 }

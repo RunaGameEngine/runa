@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use runa_render_api::RenderQueue;
 
 use crate::{
     audio::{AudioEngine, SoundId},
     components::{
-        ActiveCamera, AudioListener, AudioSource, Camera, Canvas, MeshRenderer, SpriteRenderer,
-        Tilemap, Transform,
+        ActiveCamera, AudioListener, AudioSource, Camera, Canvas, Collider2D, MeshRenderer,
+        SpriteRenderer, Tilemap, Transform,
     },
     debug_renderer::DebugRenderer,
     ocs::{Object, Script},
@@ -319,5 +319,31 @@ impl World {
 
     pub fn objects_mut(&mut self) -> &mut Vec<Object> {
         &mut self.objects
+    }
+
+    pub fn overlaps_collider_2d(
+        &self,
+        center: Vec2,
+        collider: &Collider2D,
+        ignore: Option<*const Object>,
+    ) -> bool {
+        self.objects.iter().any(|object| {
+            if ignore.is_some_and(|ignored| std::ptr::eq(object as *const Object, ignored)) {
+                return false;
+            }
+
+            let Some(other_transform) = object.get_component::<Transform>() else {
+                return false;
+            };
+            let Some(other_collider) = object.get_component::<Collider2D>() else {
+                return false;
+            };
+
+            collider.intersects(
+                center,
+                other_collider,
+                other_transform.position.truncate(),
+            )
+        })
     }
 }

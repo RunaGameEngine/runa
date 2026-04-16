@@ -1,5 +1,6 @@
-use crate::components::Transform;
+use crate::components::{Collider2D, Transform};
 use crate::ocs::{Script, World};
+use glam::Vec2;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
@@ -84,5 +85,24 @@ impl Object {
 
     pub fn set_script(&mut self, script: Box<dyn Script>) {
         self.script = Some(script);
+    }
+
+    pub fn is_colliding_2d(&mut self) -> bool {
+        let center = self
+            .get_component::<Transform>()
+            .map(|transform| transform.position.truncate())
+            .unwrap_or(Vec2::ZERO);
+        self.would_collide_2d_at(center)
+    }
+
+    pub fn would_collide_2d_at(&mut self, center: Vec2) -> bool {
+        let Some(collider) = self.get_component::<Collider2D>().copied() else {
+            return false;
+        };
+
+        let self_ptr = self as *const Object;
+        self.get_world_mut()
+            .map(|world| world.overlaps_collider_2d(center, &collider, Some(self_ptr)))
+            .unwrap_or(false)
     }
 }

@@ -1,6 +1,6 @@
 # Input System
 
-The input system handles keyboard and mouse input for your game.
+The input system handles keyboard and mouse input for your game. In the current runtime it also exposes control over the **main runtime window**.
 
 ## Checking Keyboard Input
 
@@ -66,6 +66,26 @@ if Input::is_mouse_button_just_pressed(MouseButton::Left) {
 
 // Mouse wheel
 let scroll = Input::current().mouse_wheel_delta;
+```
+
+## Window Control
+
+The current runtime is single-window. These functions control the active main game window from scripts.
+
+```rust
+use runa_core::input_system::*;
+
+set_window_title("Debug View");
+set_fullscreen(true);
+toggle_fullscreen();
+
+set_window_size(1600, 900);
+set_window_position(120, 80);
+move_window_by(16, 0);
+
+let title = window_title();
+let size = window_size();
+let fullscreen = is_fullscreen();
 ```
 
 ## Complete Example: Player Movement
@@ -170,6 +190,12 @@ impl Script for Button {
 | `Input::is_mouse_button_pressed(btn)`      | True while button is held           |
 | `Input::is_mouse_button_just_pressed(btn)` | True for one frame when clicked     |
 | `Input::get_mouse_world_position()`        | Mouse position in world coordinates |
+| `set_window_title(title)`                  | Change the main window title        |
+| `set_fullscreen(bool)`                     | Enable/disable fullscreen           |
+| `toggle_fullscreen()`                      | Toggle fullscreen                   |
+| `set_window_size(w, h)`                    | Request a new window size           |
+| `set_window_position(x, y)`                | Move window to an absolute position |
+| `move_window_by(dx, dy)`                   | Move window by an offset            |
 
 ## Tips
 
@@ -177,9 +203,11 @@ impl Script for Button {
 - Use `is_key_pressed` for continuous actions (movement, charging)
 - Always multiply movement by `dt` for frame-rate independence
 - Mouse world position requires a camera to be set up
+- Window-control functions affect the main runtime window only
+- Multi-window runtime support is not implemented yet
 
 ## Next Steps
 
 - [Transform](../components/transform.md) for moving objects
 - [CursorInteractable](../components/cursor-interactable.md) for clickable objects
-- [Camera2D](../components/camera2d.md) for screen-to-world conversion
+- [Creating a 2D Game](../getting-started/creating-a-2d-game.md) for camera setup

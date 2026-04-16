@@ -12,7 +12,7 @@ New to Runa Engine? Start here:
 2. [Creating a 3D Game](getting-started/creating-a-3d-game.md) - Complete guide for 3D games with FPS camera and mesh rendering
 3. [Creating Your First App](getting-started/creating-your-first-app.md) - Minimal application setup
 4. [Creating Scripts](scripts/creating-scripts.md) - Add behavior to game objects
-5. [Input System](systems/input.md) - Handle keyboard and mouse input
+5. [Input System](systems/input.md) - Handle keyboard, mouse, and window control
 
 ## Choosing Your Path
 
@@ -63,17 +63,18 @@ Components add properties and features to game objects:
 
 - [CursorInteractable](components/cursor-interactable.md) - Mouse hover and click events
 
-#### Physics (Coming Soon)
+#### Collision
 
-- [PhysicsCollision](components/physics-collision.md) - Collision detection
+- [Collider2D](components/physics-collision.md) - Simple AABB overlap detection
+- [PhysicsCollision](components/physics-collision.md) - Existing collision-sized component used by current editor/runtime paths
 
 ### Systems
 
 Core engine systems:
 
-- [Input](systems/input.md) - Keyboard and mouse input
+- [Input](systems/input.md) - Keyboard, mouse, cursor, and window control
 - [Audio](systems/audio.md) - Sound effects and music
-- [Rendering](../architecture/rendering.md) - How rendering works
+- [Rendering](../architecture/renderer.md) - How rendering works
 
 ### Tilemaps
 
@@ -134,4 +135,4 @@ After completing these tutorials:
 
 1. Experiment with the example projects (`sandbox`, `sandbox_3d`)
 2. Combine components to create complex behaviors
-3. Build your own game!
+3. Expect API changes while the engine is still pre-alpha

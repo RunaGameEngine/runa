@@ -1,28 +1,35 @@
-# PhysicsCollision Component
+# Collision Components
 
-The `PhysicsCollision` component defines a collision area for an object.
+Runa currently has **simple collision detection**, not a full 2D/3D physics engine.
+
+There are currently two collision-related components in the codebase:
+
+- `Collider2D`: simple AABB overlap checks for gameplay scripts
+- `PhysicsCollision`: an existing collision-sized component still used by some runtime/editor paths
+
+If you only need **2D overlap detection**, use `Collider2D`.
 
 ## Quick Start
 
 ```rust
-use runa_core::components::PhysicsCollision;
+use runa_core::components::Collider2D;
 
-// Create a collision box (width, height)
-let collision = PhysicsCollision::new(32.0, 32.0);
+// Create an AABB collider (width, height)
+let collider = Collider2D::new(32.0, 32.0);
 
 // Add to object
-object.add_component(collision);
+object.add_component(collider);
 ```
 
 ## Creating Collision Boxes
 
 ```rust
 // Create collision box
-let mut collision = PhysicsCollision::new(50.0, 100.0);
+let mut collider = Collider2D::new(50.0, 100.0);
 
 // Enable/disable collision
-collision.enabled = true;  // Collisions active
-collision.enabled = false; // Collisions ignored
+collider.enabled = true;  // Collisions active
+collider.enabled = false; // Collisions ignored
 ```
 
 ## Checking Collisions
@@ -32,11 +39,11 @@ collision.enabled = false; // Collisions ignored
 ```rust
 use runa_core::glam::Vec2;
 
-if let Some(collision) = object.get_component::<PhysicsCollision>() {
+if let Some(collider) = object.get_component::<Collider2D>() {
     if let Some(transform) = object.get_component::<Transform>() {
         let point = Vec2::new(10.0, 20.0);
 
-        if collision.contains_point(point, transform.position.xy()) {
+        if collider.contains_point(point, transform.position.xy()) {
             println!("Point is inside collision box!");
         }
     }
@@ -47,44 +54,37 @@ if let Some(collision) = object.get_component::<PhysicsCollision>() {
 
 ```rust
 fn check_collision(object1: &Object, object2: &Object) -> bool {
-    let (transform1, collision1) = match (
+    let (transform1, collider1) = match (
         object1.get_component::<Transform>(),
-        object1.get_component::<PhysicsCollision>(),
+        object1.get_component::<Collider2D>(),
     ) {
         (Some(t), Some(c)) => (t, c),
         _ => return false,
     };
 
-    let (transform2, collision2) = match (
+    let (transform2, collider2) = match (
         object2.get_component::<Transform>(),
-        object2.get_component::<PhysicsCollision>(),
+        object2.get_component::<Collider2D>(),
     ) {
         (Some(t), Some(c)) => (t, c),
         _ => return false,
     };
 
-    // Simple AABB collision check
-    let pos1 = transform1.position.xy();
-    let pos2 = transform2.position.xy();
-
-    let dx = (pos1.x - pos2.x).abs();
-    let dy = (pos1.y - pos2.y).abs();
-
-    let min_dx = collision1.size.x + collision2.size.x;
-    let min_dy = collision1.size.y + collision2.size.y;
-
-    dx < min_dx && dy < min_dy
+    collider1.intersects(
+        transform1.position.xy(),
+        collider2,
+        transform2.position.xy(),
+    )
 }
 ```
 
-## Complete Example: Player with Collision
+## Complete Example: Player with Collision Query
 
 ```rust
 use runa_core::{
-    components::{PhysicsCollision, Transform},
+    components::{Collider2D, Transform},
     input_system::*,
     ocs::{Object, Script},
-    World,
     glam::Vec3,
 };
 
@@ -102,38 +102,38 @@ impl Script for Player {
     fn construct(&self, object: &mut Object) {
         object
             .add_component(Transform::default())
-            .add_component(PhysicsCollision::new(32.0, 32.0));
+            .add_component(Collider2D::new(32.0, 32.0));
     }
 
     fn update(&mut self, object: &mut Object, dt: f32) {
-        if let Some(transform) = object.get_component_mut::<Transform>() {
-            let mut direction = Vec3::ZERO;
+        let Some(current_position) = object
+            .get_component::<Transform>()
+            .map(|transform| transform.position)
+        else {
+            return;
+        };
 
-            if Input::is_key_pressed(KeyCode::KeyW) {
-                direction.y += 1.0;
-            }
-            if Input::is_key_pressed(KeyCode::KeyS) {
-                direction.y -= 1.0;
-            }
-            if Input::is_key_pressed(KeyCode::KeyA) {
-                direction.x -= 1.0;
-            }
-            if Input::is_key_pressed(KeyCode::KeyD) {
-                direction.x += 1.0;
-            }
+        let mut direction = Vec3::ZERO;
+        if Input::is_key_pressed(KeyCode::KeyW) {
+            direction.y += 1.0;
+        }
+        if Input::is_key_pressed(KeyCode::KeyS) {
+            direction.y -= 1.0;
+        }
+        if Input::is_key_pressed(KeyCode::KeyA) {
+            direction.x -= 1.0;
+        }
+        if Input::is_key_pressed(KeyCode::KeyD) {
+            direction.x += 1.0;
+        }
 
-            if direction.length() > 0.0 {
-                direction = direction.normalize();
+        let movement = direction.normalize_or_zero() * self.speed * dt;
+        let next_position = current_position + movement;
+
+        if !object.would_collide_2d_at(next_position.xy()) {
+            if let Some(transform) = object.get_component_mut::<Transform>() {
+                transform.position = next_position;
             }
-
-            // Store old position for collision resolution
-            let old_pos = transform.position;
-
-            // Move
-            transform.position += direction * self.speed * dt;
-
-            // TODO: Check collision and resolve if needed
-            // If collision detected, restore old_pos or slide along wall
         }
     }
 }
@@ -141,32 +141,36 @@ impl Script for Player {
 
 ## Properties
 
-| Property  | Type   | Description                          |
-| --------- | ------ | ------------------------------------ |
-| `size`    | `Vec2` | Half-size (extents) of collision box |
-| `enabled` | `bool` | Are collisions active                |
+### `Collider2D`
+
+| Property     | Type   | Description                           |
+| ------------ | ------ | ------------------------------------- |
+| `half_size`  | `Vec2` | Half-size (extents) of the AABB       |
+| `enabled`    | `bool` | Are overlap checks active             |
+| `is_trigger` | `bool` | Reserved flag for trigger-style usage |
 
 ## Methods
 
 ```rust
 // Create collision box (size is halved internally)
-let collision = PhysicsCollision::new(64.0, 64.0);
-// Internal size will be (32.0, 32.0)
+let collider = Collider2D::new(64.0, 64.0);
+// Internal half_size will be (32.0, 32.0)
 
 // Check if point is inside
 let point = Vec2::new(10.0, 10.0);
 let center = Vec2::new(0.0, 0.0);
-if collision.contains_point(point, center) {
+if collider.contains_point(point, center) {
     // Point is inside
 }
 ```
 
 ## Tips
 
-- The size you pass is **halved** internally (it stores extents, not full size)
-- For a 64x64 pixel object, use `new(64.0, 64.0)`
-- Disable collisions with `enabled = false` instead of removing the component
-- Use simple shapes (rectangles) for better performance
+- `Collider2D` is detection-only; it does not resolve movement or apply physics
+- The size you pass to `Collider2D::new(width, height)` is halved internally
+- For a 64x64 object, use `Collider2D::new(64.0, 64.0)`
+- Disable overlap checks with `enabled = false` instead of removing the component
+- `PhysicsCollision` still exists in the codebase, but `Collider2D` is the simpler script-facing API
 
 ## Next Steps
 

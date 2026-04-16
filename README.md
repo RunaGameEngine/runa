@@ -4,112 +4,118 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 
-**Runa Engine** — An experimental 2D/3D game engine written in Rust, focused on performance and developer ergonomics.
+**Runa Engine** is an experimental Rust game engine workspace focused on a small script-driven runtime, a `wgpu` renderer, and in-repo tooling for project creation and scene editing.
 
-> ⚠️ **Status**: Early development (Pre-Alpha). API is unstable. Not for production use.
+> **Status:** Pre-Alpha. APIs are unstable, tooling is still evolving, and the engine is not ready for production use.
 
-## 🌟 Features
+## Current State
 
-### ✅ Implemented
+Runa is currently a **single-window runtime** with:
 
-- **2D Rendering**
-  - Sprites with textures and rotation
-  - Automatic batching (1000+ objects = 1 draw call)
-  - Transparency (alpha blending)
-  - Tilemap with negative coordinate support
-- **Object Component System (OCS)**
-  - `Transform` component (mandatory for all objects)
-  - Scripts via `Script` trait
-  - Global input access (`Input::is_key_pressed()`)
-- **Input System**
-  - Keyboard and mouse handling
-  - Screen-to-world coordinate conversion
-  - `CursorInteractable` component for object clicks
+- 2D sprite rendering
+- Tilemaps
+- Basic 3D mesh rendering
+- Script-driven objects
+- Global input API
+- Basic audio and spatial audio
+- World/project serialization in RON
+- Experimental editor and hub applications
 
-### 🚧 In Progress
+The repository is a workspace, not just a runtime crate. It contains runtime, rendering, assets, project scaffolding, editor, and launcher tools.
 
-- [ ] World (Scene) serialization
-- [ ] Object serialization
-- [ ] Physics (2D/3D)
-- [ ] Animations (sprites, skeletal)
-- [ ] Level editor
-- [ ] Custom shader support
-- [x] Tilemap
-- [x] **Audio** (basic)
-  - [x] Sound playback via `rodio`
-- [ ] **3D Support** (experimental)
-  - [ ] Mesh pipeline with depth buffer
-  - [ ] Instancing for massive object rendering
-  - [ ] Basic lighting (diffuse + ambient)
-  - [x] Simple 3D support
+## What Works Today
 
-## 🚀 Quick Start
+### Runtime
+
+- `World`, `Object`, and `Script` lifecycle (`construct`, `start`, `update`)
+- `Transform`, `SpriteRenderer`, `MeshRenderer`, `Tilemap`, `Camera`, `AudioSource`
+- Unified 2D/3D camera component
+- Cursor interaction via `CursorInteractable`
+- Simple 2D AABB overlap detection via `Collider2D`
+- Window control from scripts:
+  - change window title
+  - toggle/set fullscreen
+  - resize the main window
+  - move the main window on screen
+
+### Rendering
+
+- 2D textured sprites
+- Tilemap rendering with negative coordinates
+- Basic 3D mesh path with depth buffer
+- Offscreen render target support used by the editor
+
+### Tooling
+
+- `.runaproj` project manifest
+- world save/load in RON
+- project scaffolding through `runa_project`
+- `runa_editor` for scene inspection/editing
+- `runa_hub` for creating/opening projects
+
+## Current Limitations
+
+- Single runtime window only
+- No full physics engine
+- No mature animation system
+- No stable shader/material pipeline for user-defined shaders
+- 3D support is still basic and experimental
+- Editor and hub are usable but not feature-complete
+- API stability is not guaranteed between alpha builds
+
+## Workspace Layout
+
+```text
+runa-engine/
++-- crates/
+�   +-- runa_app/         # Runtime app loop and window setup
+�   +-- runa_asset/       # Asset loading helpers
+�   +-- runa_core/        # World, components, scripts, input, audio
+�   +-- runa_editor/      # Experimental editor
+�   +-- runa_engine/      # Umbrella re-export crate
+�   +-- runa_hub/         # Experimental launcher/project hub
+�   +-- runa_project/     # Project manifests, world serialization, scaffolding
+�   +-- runa_render/      # wgpu renderer
+�   L-- runa_render_api/  # Render command layer
++-- docs/
++-- examples/
+�   +-- sandbox/
+�   +-- sandbox_3d/
+�   L-- sandbox_soundtest/
++-- CHANGELOG.md
+L-- Cargo.toml
+```
+
+## Quick Start
 
 ### Requirements
 
 - Rust 1.75+
-- GPU with Vulkan/Metal/DirectX 12 support
+- A GPU/backend supported by `wgpu`
 
-### Run Example
+### Run a bundled example
 
 ```bash
-# Clone
-git clone https://github.com/AnuranGames/runa-engine
-cd runa-engine
-
-# Run sandbox example
-cargo run --example sandbox
+cargo run -p sandbox
 ```
 
-### Create a new game project with Runa:
-
-Create project:
-
-```sh
-cargo new my_game
-cd my_game
-```
-
-Add dependencies:
+### Use the umbrella crate
 
 ```toml
 [dependencies]
 runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.2.0-alpha.2" }
 ```
 
-### Create a new game project with Runa:
-
-#### 2D Game Example
-
-Create project:
-
-```sh
-cargo new my_2d_game
-cd my_2d_game
-```
-
-Add dependencies:
-
-```toml
-[dependencies]
-runa_engine = { git = "https://github.com/AnuranGames/runa-engine.git", tag = "v0.2.0-alpha.2" }
-```
-
-### Create Your 2D Game with Player Script
+## Minimal 2D Example
 
 ```rust
-// main.rs
 use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
-use runa_engine::runa_core::World;
-use runa_engine::{runa_asset, runa_core};
-
-use runa_engine::runa_core::Vec3;
 use runa_engine::runa_core::{
-    components::{Camera, SpriteRenderer, Transform, ActiveCamera},
+    components::{ActiveCamera, Camera, SpriteRenderer, Transform},
     input_system::*,
     ocs::Script,
+    Vec3, World,
 };
-
 
 fn main() {
     let mut world = World::default();
@@ -128,120 +134,81 @@ fn main() {
     let _ = RunaApp::run_with_config(world, config);
 }
 
-pub struct Player {
+struct Player {
     speed: f32,
-    direction: Vec3,
 }
 
 impl Player {
-    pub fn new() -> Self {
-        Self { speed: 0.25, direction: Vec3::ZERO }
+    fn new() -> Self {
+        Self { speed: 0.25 }
     }
 }
 
 impl Script for Player {
-    fn construct(&self, object: &mut runa_core::ocs::Object) {
-        // Add 2D orthographic camera (32x18 world units)
-        object.add_component(Camera::new_ortho(32.0, 18.0, (1280, 720)));
-        object.add_component(ActiveCamera);
-
+    fn construct(&self, object: &mut runa_engine::runa_core::ocs::Object) {
         object
             .add_component(Transform::default())
-            .add_component(SpriteRenderer {
-                texture: Some(runa_asset::load_image!("assets/Charactert.png")),
-            });
+            .add_component(Camera::new_ortho(320.0, 180.0, (1280, 720)))
+            .add_component(ActiveCamera)
+            .add_component(SpriteRenderer::new(Some(
+                runa_engine::runa_asset::load_image!("assets/Charactert.png"),
+            )));
     }
 
-    fn start(&mut self, object: &mut runa_core::ocs::Object) {
+    fn update(&mut self, object: &mut runa_engine::runa_core::ocs::Object, _dt: f32) {
         if let Some(transform) = object.get_component_mut::<Transform>() {
-            transform.position = Vec3::new(0.0, 0.0, 0.0);
-            transform.scale = Vec3::new(1.0, 1.0, 1.0);
-        }
-    }
-
-    fn update(&mut self, object: &mut runa_core::ocs::Object, _dt: f32) {
-        if let Some(transform) = object.get_component_mut::<Transform>() {
-            self.direction = Vec3::ZERO;
-            if Input::is_key_pressed(KeyCode::KeyW) { self.direction.y = 1.0; }
-            if Input::is_key_pressed(KeyCode::KeyS) { self.direction.y = -1.0; }
-            if Input::is_key_pressed(KeyCode::KeyD) { self.direction.x = 1.0; }
-            if Input::is_key_pressed(KeyCode::KeyA) { self.direction.x = -1.0; }
-            transform.position += self.direction.normalize_or_zero() * self.speed;
+            let mut direction = Vec3::ZERO;
+            if Input::is_key_pressed(KeyCode::KeyW) {
+                direction.y += 1.0;
+            }
+            if Input::is_key_pressed(KeyCode::KeyS) {
+                direction.y -= 1.0;
+            }
+            if Input::is_key_pressed(KeyCode::KeyA) {
+                direction.x -= 1.0;
+            }
+            if Input::is_key_pressed(KeyCode::KeyD) {
+                direction.x += 1.0;
+            }
+            transform.position += direction.normalize_or_zero() * self.speed;
         }
     }
 }
 ```
 
-#### 3D Game Example
-
-For 3D games, use perspective camera:
+## Script Window Control Example
 
 ```rust
-// Add 3D perspective camera
-object.add_component(Camera::new_perspective(
-    Vec3::new(0.0, 0.0, 5.0), // position
-    Vec3::ZERO,                // target (look at)
-    Vec3::Y,                   // up
-    75.0_f32.to_radians(),    // FOV
-    0.1,                       // near
-    1000.0,                    // far
-    (1280, 720),               // viewport
-));
-object.add_component(ActiveCamera);
+use runa_engine::runa_core::input_system::*;
 
-// Add 3D mesh
-let mesh = Mesh::cube(2.0);
-object.add_component(MeshRenderer::new(mesh));
+if Input::is_key_just_pressed(KeyCode::F1) {
+    set_window_title("Debug Mode");
+}
+
+if Input::is_key_just_pressed(KeyCode::F2) {
+    toggle_fullscreen();
+}
+
+if Input::is_key_just_pressed(KeyCode::F3) {
+    set_window_size(1600, 900);
+}
+
+if Input::is_key_pressed(KeyCode::ArrowRight) {
+    move_window_by(8, 0);
+}
 ```
 
-For complete guides, see:
+## Documentation
 
-- [Creating a 2D Game](docs/tutorials/getting-started/creating-a-2d-game.md)
-- [Creating a 3D Game](docs/tutorials/getting-started/creating-a-3d-game.md)
+- [Tutorial Index](docs/tutorials/README.md)
+- [Create a 2D Game](docs/tutorials/getting-started/creating-a-2d-game.md)
+- [Create a 3D Game](docs/tutorials/getting-started/creating-a-3d-game.md)
+- [Input System](docs/tutorials/systems/input.md)
+- [Renderer Notes](docs/architecture/renderer.md)
 
-## 📂 Project Structure
-
-```
-runa-engine/
-├── crates/
-│   ├── runa_app/           # App entrypoint (RunaApp and WindowConfig)
-│   ├── runa_assets/        # Audio system (rodio)
-│   ├── runa_core/          # Core: ECS, components, scripts
-│   ├── runa_editor/        # Editor and debugger for designing Runa Engine games
-│   ├── runa_hub/           # Launcher for creating/managing projects
-│   ├── runa_render/        # wgpu renderer
-│   └── runa_render_api/    # Renderer-agnostic commands
-├── examples/             # Dev tests
-│   └── sandbox/            # Test sandbox
-├── docs/                 # Documentation
-├── CHANGELOG.md          # Changelog
-├── README.md             # This file
-└── Cargo.toml            # Workspace root
-```
-
-## 📜 License
+## License
 
 Dual-licensed under:
 
 - [MIT License](LICENSE-MIT)
 - [Apache License 2.0](LICENSE-APACHE)
-
-Choose whichever suits your project best.
-
-## 🤝 Contributing
-
-Project is currently private. When public:
-
-- Open Issues for bugs and feature requests
-- Submit PRs to `dev` branch
-- Follow Conventional Commits
-
-## 🙏 Acknowledgements
-
-- **wgpu** — Cross-platform graphics API
-- **glam** — Math library
-- **rodio** — Audio playback
-
----
-
-✨ _Built with ❤️ in Rust_ ✨

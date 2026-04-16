@@ -1,18 +1,35 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use egui::{ColorImage, RichText, TextureHandle, Ui, Vec2};
+use egui::{Color32, ColorImage, RichText, TextureHandle, Ui, Vec2};
 use rfd::FileDialog;
 
 use crate::editor_settings::EditorSettings;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AssetKind {
+    Directory,
+    GenericFile,
+    RustFile,
+    ImageFile,
+    AudioFile,
+    ShaderFile,
+}
+
+#[derive(Clone)]
 pub struct ContentEntry {
     pub name: String,
     pub relative_path: String,
     pub full_path: PathBuf,
-    pub is_dir: bool,
-    pub is_rust_file: bool,
+    kind: AssetKind,
+}
+
+impl ContentEntry {
+    fn is_dir(&self) -> bool {
+        self.kind == AssetKind::Directory
+    }
 }
 
 struct ContentBrowserIcons {
@@ -20,6 +37,9 @@ struct ContentBrowserIcons {
     folder_open: TextureHandle,
     file: TextureHandle,
     rust_file: TextureHandle,
+    image_file: TextureHandle,
+    audio_file: TextureHandle,
+    shader_file: TextureHandle,
 }
 
 struct RenameState {
@@ -45,11 +65,14 @@ pub struct ContentBrowserState {
     clipboard: Option<ClipboardEntry>,
     pending_open_dir: Option<PathBuf>,
     last_message: Option<String>,
+    expanded_dirs: HashSet<PathBuf>,
 }
 
 impl ContentBrowserState {
     pub fn new(project_root: PathBuf) -> Self {
         let entries = collect_directory_entries(&project_root, &project_root, false);
+        let mut expanded_dirs = HashSet::new();
+        expanded_dirs.insert(project_root.clone());
         Self {
             current_dir: project_root.clone(),
             project_root,
@@ -61,10 +84,12 @@ impl ContentBrowserState {
             clipboard: None,
             pending_open_dir: None,
             last_message: None,
+            expanded_dirs,
         }
     }
 
     pub fn open_dir(&mut self, dir: PathBuf, settings: &EditorSettings) {
+        self.ensure_directory_expanded(&dir);
         self.current_dir = dir;
         self.entries = collect_directory_entries(
             &self.project_root,
@@ -85,10 +110,12 @@ impl ContentBrowserState {
 
     pub fn set_project_root(&mut self, project_root: PathBuf, settings: &EditorSettings) {
         self.project_root = project_root.clone();
-        self.current_dir = project_root;
+        self.current_dir = project_root.clone();
         self.selected_path = None;
         self.rename_state = None;
         self.clipboard = None;
+        self.expanded_dirs.clear();
+        self.expanded_dirs.insert(project_root);
         self.refresh(settings);
     }
 
@@ -124,21 +151,20 @@ impl ContentBrowserState {
                             .show(ui, |ui| {
                                 ui.set_min_width(ui.available_width());
                                 let root = self.project_root.clone();
-                                let current = self.current_dir.clone();
                                 let mut next_dir = None;
-                                folder_tree_ui(
-                                    ui,
-                                    &root,
-                                    &current,
-                                    &mut next_dir,
-                                    0,
-                                    5,
-                                    settings.show_hidden_files,
-                                );
+                                self.folder_tree_ui(ui, &root, 0, settings, &mut next_dir);
                                 if let Some(dir) = next_dir {
                                     self.open_dir(dir, settings);
                                 }
                             });
+
+                        let blank_response = ui.allocate_response(
+                            egui::vec2(ui.available_width(), ui.available_height().max(24.0)),
+                            egui::Sense::click(),
+                        );
+                        blank_response.context_menu(|ui| {
+                            self.folder_area_context_menu(ui, settings);
+                        });
                     },
                 );
 
@@ -146,21 +172,27 @@ impl ContentBrowserState {
                     egui::vec2(handle_width, available.y),
                     egui::Sense::click_and_drag(),
                 );
+                if handle_response.hovered() || handle_response.dragged() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                }
                 if handle_response.dragged() {
                     self.sidebar_width = (self.sidebar_width + handle_response.drag_delta().x)
                         .clamp(min_sidebar, max_sidebar);
                 }
-                ui.painter().rect_filled(
-                    handle_rect.shrink2(egui::vec2(2.0, 4.0)),
-                    3.0,
-                    ui.visuals().widgets.inactive.bg_fill,
-                );
+                paint_splitter(ui, handle_rect, &handle_response);
 
                 let right_width = ui.available_width().max(120.0);
                 ui.allocate_ui_with_layout(
                     egui::vec2(right_width, available.y),
                     egui::Layout::top_down(egui::Align::Min),
                     |ui| {
+                        let asset_area_rect = ui.max_rect();
+                        let asset_area_response = ui.interact(
+                            asset_area_rect,
+                            ui.id().with("assets_background_context"),
+                            egui::Sense::click(),
+                        );
+
                         ui.label(RichText::new("Assets").strong());
                         ui.separator();
                         egui::ScrollArea::vertical()
@@ -170,15 +202,12 @@ impl ContentBrowserState {
                                 ui.set_min_width(ui.available_width());
                                 self.content_grid_ui(ui, settings);
                             });
-                        let blank_response = ui.allocate_response(
-                            egui::vec2(ui.available_width(), ui.available_height().max(24.0)),
-                            egui::Sense::click(),
-                        );
-                        if blank_response.clicked() {
+
+                        if asset_area_response.clicked() {
                             self.selected_path = None;
                         }
-                        blank_response.context_menu(|ui| {
-                            self.content_area_context_menu(ui, settings);
+                        asset_area_response.context_menu(|ui| {
+                            self.asset_area_context_menu(ui, self.current_dir.clone(), settings);
                         });
                     },
                 );
@@ -203,7 +232,7 @@ impl ContentBrowserState {
         let cell_width = (settings.content_icon_size + 56.0).max(110.0);
         let cell_height = (settings.content_icon_size + 64.0).max(110.0);
         let columns = ((ui.available_width() / cell_width).floor() as usize).max(1);
-        let entries_snapshot: Vec<ContentEntry> = self.entries.iter().map(clone_entry).collect();
+        let entries_snapshot = self.entries.clone();
 
         for row in entries_snapshot.chunks(columns) {
             ui.horizontal(|ui| {
@@ -260,9 +289,9 @@ impl ContentBrowserState {
                 .layout(egui::Layout::top_down(egui::Align::Center)),
         );
         let content_tint = if is_cut {
-            egui::Color32::from_white_alpha(110)
+            Color32::from_white_alpha(110)
         } else {
-            egui::Color32::WHITE
+            Color32::WHITE
         };
 
         let icon = self.icon_for(entry);
@@ -311,18 +340,24 @@ impl ContentBrowserState {
         }
         if response.double_clicked() {
             self.selected_path = Some(entry.full_path.clone());
-            if entry.is_dir {
+            if entry.is_dir() {
                 self.pending_open_dir = Some(entry.full_path.clone());
             } else {
                 self.edit_file(entry, settings);
             }
         }
 
-        let entry_clone = clone_entry(entry);
+        let entry_clone = entry.clone();
         response.context_menu(|ui| {
-            if !entry_clone.is_dir && ui.button("Edit").clicked() {
+            self.selected_path = Some(entry_clone.full_path.clone());
+            if !entry_clone.is_dir() && ui.button("Edit").clicked() {
                 self.selected_path = Some(entry_clone.full_path.clone());
                 self.edit_file(&entry_clone, settings);
+                ui.close();
+            }
+            if entry_clone.is_dir() && ui.button("Open Folder").clicked() {
+                self.selected_path = Some(entry_clone.full_path.clone());
+                self.pending_open_dir = Some(entry_clone.full_path.clone());
                 ui.close();
             }
             if ui.button("Copy").clicked() {
@@ -337,9 +372,39 @@ impl ContentBrowserState {
                 .add_enabled(self.clipboard.is_some(), egui::Button::new("Paste"))
                 .clicked()
             {
-                self.paste_into(entry_clone.full_path.clone(), settings);
+                self.paste_into(target_directory(&entry_clone.full_path), settings);
                 ui.close();
             }
+            ui.separator();
+            if ui.button("Create Empty Rust File").clicked() {
+                self.create_new_rust_file(
+                    &target_directory(&entry_clone.full_path),
+                    RustFileKind::Empty,
+                    settings,
+                );
+                ui.close();
+            }
+            if ui.button("Create Rust Script").clicked() {
+                self.create_new_rust_file(
+                    &target_directory(&entry_clone.full_path),
+                    RustFileKind::Script,
+                    settings,
+                );
+                ui.close();
+            }
+            if ui.button("Create Folder").clicked() {
+                self.create_folder_in(&target_directory(&entry_clone.full_path), settings);
+                ui.close();
+            }
+            if ui.button("Create WGSL Shader").clicked() {
+                self.create_wgsl_shader(&target_directory(&entry_clone.full_path), settings);
+                ui.close();
+            }
+            if ui.button("Import").clicked() {
+                self.import_assets_into(&target_directory(&entry_clone.full_path), settings);
+                ui.close();
+            }
+            ui.separator();
             if ui.button("Rename").clicked() {
                 self.selected_path = Some(entry_clone.full_path.clone());
                 self.start_rename(entry_clone.full_path.clone());
@@ -352,29 +417,184 @@ impl ContentBrowserState {
         });
     }
 
-    fn content_area_context_menu(&mut self, ui: &mut Ui, settings: &EditorSettings) {
-        if ui.button("New Empty Rust File").clicked() {
-            self.create_new_rust_file(false, settings);
+    fn asset_context_menu(&mut self, ui: &mut Ui, target_dir: PathBuf, settings: &EditorSettings) {
+        if ui.button("Copy").clicked() {
+            if let Some(path) = self.selected_path.clone() {
+                self.copy_entry(path, false);
+            }
             ui.close();
-            return;
         }
-        if ui.button("New Object Script Template").clicked() {
-            self.create_new_rust_file(true, settings);
+        if ui.button("Cut").clicked() {
+            if let Some(path) = self.selected_path.clone() {
+                self.copy_entry(path, true);
+            }
             ui.close();
-            return;
         }
-        if ui.button("Import Assets...").clicked() {
-            self.import_assets(settings);
+        if ui
+            .add_enabled(self.clipboard.is_some(), egui::Button::new("Paste"))
+            .clicked()
+        {
+            self.paste_into(target_dir.clone(), settings);
             ui.close();
-            return;
         }
         ui.separator();
+        if ui.button("Create Empty Rust File").clicked() {
+            self.create_new_rust_file(&target_dir, RustFileKind::Empty, settings);
+            ui.close();
+        }
+        if ui.button("Create Rust Script").clicked() {
+            self.create_new_rust_file(&target_dir, RustFileKind::Script, settings);
+            ui.close();
+        }
+        if ui.button("Create Folder").clicked() {
+            self.create_folder_in(&target_dir, settings);
+            ui.close();
+        }
+        if ui.button("Create WGSL Shader").clicked() {
+            self.create_wgsl_shader(&target_dir, settings);
+            ui.close();
+        }
+        if ui.button("Import").clicked() {
+            self.import_assets_into(&target_dir, settings);
+            ui.close();
+        }
+    }
+
+    fn asset_area_context_menu(
+        &mut self,
+        ui: &mut Ui,
+        target_dir: PathBuf,
+        settings: &EditorSettings,
+    ) {
+        if ui
+            .add_enabled(self.clipboard.is_some(), egui::Button::new("Paste"))
+            .clicked()
+        {
+            self.paste_into(target_dir.clone(), settings);
+            ui.close();
+        }
+        ui.separator();
+        if ui.button("Create Empty Rust File").clicked() {
+            self.create_new_rust_file(&target_dir, RustFileKind::Empty, settings);
+            ui.close();
+        }
+        if ui.button("Create Rust Script").clicked() {
+            self.create_new_rust_file(&target_dir, RustFileKind::Script, settings);
+            ui.close();
+        }
+        if ui.button("Create Folder").clicked() {
+            self.create_folder_in(&target_dir, settings);
+            ui.close();
+        }
+        if ui.button("Create WGSL Shader").clicked() {
+            self.create_wgsl_shader(&target_dir, settings);
+            ui.close();
+        }
+        if ui.button("Import").clicked() {
+            self.import_assets_into(&target_dir, settings);
+            ui.close();
+        }
+    }
+
+    fn folder_area_context_menu(&mut self, ui: &mut Ui, settings: &EditorSettings) {
+        if ui.button("Create Folder").clicked() {
+            self.create_folder_in(&self.current_dir.clone(), settings);
+            ui.close();
+        }
         if ui
             .add_enabled(self.clipboard.is_some(), egui::Button::new("Paste"))
             .clicked()
         {
             self.paste_into(self.current_dir.clone(), settings);
             ui.close();
+        }
+        if self.current_dir != self.project_root && ui.button("Delete Folder").clicked() {
+            self.delete_entry(self.current_dir.clone(), settings);
+            ui.close();
+        }
+    }
+
+    fn folder_entry_context_menu(
+        &mut self,
+        ui: &mut Ui,
+        directory: PathBuf,
+        settings: &EditorSettings,
+    ) {
+        if ui.button("Create Folder").clicked() {
+            self.create_folder_in(&directory, settings);
+            ui.close();
+        }
+        if ui
+            .add_enabled(self.clipboard.is_some(), egui::Button::new("Paste"))
+            .clicked()
+        {
+            self.paste_into(directory.clone(), settings);
+            ui.close();
+        }
+        if directory != self.project_root && ui.button("Delete Folder").clicked() {
+            self.delete_entry(directory, settings);
+            ui.close();
+        }
+    }
+
+    fn folder_tree_ui(
+        &mut self,
+        ui: &mut Ui,
+        root: &Path,
+        depth: usize,
+        settings: &EditorSettings,
+        next_dir: &mut Option<PathBuf>,
+    ) {
+        let directories = collect_subdirectories(root, settings.show_hidden_files);
+
+        for directory in directories {
+            let name = directory
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| directory.display().to_string());
+            let selected = self.current_dir == directory;
+            let expanded = self.expanded_dirs.contains(&directory);
+            let has_children = has_visible_subdirectories(&directory, settings.show_hidden_files);
+            let icons = self.icons.as_ref().expect("icons must be initialized");
+            let folder_icon = if expanded {
+                icons.folder_open.clone()
+            } else {
+                icons.folder.clone()
+            };
+
+            let row = ui.horizontal(|ui| {
+                ui.add_space((depth as f32) * 12.0);
+                let folder_response = ui.add(
+                    egui::Image::new(&folder_icon)
+                        .fit_to_exact_size(egui::vec2(18.0, 18.0))
+                        .sense(if has_children {
+                            egui::Sense::click()
+                        } else {
+                            egui::Sense::hover()
+                        }),
+                );
+                if has_children && folder_response.clicked() {
+                    if expanded {
+                        self.expanded_dirs.remove(&directory);
+                    } else {
+                        self.expanded_dirs.insert(directory.clone());
+                    }
+                }
+
+                let label = ui.selectable_label(selected, name);
+                if label.clicked() {
+                    self.ensure_directory_expanded(&directory);
+                    *next_dir = Some(directory.clone());
+                }
+            });
+
+            row.response.context_menu(|ui| {
+                self.folder_entry_context_menu(ui, directory.clone(), settings);
+            });
+
+            if expanded {
+                self.folder_tree_ui(ui, &directory, depth + 1, settings, next_dir);
+            }
         }
     }
 
@@ -418,11 +638,7 @@ impl ContentBrowserState {
                 if self.current_dir == rename_state.path {
                     self.current_dir = new_path.clone();
                 }
-                self.entries = collect_directory_entries(
-                    &self.project_root,
-                    &self.current_dir,
-                    settings.show_hidden_files,
-                );
+                self.refresh(settings);
             }
             Err(error) => {
                 self.last_message = Some(format!("Rename failed: {error}"));
@@ -512,6 +728,7 @@ impl ContentBrowserState {
                 {
                     self.clipboard = None;
                 }
+                self.expanded_dirs.remove(&path);
                 self.refresh(settings);
                 self.last_message = Some("Deleted item.".to_string());
             }
@@ -521,21 +738,24 @@ impl ContentBrowserState {
         }
     }
 
-    fn create_new_rust_file(&mut self, with_template: bool, settings: &EditorSettings) {
-        let base_name = if with_template {
-            "NewObject"
-        } else {
-            "NewFile"
+    fn create_new_rust_file(
+        &mut self,
+        target_dir: &Path,
+        kind: RustFileKind,
+        settings: &EditorSettings,
+    ) {
+        let base_name = match kind {
+            RustFileKind::Empty => "NewFile",
+            RustFileKind::Script => "NewObject",
         };
-        let path = unique_rust_file_path(&self.current_dir, base_name);
-        let content = if with_template {
-            object_script_template(
+        let path = unique_file_path(target_dir, base_name, "rs");
+        let content = match kind {
+            RustFileKind::Empty => String::new(),
+            RustFileKind::Script => object_script_template(
                 path.file_stem()
                     .and_then(|stem| stem.to_str())
                     .unwrap_or("NewObject"),
-            )
-        } else {
-            String::new()
+            ),
         };
 
         match fs::write(&path, content) {
@@ -550,8 +770,47 @@ impl ContentBrowserState {
         }
     }
 
-    fn import_assets(&mut self, settings: &EditorSettings) {
-        let Some(paths) = FileDialog::new().pick_files() else {
+    fn create_folder_in(&mut self, target_dir: &Path, settings: &EditorSettings) {
+        let path = unique_directory_path(target_dir, "NewFolder");
+        match fs::create_dir_all(&path) {
+            Ok(()) => {
+                self.ensure_directory_expanded(target_dir);
+                self.refresh(settings);
+                self.last_message = Some(format!("Created folder {}.", path.display()));
+            }
+            Err(error) => {
+                self.last_message = Some(format!("Create folder failed: {error}"));
+            }
+        }
+    }
+
+    fn create_wgsl_shader(&mut self, target_dir: &Path, settings: &EditorSettings) {
+        let path = unique_file_path(target_dir, "new_shader", "wgsl");
+        match fs::write(&path, wgsl_shader_template()) {
+            Ok(()) => {
+                self.refresh(settings);
+                self.selected_path = Some(path.clone());
+                self.last_message = Some(format!("Created shader {}.", path.display()));
+            }
+            Err(error) => {
+                self.last_message = Some(format!("Create shader failed: {error}"));
+            }
+        }
+    }
+
+    fn import_assets_into(&mut self, target_dir: &Path, settings: &EditorSettings) {
+        let Some(paths) = FileDialog::new()
+            .set_directory(target_dir)
+            .add_filter(
+                "Supported assets",
+                &["png", "jpg", "jpeg", "ogg", "wav", "ron", "rs", "wgsl"],
+            )
+            .add_filter("Images", &["png", "jpg", "jpeg"])
+            .add_filter("Audio", &["ogg", "wav"])
+            .add_filter("Code", &["rs", "wgsl"])
+            .add_filter("Worlds", &["ron"])
+            .pick_files()
+        else {
             return;
         };
 
@@ -560,7 +819,7 @@ impl ContentBrowserState {
             let Some(name) = source.file_name() else {
                 continue;
             };
-            let destination = self.current_dir.join(name);
+            let destination = target_dir.join(name);
             if destination.exists() {
                 continue;
             }
@@ -574,7 +833,7 @@ impl ContentBrowserState {
     }
 
     fn edit_file(&mut self, entry: &ContentEntry, settings: &EditorSettings) {
-        if entry.is_dir {
+        if entry.is_dir() {
             return;
         }
 
@@ -629,76 +888,66 @@ impl ContentBrowserState {
                 "content_browser_rust_file_icon",
                 include_bytes!("../assets/icons/rust-file.png"),
             ),
+            image_file: load_png_texture(
+                ctx,
+                "content_browser_image_file_icon",
+                include_bytes!("../assets/icons/image.png"),
+            ),
+            audio_file: load_png_texture(
+                ctx,
+                "content_browser_audio_file_icon",
+                include_bytes!("../assets/icons/audio.png"),
+            ),
+            shader_file: load_png_texture(
+                ctx,
+                "content_browser_shader_file_icon",
+                include_bytes!("../assets/icons/wgsl.png"),
+            ),
         });
     }
 
     fn icon_for(&self, entry: &ContentEntry) -> &TextureHandle {
         let icons = self.icons.as_ref().expect("icons must be initialized");
-        if entry.is_dir {
-            if self.current_dir == entry.full_path
-                || self.selected_path.as_ref() == Some(&entry.full_path)
-            {
-                &icons.folder_open
-            } else {
-                &icons.folder
+        match entry.kind {
+            AssetKind::Directory => &icons.folder,
+            AssetKind::RustFile => &icons.rust_file,
+            AssetKind::ImageFile => &icons.image_file,
+            AssetKind::AudioFile => &icons.audio_file,
+            AssetKind::ShaderFile => &icons.shader_file,
+            AssetKind::GenericFile => &icons.file,
+        }
+    }
+
+    fn ensure_directory_expanded(&mut self, dir: &Path) {
+        let mut current = Some(dir);
+        while let Some(path) = current {
+            if path.starts_with(&self.project_root) {
+                self.expanded_dirs.insert(path.to_path_buf());
             }
-        } else if entry.is_rust_file {
-            &icons.rust_file
-        } else {
-            &icons.file
+            current = path.parent();
         }
     }
 }
 
-fn folder_tree_ui(
-    ui: &mut Ui,
-    root: &Path,
-    current_dir: &Path,
-    next_dir: &mut Option<PathBuf>,
-    depth: usize,
-    max_depth: usize,
-    show_hidden_files: bool,
-) {
-    let Ok(read_dir) = fs::read_dir(root) else {
-        return;
+#[derive(Clone, Copy)]
+enum RustFileKind {
+    Empty,
+    Script,
+}
+
+fn paint_splitter(ui: &Ui, rect: egui::Rect, response: &egui::Response) {
+    let fill = if response.dragged() {
+        ui.visuals().widgets.active.bg_fill.gamma_multiply(1.2)
+    } else if response.hovered() {
+        ui.visuals().widgets.hovered.bg_fill.gamma_multiply(1.35)
+    } else {
+        ui.visuals().widgets.inactive.bg_fill
     };
-
-    let mut directories: Vec<PathBuf> = read_dir
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .filter(|path| !is_ignored_path(path, show_hidden_files))
-        .collect();
-    directories.sort();
-
-    for directory in directories {
-        let name = directory
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| directory.display().to_string());
-
-        ui.push_id(directory.display().to_string(), |ui| {
-            ui.horizontal(|ui| {
-                ui.add_space((depth as f32) * 12.0);
-                let selected = current_dir == directory.as_path();
-                if ui.selectable_label(selected, name).clicked() {
-                    *next_dir = Some(directory.clone());
-                }
-            });
-        });
-
-        if depth < max_depth {
-            folder_tree_ui(
-                ui,
-                &directory,
-                current_dir,
-                next_dir,
-                depth + 1,
-                max_depth,
-                show_hidden_files,
-            );
-        }
-    }
+    ui.painter()
+        .rect_filled(rect, 3.0, fill.gamma_multiply(0.45));
+    let line_rect = egui::Rect::from_center_size(rect.center(), egui::vec2(4.0, rect.height()));
+    ui.painter()
+        .rect_filled(line_rect.shrink2(egui::vec2(0.0, 4.0)), 3.0, fill);
 }
 
 fn collect_directory_entries(
@@ -722,24 +971,67 @@ fn collect_directory_entries(
             .strip_prefix(project_root)
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| path.display().to_string());
-        let is_dir = path.is_dir();
-        let is_rust_file = path.extension().and_then(|ext| ext.to_str()) == Some("rs");
+        let kind = classify_asset_kind(&path);
 
         entries.push(ContentEntry {
             name,
             relative_path,
             full_path: path,
-            is_dir,
-            is_rust_file,
+            kind,
         });
     }
 
-    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+    entries.sort_by(|a, b| match (a.is_dir(), b.is_dir()) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
         _ => a.name.cmp(&b.name),
     });
     entries
+}
+
+fn collect_subdirectories(root: &Path, show_hidden_files: bool) -> Vec<PathBuf> {
+    let Ok(read_dir) = fs::read_dir(root) else {
+        return Vec::new();
+    };
+
+    let mut directories: Vec<PathBuf> = read_dir
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .filter(|path| !is_ignored_path(path, show_hidden_files))
+        .collect();
+    directories.sort();
+    directories
+}
+
+fn has_visible_subdirectories(path: &Path, show_hidden_files: bool) -> bool {
+    let Ok(read_dir) = fs::read_dir(path) else {
+        return false;
+    };
+
+    read_dir.flatten().any(|entry| {
+        let path = entry.path();
+        path.is_dir() && !is_ignored_path(&path, show_hidden_files)
+    })
+}
+
+fn classify_asset_kind(path: &Path) -> AssetKind {
+    if path.is_dir() {
+        return AssetKind::Directory;
+    }
+
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("rs") => AssetKind::RustFile,
+        Some("png" | "jpg" | "jpeg") => AssetKind::ImageFile,
+        Some("ogg" | "wav" | "mp3") => AssetKind::AudioFile,
+        Some("wgsl") => AssetKind::ShaderFile,
+        _ => AssetKind::GenericFile,
+    }
 }
 
 fn is_ignored_path(path: &Path, show_hidden_files: bool) -> bool {
@@ -765,16 +1057,6 @@ fn load_png_texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> TextureHan
     ctx.load_texture(name, color_image, egui::TextureOptions::LINEAR)
 }
 
-fn clone_entry(entry: &ContentEntry) -> ContentEntry {
-    ContentEntry {
-        name: entry.name.clone(),
-        relative_path: entry.relative_path.clone(),
-        full_path: entry.full_path.clone(),
-        is_dir: entry.is_dir,
-        is_rust_file: entry.is_rust_file,
-    }
-}
-
 fn copy_directory_recursive(source: &Path, destination: &Path) -> std::io::Result<()> {
     fs::create_dir_all(destination)?;
     for entry in fs::read_dir(source)? {
@@ -790,13 +1072,13 @@ fn copy_directory_recursive(source: &Path, destination: &Path) -> std::io::Resul
     Ok(())
 }
 
-fn unique_rust_file_path(directory: &Path, base_name: &str) -> PathBuf {
+fn unique_file_path(directory: &Path, base_name: &str, extension: &str) -> PathBuf {
     let mut index = 0usize;
     loop {
         let file_name = if index == 0 {
-            format!("{base_name}.rs")
+            format!("{base_name}.{extension}")
         } else {
-            format!("{base_name}{index}.rs")
+            format!("{base_name}{index}.{extension}")
         };
         let path = directory.join(file_name);
         if !path.exists() {
@@ -806,8 +1088,39 @@ fn unique_rust_file_path(directory: &Path, base_name: &str) -> PathBuf {
     }
 }
 
+fn unique_directory_path(directory: &Path, base_name: &str) -> PathBuf {
+    let mut index = 0usize;
+    loop {
+        let file_name = if index == 0 {
+            base_name.to_string()
+        } else {
+            format!("{base_name}{index}")
+        };
+        let path = directory.join(file_name);
+        if !path.exists() {
+            return path;
+        }
+        index += 1;
+    }
+}
+
+fn target_directory(path: &Path) -> PathBuf {
+    if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."))
+    }
+}
+
 fn object_script_template(type_name: &str) -> String {
     format!(
-        "use runa_engine::{{\n    runa_core::{{\n        components::{{SpriteRenderer, Transform}},\n        ocs::{{Object, Script}},\n        Vec3,\n    }},\n}};\n\npub struct {type_name} {{\n    speed: f32,\n    direction: Vec3,\n}}\n\nimpl {type_name} {{\n    pub fn new() -> Self {{\n        Self {{\n            speed: 1.0,\n            direction: Vec3::ZERO,\n        }}\n    }}\n}}\n\nimpl Script for {type_name} {{\n    fn construct(&self, object: &mut Object) {{\n        // Register the components this object needs.\n        object\n            .add_component(Transform::default())\n            .add_component(SpriteRenderer::default());\n\n        // Register this object in your place object registry so it appears in the editor.\n    }}\n\n    fn update(&mut self, object: &mut Object, dt: f32) {{\n        let _ = (&self.speed, &self.direction, object, dt);\n    }}\n}}\n"
+        "use runa_engine::{{\n    runa_core::{{\n        components::{{SpriteRenderer, Transform}},\n        ocs::{{Object, Script}},\n        Vec3,\n    }},\n}};\n\npub struct {type_name} {{\n    speed: f32,\n    direction: Vec3,\n}}\n\nimpl {type_name} {{\n    pub fn new() -> Self {{\n        Self {{\n            speed: 1.0,\n            direction: Vec3::ZERO,\n        }}\n    }}\n}}\n\nimpl Script for {type_name} {{\n    fn construct(&self, object: &mut Object) {{\n        object\n            .add_component(Transform::default())\n            .add_component(SpriteRenderer::default());\n    }}\n\n    fn update(&mut self, object: &mut Object, dt: f32) {{\n        let _ = (&self.speed, &self.direction, object, dt);\n    }}\n}}\n"
     )
 }
+
+fn wgsl_shader_template() -> &'static str {
+    "@group(0) @binding(0)\nvar<uniform> globals: mat4x4<f32>;\n\nstruct VertexInput {\n    @location(0) position: vec3<f32>,\n    @location(1) uv: vec2<f32>,\n};\n\nstruct VertexOutput {\n    @builtin(position) clip_position: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n};\n\n@vertex\nfn vs_main(input: VertexInput) -> VertexOutput {\n    var out: VertexOutput;\n    out.clip_position = globals * vec4<f32>(input.position, 1.0);\n    out.uv = input.uv;\n    return out;\n}\n\n@fragment\nfn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {\n    return vec4<f32>(input.uv, 0.5, 1.0);\n}\n"
+}
+

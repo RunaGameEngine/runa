@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::sync::Arc;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::resources::texture::GpuTexture;
 use runa_asset::TextureAsset;
@@ -228,6 +228,7 @@ impl FontManager {
             width: self.atlas_width,
             height: self.atlas_height,
             pixels,
+            path: PathBuf::new(),
         };
 
         GpuTexture::from_asset(device, queue, &temp_asset)

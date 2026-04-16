@@ -8,6 +8,17 @@ pub struct SpriteRenderer {
 }
 
 impl SpriteRenderer {
+    pub fn new(texture: Option<Handle<TextureAsset>>) -> Self {
+        let texture_path = texture
+            .as_ref()
+            .map(|handle| handle.inner.path.to_string_lossy().to_string());
+
+        Self {
+            texture,
+            texture_path,
+        }
+    }
+
     /// texture = None
     pub fn default() -> Self {
         Self {

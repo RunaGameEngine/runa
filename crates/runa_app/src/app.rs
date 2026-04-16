@@ -13,7 +13,7 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Fullscreen, Window, WindowId};
+use winit::window::{Window, WindowId};
 
 #[derive(Debug, Clone)]
 pub struct RunaWindowConfig {
@@ -64,18 +64,8 @@ pub struct App<'window> {
 
 impl<'window> App<'window> {
     fn toggle_fullscreen(&mut self) {
-        if let Some(window) = &self.window {
-            self.config.fullscreen = !self.config.fullscreen;
-
-            if self.config.fullscreen {
-                // Open fullscreen
-                let fullscreen = Some(Fullscreen::Borderless(window.current_monitor()));
-                window.set_fullscreen(fullscreen);
-            } else {
-                // Close fullscreen
-                window.set_fullscreen(None);
-            }
-        }
+        runa_core::input_system::toggle_fullscreen();
+        self.config.fullscreen = runa_core::input_system::is_fullscreen().unwrap_or(false);
     }
 
     fn render(&mut self) {
@@ -119,6 +109,8 @@ impl<'window> App<'window> {
                     / now.duration_since(self.last_fps_update).as_secs_f32();
                 self.frame_count = 0;
                 self.last_fps_update = now;
+                self.config.title = runa_core::input_system::window_title()
+                    .unwrap_or_else(|| self.config.title.clone());
                 if self.config.show_fps_in_title {
                     window.set_title(&format!(
                         "{} - {:.1} FPS",
@@ -228,18 +220,17 @@ impl<'window> ApplicationHandler for App<'window> {
                 }
             }
 
-            if self.config.fullscreen {
-                // Open fullscreen
-                let fullscreen = Some(Fullscreen::Borderless(window.current_monitor()));
-                window.set_fullscreen(fullscreen);
-            } else {
-                // Close fullscreen
-                window.set_fullscreen(None);
-            }
+            runa_core::input_system::initialize_window_state(
+                self.config.title.clone(),
+                self.config.fullscreen,
+                (self.config.width, self.config.height),
+            );
             self.window = Some(window.clone());
 
             // Set window handle for input system (cursor control)
             runa_core::input_system::set_window_handle(&window);
+            runa_core::input_system::set_window_size(self.config.width, self.config.height);
+            runa_core::input_system::set_fullscreen(self.config.fullscreen);
 
             let renderer = Renderer::new(window.clone(), self.config.vsync);
             self.renderer = Some(renderer);
@@ -312,6 +303,15 @@ impl<'window> ApplicationHandler for App<'window> {
                 {
                     wgpu_ctx.resize((new_size.width, new_size.height));
                     self.camera.resize(new_size.width, new_size.height);
+                    self.config.width = new_size.width;
+                    self.config.height = new_size.height;
+                    runa_core::input_system::initialize_window_state(
+                        runa_core::input_system::window_title()
+                            .unwrap_or_else(|| self.config.title.clone()),
+                        runa_core::input_system::is_fullscreen()
+                            .unwrap_or(self.config.fullscreen),
+                        (new_size.width, new_size.height),
+                    );
                     window.request_redraw();
                 }
             }
