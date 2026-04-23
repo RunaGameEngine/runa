@@ -39,6 +39,14 @@ This document summarizes the larger runtime/editor changes that landed after `0.
   - `Scripts`
 - Component and script creation now consult the runtime type registry instead of hardcoded editor-side lists
 - SVG icon loading was added for editor-only UI/icon assets
+- `Project Settings` now exposes the manifest-backed app/window settings used by `Play In Window`
+- `Build Settings` now covers build profile, output directory, and Windows release console-hiding
+- `Content Browser -> Live Rust` now separates script-file and archetype-file creation instead of generating both in one template
+
+## Serialized Runtime Data
+
+- Project/world loading now reapplies serialized fields onto existing runtime script/component instances instead of dropping them when the runtime type is already present
+- Archetype-backed object overrides keep serialized script/component entries when the editor reconstructs the object from project metadata
 
 ## Current Known Follow-Ups
 

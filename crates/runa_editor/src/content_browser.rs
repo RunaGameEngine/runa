@@ -413,22 +413,7 @@ impl ContentBrowserState {
                 ui.close();
             }
             ui.separator();
-            if ui.button("Create Empty Rust File").clicked() {
-                self.create_new_rust_file(
-                    &target_directory(&entry_clone.full_path),
-                    RustFileKind::Empty,
-                    settings,
-                );
-                ui.close();
-            }
-            if ui.button("Create Rust Script").clicked() {
-                self.create_new_rust_file(
-                    &target_directory(&entry_clone.full_path),
-                    RustFileKind::Script,
-                    settings,
-                );
-                ui.close();
-            }
+            self.live_rust_menu_ui(ui, &target_directory(&entry_clone.full_path), settings);
             if ui.button("Create Folder").clicked() {
                 self.create_folder_in(&target_directory(&entry_clone.full_path), settings);
                 ui.close();
@@ -475,14 +460,7 @@ impl ContentBrowserState {
             ui.close();
         }
         ui.separator();
-        if ui.button("Create Empty Rust File").clicked() {
-            self.create_new_rust_file(&target_dir, RustFileKind::Empty, settings);
-            ui.close();
-        }
-        if ui.button("Create Rust Script").clicked() {
-            self.create_new_rust_file(&target_dir, RustFileKind::Script, settings);
-            ui.close();
-        }
+        self.live_rust_menu_ui(ui, &target_dir, settings);
         if ui.button("Create Folder").clicked() {
             self.create_folder_in(&target_dir, settings);
             ui.close();
@@ -511,14 +489,7 @@ impl ContentBrowserState {
             ui.close();
         }
         ui.separator();
-        if ui.button("Create Empty Rust File").clicked() {
-            self.create_new_rust_file(&target_dir, RustFileKind::Empty, settings);
-            ui.close();
-        }
-        if ui.button("Create Rust Script").clicked() {
-            self.create_new_rust_file(&target_dir, RustFileKind::Script, settings);
-            ui.close();
-        }
+        self.live_rust_menu_ui(ui, &target_dir, settings);
         if ui.button("Create Folder").clicked() {
             self.create_folder_in(&target_dir, settings);
             ui.close();
@@ -788,6 +759,7 @@ impl ContentBrowserState {
         let base_name = match kind {
             RustFileKind::Empty => "NewFile",
             RustFileKind::Script => "NewObject",
+            RustFileKind::Archetype => "NewArchetype",
         };
         let path = unique_file_path(target_dir, base_name, "rs");
         let content = match kind {
@@ -796,6 +768,11 @@ impl ContentBrowserState {
                 path.file_stem()
                     .and_then(|stem| stem.to_str())
                     .unwrap_or("NewObject"),
+            ),
+            RustFileKind::Archetype => object_archetype_template(
+                path.file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .unwrap_or("NewArchetype"),
             ),
         };
 
@@ -951,12 +928,30 @@ impl ContentBrowserState {
             current = path.parent();
         }
     }
+
+    fn live_rust_menu_ui(&mut self, ui: &mut Ui, target_dir: &Path, settings: &EditorSettings) {
+        ui.menu_button("Live Rust", |ui| {
+            if ui.button("New Empty Rust File").clicked() {
+                self.create_new_rust_file(target_dir, RustFileKind::Empty, settings);
+                ui.close();
+            }
+            if ui.button("New Rust Script").clicked() {
+                self.create_new_rust_file(target_dir, RustFileKind::Script, settings);
+                ui.close();
+            }
+            if ui.button("New Rust Archetype").clicked() {
+                self.create_new_rust_file(target_dir, RustFileKind::Archetype, settings);
+                ui.close();
+            }
+        });
+    }
 }
 
 #[derive(Clone, Copy)]
 enum RustFileKind {
     Empty,
     Script,
+    Archetype,
 }
 
 fn paint_splitter(ui: &Ui, rect: egui::Rect, response: &egui::Response) {
@@ -1140,6 +1135,47 @@ fn target_directory(path: &Path) -> PathBuf {
 }
 
 fn object_script_template(type_name: &str) -> String {
+    format!(
+        r#"use runa_engine::{{
+    runa_core::{{
+        components::Transform,
+        ocs::{{Script, ScriptContext}},
+        Vec3,
+    }},
+    RunaScript,
+}};
+
+#[derive(RunaScript)]
+pub struct {type_name} {{
+    #[serialize_field]
+    speed: f32,
+    #[serialize_field]
+    direction: Vec3,
+}}
+
+impl {type_name} {{
+    pub fn new() -> Self {{
+        Self {{
+            speed: 1.0,
+            direction: Vec3::ZERO,
+        }}
+    }}
+}}
+
+impl Script for {type_name} {{
+    fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {{
+        let movement = self.direction.normalize_or_zero() * self.speed * dt;
+
+        if let Some(transform) = ctx.get_component_mut::<Transform>() {{
+            transform.position += movement;
+        }}
+    }}
+}}
+"#,
+    )
+}
+
+fn object_archetype_template(type_name: &str) -> String {
     let type_name_snake = type_name
         .chars()
         .enumerate()
@@ -1152,12 +1188,10 @@ fn object_script_template(type_name: &str) -> String {
             chars
         })
         .collect::<String>();
-    let archetype_name = format!("{type_name}Archetype");
 
     format!(
-        "use runa_engine::{{\n    runa_core::{{\n        components::Transform,\n        ocs::{{Object, Script, ScriptContext, World}},\n        Vec3,\n    }},\n    RunaArchetype,\n    RunaScript,\n}};\n\n#[derive(RunaScript)]\npub struct {type_name} {{\n    #[serialize_field]\n    speed: f32,\n    #[serialize_field]\n    direction: Vec3,\n}}\n\nimpl {type_name} {{\n    pub fn new() -> Self {{\n        Self {{\n            speed: 1.0,\n            direction: Vec3::ZERO,\n        }}\n    }}\n}}\n\nimpl Script for {type_name} {{\n    fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {{\n        let _ = (&self.speed, &self.direction, dt);\n\n        if let Some(transform) = ctx.get_component_mut::<Transform>() {{\n            let _ = transform;\n        }}\n    }}\n}}\n\npub fn create_{type_name_snake}() -> Object {{\n    Object::new(\"{type_name}\")\n        .with({type_name}::new())\n}}\n\n#[derive(RunaArchetype)]\n#[runa(name = \"{type_name_snake}\")]\npub struct {archetype_name};\n\nimpl {archetype_name} {{\n    pub fn create(world: &mut World) -> u64 {{\n        world.spawn(create_{type_name_snake}())\n    }}\n}}\n",
+        "use runa_engine::{{\n    runa_core::ocs::{{Object, World}},\n    RunaArchetype,\n}};\n\n#[derive(RunaArchetype)]\n#[runa(name = \"{type_name_snake}\")]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn create(world: &mut World) -> u64 {{\n        world.spawn(Object::new(\"{type_name}\"))\n    }}\n}}\n",
         type_name_snake = type_name_snake,
-        archetype_name = archetype_name,
     )
 }
 

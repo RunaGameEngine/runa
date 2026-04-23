@@ -3,11 +3,11 @@
 <rect x="7" y="7" width="5" height="5" rx="1" fill="#AAAAAA"/>
 <rect x="7" y="7" width="5" height="5" rx="1" fill="#AAAAAA"/>
 <rect x="2" y="12" width="5" height="3" rx="1" fill="#AAAAAA"/>
-<rect x="12" y="12" width="3" height="2" rx="1" fill="#AAAAAA"/>
-<rect x="12" y="2" width="3" height="5" rx="1" fill="#AAAAAA"/>
+<path d="M12 13C12 12.4477 12.4477 12 13 12H14V14H12V13Z" fill="#AAAAAA"/>
+<path d="M12 3C12 2.44772 12.4477 2 13 2H14V7H13C12.4477 7 12 6.55228 12 6V3Z" fill="#AAAAAA"/>
 <rect x="7" y="2" width="5" height="5" rx="1" fill="#888888"/>
 <rect x="7" y="12" width="5" height="3" rx="1" fill="#888888"/>
-<rect x="12" y="7" width="3" height="5" rx="1" fill="#888888"/>
+<path d="M12 8C12 7.44772 12.4477 7 13 7H14V12H13C12.4477 12 12 11.5523 12 11V8Z" fill="#888888"/>
 <rect x="2" y="7" width="5" height="5" rx="1" fill="#888888"/>
 <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" stroke="#0077FF"/>
 </svg>

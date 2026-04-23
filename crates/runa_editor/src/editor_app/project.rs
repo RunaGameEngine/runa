@@ -253,6 +253,123 @@ impl<'window> EditorApp<'window> {
         }
     }
 
+    pub(super) fn build_project(&mut self) {
+        let Some(session) = self.project_session.as_ref().cloned() else {
+            self.status_line = "Open a project before building.".to_string();
+            return;
+        };
+
+        if self.build_process.is_some() {
+            self.status_line = "Build is already running.".to_string();
+            return;
+        }
+
+        if let Err(error) = ensure_release_windows_subsystem(
+            &session.project.root_dir,
+            session.project.manifest.build.hide_console_window_on_windows,
+        ) {
+            self.status_line = format!("Failed to prepare release main.rs: {error}");
+            self.push_output(self.status_line.clone());
+            return;
+        }
+
+        let release = session.project.manifest.build.release;
+        let profile_label = if release { "release" } else { "debug" };
+        let mut command = Command::new("cargo");
+        command
+            .arg("build")
+            .arg("--bin")
+            .arg(&session.project.manifest.binary_name)
+            .current_dir(&session.project.root_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if release {
+            command.arg("--release");
+        }
+        placeables::configure_background_command(&mut command);
+
+        match command.spawn() {
+            Ok(child) => {
+                self.build_process = Some(child);
+                if let Some(child_ref) = self.build_process.as_mut() {
+                    placeables::attach_child_output(child_ref, self.output_tx.clone(), "build");
+                }
+                self.status_line = format!("Started {profile_label} build.");
+                self.push_output(self.status_line.clone());
+            }
+            Err(error) => {
+                self.status_line = format!("Failed to start build: {error}");
+                self.push_output(self.status_line.clone());
+            }
+        }
+    }
+
+    pub(super) fn update_build_process_state(&mut self) {
+        let Some(child) = self.build_process.as_mut() else {
+            return;
+        };
+
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let Some(session) = self.project_session.as_ref().cloned() else {
+                    self.build_process = None;
+                    return;
+                };
+                self.build_process = None;
+
+                if !status.success() {
+                    self.status_line = format!("Build failed with status {status}.");
+                    self.push_output(self.status_line.clone());
+                    return;
+                }
+
+                let profile_dir = if session.project.manifest.build.release {
+                    "release"
+                } else {
+                    "debug"
+                };
+                let executable_name = if cfg!(target_os = "windows") {
+                    format!("{}.exe", session.project.manifest.binary_name)
+                } else {
+                    session.project.manifest.binary_name.clone()
+                };
+                let source_binary = session
+                    .project
+                    .root_dir
+                    .join("target")
+                    .join(profile_dir)
+                    .join(&executable_name);
+                let output_dir = session
+                    .project
+                    .root_dir
+                    .join(&session.project.manifest.build.output_dir);
+                let destination_binary = output_dir.join(&executable_name);
+
+                match std::fs::create_dir_all(&output_dir)
+                    .and_then(|_| std::fs::copy(&source_binary, &destination_binary).map(|_| ()))
+                {
+                    Ok(()) => {
+                        self.status_line =
+                            format!("Build finished: {}", destination_binary.display());
+                        self.push_output(self.status_line.clone());
+                    }
+                    Err(error) => {
+                        self.status_line = format!(
+                            "Build finished but failed to copy artifact: {error}"
+                        );
+                        self.push_output(self.status_line.clone());
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                self.build_process = None;
+                self.status_line = format!("Failed to poll build process: {error}");
+                self.push_output(self.status_line.clone());
+            }
+        }
+    }
+
     pub(super) fn poll_project_load(&mut self) {
         let Some(receiver) = self.project_load.as_ref() else {
             return;

@@ -68,6 +68,7 @@ The runtime is code-first:
 - project scaffolding
 - experimental editor
 - experimental hub/launcher
+- editor-side build flow with project/build settings
 
 ## Current Limits
 
@@ -214,6 +215,12 @@ Good practice in Runa:
 - use `ObjectId` and queries for object communication
 
 Script fields intended for editor/runtime serialization can be exposed through public fields or `#[serialize_field]` on private fields when using the derive macros.
+
+Editor workflow notes:
+
+- `Project Settings` edits the project manifest, including the `RunaWindowConfig` values used by `Play In Window`
+- `Build Settings` controls release/debug output and Windows console-hiding for final builds
+- `Content Browser -> Live Rust` now separates `New Rust Script` from `New Rust Archetype`, so scripts can be authored without bundling archetype code into the same file
 
 ## Documentation
 

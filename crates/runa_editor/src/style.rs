@@ -22,6 +22,9 @@ pub const RENDER_CLEAR_COLOR: Color = Color {
 /// Panel background color (hierarchy, inspector, content browser).
 pub const PANEL_BACKGROUND: Color32 = Color32::from_rgb(24, 24, 24);
 
+/// Component card background color (slightly lighter than panel background).
+pub const COMPONENT_BACKGROUND: Color32 = Color32::from_rgb(32, 32, 32);
+
 /// Error color for displaying errors and validation messages.
 pub const ERROR_COLOR: Color32 = Color32::from_rgb(255, 80, 80);
 
@@ -36,6 +39,9 @@ pub const BORDER_COLOR: Color32 = Color32::from_rgb(15, 15, 15);
 
 /// Text color for primary/normal text.
 pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(200, 200, 200);
+
+/// Component title text color.
+pub const COMPONENT_TITLE_COLOR: Color32 = Color32::from_rgb(220, 220, 220);
 
 /// Accent color for buttons and interactive elements.
 pub const ACCENT_COLOR: Color32 = Color32::from_rgb(70, 130, 220);
@@ -54,6 +60,9 @@ pub mod spacing {
     /// Icon size in content browser (default).
     pub const CONTENT_ICON_SIZE: f32 = 48.0;
 
+    /// Icon size for component icons in inspector.
+    pub const COMPONENT_ICON_SIZE: f32 = 16.0;
+
     /// Corner radius for rounded rectangles (in u8 for egui).
     pub const CORNER_RADIUS: u8 = 4;
 }
@@ -67,6 +76,9 @@ pub mod typography {
 
     /// Font size for headings.
     pub const HEADING_FONT_SIZE: f32 = 18.0;
+
+    /// Font size for component titles.
+    pub const COMPONENT_TITLE_FONT_SIZE: f32 = 14.0;
 
     /// Font size for small text (labels, captions).
     pub const SMALL_FONT_SIZE: f32 = 12.0;
@@ -82,6 +94,11 @@ pub mod typography {
     /// Get the font ID for headings.
     pub fn heading_font() -> FontId {
         FontId::new(HEADING_FONT_SIZE, FontFamily::Proportional)
+    }
+
+    /// Get the font ID for component titles (bold style).
+    pub fn component_title_font() -> FontId {
+        FontId::new(COMPONENT_TITLE_FONT_SIZE, FontFamily::Name("Arial Bold".into()))
     }
 
     /// Get the font ID for small text.
@@ -173,6 +190,9 @@ pub fn apply_editor_style(ctx: &egui::Context) {
     style
         .text_styles
         .insert(TextStyle::Small, typography::small_font());
+    style
+        .text_styles
+        .insert(TextStyle::Name("component_title".into()), typography::component_title_font());
 
     ctx.set_global_style(style);
 }

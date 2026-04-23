@@ -2,14 +2,14 @@
 <g clip-path="url(#clip0_21_352)">
 <g filter="url(#filter0_d_21_352)">
 <path d="M1 4H8V11H1V4Z" fill="#D0D0D0"/>
-<path d="M7.5 4.5V10.5H1.5V4.5H7.5Z" stroke="#DE4C36"/>
+<path d="M7.5 4.5V10.5H1.5V4.5H7.5Z" stroke="#FF6666"/>
 </g>
-<path d="M9.79297 1.5L7.79297 3.5H2.03516L3.62207 1.5H9.79297Z" fill="#D9D9D9" stroke="#DE4C36"/>
-<path d="M10.5 7.92871L8.5 9.83301V4.20703L10.5 2.20703V7.92871Z" fill="#B2B2B2" stroke="#DE4C36"/>
-<path d="M8.85289 7.6892L13.7942 10.5421L8.85289 13.395L8.85289 7.6892Z" fill="black"/>
-<rect x="10.2589" y="11.4421" width="1.31769" height="5.27077" transform="rotate(-30 10.2589 11.4421)" fill="black"/>
-<path d="M8.85289 6.64711L13.7942 9.5L8.85289 12.3529L8.85289 6.64711Z" fill="white"/>
-<rect x="10.2589" y="10.4" width="1.31769" height="5.27077" transform="rotate(-30 10.2589 10.4)" fill="white"/>
+<path d="M9.79297 1.5L7.79297 3.5H2.03516L3.62207 1.5H9.79297Z" fill="#D9D9D9" stroke="#FF6666"/>
+<path d="M10.5 7.92871L8.5 9.83301V4.20703L10.5 2.20703V7.92871Z" fill="#B2B2B2" stroke="#FF6666"/>
+<path d="M8.48686 7.171L14.5263 10.6579L8.48686 14.1447L8.48686 7.171Z" fill="black"/>
+<rect x="10.2053" y="11.7579" width="1.61051" height="4.2914" transform="rotate(-30 10.2053 11.7579)" fill="black"/>
+<path d="M8.48686 5.89735L14.5263 9.38421L8.48686 12.8711L8.48686 5.89735Z" fill="white"/>
+<rect x="10.2053" y="10.4842" width="1.61051" height="4.57194" transform="rotate(-30 10.2053 10.4842)" fill="white"/>
 </g>
 <defs>
 <filter id="filter0_d_21_352" x="-1" y="4" width="11" height="11" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">

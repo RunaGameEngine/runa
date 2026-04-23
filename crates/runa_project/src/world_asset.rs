@@ -432,6 +432,12 @@ impl WorldObjectAsset {
                 if self.physics_collision.is_some() {
                     spawned.physics_collision = self.physics_collision;
                 }
+                if !self.serialized_components.is_empty() {
+                    spawned.serialized_components = self.serialized_components;
+                }
+                if !self.serialized_scripts.is_empty() {
+                    spawned.serialized_scripts = self.serialized_scripts;
+                }
                 return spawned.into_object_with_runtime_registry(project_root, None);
             }
         }
@@ -506,9 +512,12 @@ fn apply_serialized_type_assets(
     for asset in assets {
         if let Some(registry) = runtime_registry {
             if let Some(metadata) = registry.types().get_by_name(&asset.type_name) {
-                if registry.add_type_to_object(object, metadata.type_id()) {
+                let type_id = metadata.type_id();
+                let has_runtime_instance =
+                    object.with_component_by_type_id(type_id, |_| ()).is_some();
+                if has_runtime_instance || registry.add_type_to_object(object, type_id) {
                     for field in &asset.fields {
-                        let _ = object.with_component_mut_by_type_id(metadata.type_id(), |component| {
+                        let _ = object.with_component_mut_by_type_id(type_id, |component| {
                             component.set_serialized_field(&field.name, field.value.clone())
                         });
                     }
@@ -823,4 +832,111 @@ fn load_texture_handle(project_root: &Path, relative_path: &str) -> Option<Handl
     Some(Handle {
         inner: std::sync::Arc::new(texture),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_serialized_type_assets, SerializedObjectTypeAsset, WorldObjectAsset};
+    use runa_core::components::{
+        SerializedField, SerializedFieldAccess, SerializedFieldValue, SerializedTypeKind,
+        SerializedTypeStorage,
+    };
+    use runa_core::ocs::{Object, Script, ScriptContext};
+    use runa_core::registry::RuntimeRegistry;
+
+    #[derive(Clone)]
+    struct TestScript {
+        speed: f32,
+    }
+
+    impl SerializedFieldAccess for TestScript {
+        fn serialized_fields(&self) -> Vec<SerializedField> {
+            vec![SerializedField {
+                name: "speed".to_string(),
+                value: SerializedFieldValue::F32(self.speed),
+            }]
+        }
+
+        fn set_serialized_field(&mut self, field_name: &str, value: SerializedFieldValue) -> bool {
+            match (field_name, value) {
+                ("speed", SerializedFieldValue::F32(speed)) => {
+                    self.speed = speed;
+                    true
+                }
+                _ => false,
+            }
+        }
+    }
+
+    impl Script for TestScript {
+        fn update(&mut self, _ctx: &mut ScriptContext, _dt: f32) {}
+    }
+
+    #[test]
+    fn serialized_script_fields_apply_to_existing_runtime_instance() {
+        let mut registry = RuntimeRegistry::new();
+        let metadata = registry.register_script_named_factory::<TestScript, _>(
+            std::any::type_name::<TestScript>(),
+            || TestScript { speed: 1.0 },
+        );
+
+        let mut object = Object::new("Runtime Script");
+        assert!(registry.add_type_to_object(&mut object, metadata.type_id()));
+
+        apply_serialized_type_assets(
+            &mut object,
+            Some(&registry),
+            SerializedTypeKind::Script,
+            vec![SerializedObjectTypeAsset {
+                type_name: std::any::type_name::<TestScript>().to_string(),
+                fields: vec![SerializedField {
+                    name: "speed".to_string(),
+                    value: SerializedFieldValue::F32(9.5),
+                }],
+            }],
+        );
+
+        let applied_speed = object
+            .get_component::<TestScript>()
+            .map(|script| script.speed)
+            .unwrap_or_default();
+        assert!((applied_speed - 9.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn archetype_override_preserves_serialized_script_asset_data() {
+        let mut base_object = Object::new("Base");
+        base_object.add_component(TestScript { speed: 1.0 });
+        let base_asset = WorldObjectAsset::from_object(&base_object);
+
+        let mut override_asset = WorldObjectAsset::from_object(&Object::new("Override"));
+        override_asset.object_id = Some("test_script_archetype".to_string());
+        override_asset.serialized_scripts = vec![SerializedObjectTypeAsset {
+            type_name: std::any::type_name::<TestScript>().to_string(),
+            fields: vec![SerializedField {
+                name: "speed".to_string(),
+                value: SerializedFieldValue::F32(4.0),
+            }],
+        }];
+
+        let object = override_asset.into_object_with_object_loader(None, |_object_id| {
+            Some(base_asset.clone())
+        });
+
+        let serialized_speed = object
+            .get_component::<SerializedTypeStorage>()
+            .and_then(|storage| {
+                storage
+                    .entries_of_kind(SerializedTypeKind::Script)
+                    .find(|entry| entry.type_name == std::any::type_name::<TestScript>())
+            })
+            .and_then(|entry| entry.fields.first())
+            .and_then(|field| match &field.value {
+                SerializedFieldValue::F32(value) => Some(*value),
+                _ => None,
+            })
+            .unwrap_or_default();
+
+        assert!((serialized_speed - 4.0).abs() < f32::EPSILON);
+    }
 }

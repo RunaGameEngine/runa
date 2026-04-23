@@ -175,6 +175,9 @@ In this example:
 - `aggro_radius` is exposed
 - `hidden_runtime_state` stays runtime-only
 
+In the editor, `Content Browser -> Live Rust -> New Rust Script` now generates a pure script file.
+Archetypes are created separately through `New Rust Archetype`, which keeps behavior code and object/template code split cleanly.
+
 ## Migration Summary
 
 - move object assembly out of scripts

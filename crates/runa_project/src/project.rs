@@ -53,6 +53,52 @@ pub struct ProjectManifest {
     pub worlds_dir: String,
     pub scripts_dir: String,
     pub binary_name: String,
+    #[serde(default)]
+    pub app: ProjectAppConfig,
+    #[serde(default)]
+    pub build: ProjectBuildConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectAppConfig {
+    pub window_title: String,
+    pub width: u32,
+    pub height: u32,
+    pub fullscreen: bool,
+    pub vsync: bool,
+    pub show_fps_in_title: bool,
+    pub window_icon: Option<String>,
+}
+
+impl Default for ProjectAppConfig {
+    fn default() -> Self {
+        Self {
+            window_title: "Runa Game".to_string(),
+            width: 1280,
+            height: 720,
+            fullscreen: false,
+            vsync: true,
+            show_fps_in_title: false,
+            window_icon: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectBuildConfig {
+    pub output_dir: String,
+    pub release: bool,
+    pub hide_console_window_on_windows: bool,
+}
+
+impl Default for ProjectBuildConfig {
+    fn default() -> Self {
+        Self {
+            output_dir: "build".to_string(),
+            release: true,
+            hide_console_window_on_windows: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

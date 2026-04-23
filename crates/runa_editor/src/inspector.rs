@@ -981,15 +981,19 @@ fn component_card(
     let state =
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), card_id, true);
 
-    egui::Frame::group(ui.style()).show(ui, |ui| {
+    let frame = egui::Frame {
+        fill: style::COMPONENT_BACKGROUND,
+        ..egui::Frame::group(ui.style())
+    };
+    frame.show(ui, |ui| {
         state
             .show_header(ui, |ui| {
                 ui.add(
                     egui::Image::new(&icon)
-                        .fit_to_exact_size(egui::vec2(18.0, 18.0))
+                        .fit_to_exact_size(egui::vec2(style::spacing::COMPONENT_ICON_SIZE, style::spacing::COMPONENT_ICON_SIZE))
                         .sense(egui::Sense::hover()),
                 );
-                ui.label(RichText::new(title).strong());
+                ui.label(RichText::new(title).text_style(egui::TextStyle::Name("component_title".into())).strong().color(style::COMPONENT_TITLE_COLOR));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if removable && ui.button("Delete").clicked() {
                         if let Some((remove_type_id, _)) = &removal {
@@ -1066,13 +1070,18 @@ fn component_icon_name(type_id: TypeId, kind: ComponentRuntimeKind) -> &'static 
         "c-Camera"
     } else if type_id == TypeId::of::<ActiveCamera>() {
         "c-ActiveCamera"
-    } else if type_id == TypeId::of::<AudioSource>() || type_id == TypeId::of::<AudioListener>() {
+    } else if type_id == TypeId::of::<AudioSource>() {
         "c-AudioSource"
-    } else if type_id == TypeId::of::<Collider2D>() || type_id == TypeId::of::<PhysicsCollision>()
-    {
+    } else if type_id == TypeId::of::<AudioListener>() { 
+        "c-AudioListener"
+    } else if type_id == TypeId::of::<Collider2D>() {
         "c-Collider"
-    } else if type_id == TypeId::of::<CursorInteractable>() || type_id == TypeId::of::<Canvas>() {
+    } else if type_id == TypeId::of::<PhysicsCollision>() { 
+        "c-PhysicsCollision"
+    } else if type_id == TypeId::of::<CursorInteractable>() {
         "c-CursorInteractable"
+    } else if  type_id == TypeId::of::<Canvas>() {
+        "c-Canvas"
     } else if type_id == TypeId::of::<MeshRenderer>() {
         "c-MeshRenderer"
     } else if type_id == TypeId::of::<SpriteRenderer>() {
@@ -1082,7 +1091,7 @@ fn component_icon_name(type_id: TypeId, kind: ComponentRuntimeKind) -> &'static 
     } else if kind == ComponentRuntimeKind::Script {
         "c-Script"
     } else {
-        "c-Script"
+        "c-Object"
     }
 }
 

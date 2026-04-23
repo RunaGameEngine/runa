@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::project::{ProjectError, ProjectManifest, ProjectPaths};
+use crate::project::{ProjectAppConfig, ProjectBuildConfig, ProjectError, ProjectManifest, ProjectPaths};
 use crate::world_asset::{create_empty_world, save_world};
 
 pub fn create_empty_project(
@@ -31,6 +31,11 @@ pub fn create_empty_project(
         worlds_dir: "worlds".to_string(),
         scripts_dir: "src".to_string(),
         binary_name: binary_name.clone(),
+        app: ProjectAppConfig {
+            window_title: project_name.to_string(),
+            ..ProjectAppConfig::default()
+        },
+        build: ProjectBuildConfig::default(),
     };
 
     let project = ProjectPaths {
@@ -49,6 +54,7 @@ pub fn create_empty_project(
         cargo_toml_template(project_name, &binary_name),
     )?;
     ensure_editor_bridge_files(&root_dir)?;
+    ensure_release_windows_subsystem(&root_dir, true)?;
 
     Ok(project)
 }
@@ -58,6 +64,7 @@ pub fn ensure_editor_bridge_files(project_root: &Path) -> Result<(), ProjectErro
     fs::create_dir_all(&proj_dir)?;
     ensure_project_dependencies(project_root)?;
     ensure_public_register_game_types(project_root)?;
+    ensure_project_uses_manifest_app_config(project_root)?;
 
     let place_objects_path = proj_dir.join("place_objects.rs");
     fs::write(
@@ -68,6 +75,32 @@ pub fn ensure_editor_bridge_files(project_root: &Path) -> Result<(), ProjectErro
     let bridge_path = proj_dir.join("runa_object_bridge.rs");
     fs::write(&bridge_path, object_bridge_rs_template())?;
 
+    Ok(())
+}
+
+pub fn ensure_release_windows_subsystem(
+    project_root: &Path,
+    enabled: bool,
+) -> Result<(), ProjectError> {
+    const ATTR: &str = "#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = \"windows\")]";
+
+    let main_rs_path = project_root.join("src").join("main.rs");
+    if !main_rs_path.exists() {
+        return Ok(());
+    }
+
+    let mut content = fs::read_to_string(&main_rs_path)?;
+    let has_attr = content.lines().next().map(|line| line.trim()) == Some(ATTR);
+
+    if enabled && !has_attr {
+        content = format!("{ATTR}\n\n{content}");
+    } else if !enabled && has_attr {
+        content = content.replacen(&format!("{ATTR}\n\n"), "", 1);
+        content = content.replacen(&format!("{ATTR}\n"), "", 1);
+        content = content.replacen(ATTR, "", 1);
+    }
+
+    fs::write(main_rs_path, content)?;
     Ok(())
 }
 
@@ -89,6 +122,34 @@ fn ensure_public_register_game_types(project_root: &Path) -> Result<(), ProjectE
         1,
     );
     fs::write(main_rs_path, updated)?;
+    Ok(())
+}
+
+fn ensure_project_uses_manifest_app_config(project_root: &Path) -> Result<(), ProjectError> {
+    let main_rs_path = project_root.join("src").join("main.rs");
+    if !main_rs_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(&main_rs_path)?;
+    let old_block = r#"    let config = RunaWindowConfig {
+        title: project.manifest.name.clone(),
+        ..RunaWindowConfig::default()
+    };"#;
+    let new_block = r#"    let config = RunaWindowConfig {
+        title: project.manifest.app.window_title.clone(),
+        width: project.manifest.app.width,
+        height: project.manifest.app.height,
+        fullscreen: project.manifest.app.fullscreen,
+        vsync: project.manifest.app.vsync,
+        show_fps_in_title: project.manifest.app.show_fps_in_title,
+        window_icon: project.manifest.app.window_icon.clone(),
+    };"#;
+
+    let updated = content.replace(old_block, new_block);
+    if updated != content {
+        fs::write(main_rs_path, updated)?;
+    }
     Ok(())
 }
 
@@ -215,7 +276,9 @@ fn descriptor(id: &str, name: &str, category: &str) -> PlaceableObjectDescriptor
 }
 
 fn main_rs_template() -> &'static str {
-    r#"use std::sync::Arc;
+    r#"#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
+use std::sync::Arc;
 
 use runa_engine::{
     runa_app::{RunaApp, RunaWindowConfig},
@@ -241,8 +304,13 @@ fn main() {
     world.set_runtime_registry(Arc::new(engine.runtime_registry().clone()));
 
     let config = RunaWindowConfig {
-        title: project.manifest.name.clone(),
-        ..RunaWindowConfig::default()
+        title: project.manifest.app.window_title.clone(),
+        width: project.manifest.app.width,
+        height: project.manifest.app.height,
+        fullscreen: project.manifest.app.fullscreen,
+        vsync: project.manifest.app.vsync,
+        show_fps_in_title: project.manifest.app.show_fps_in_title,
+        window_icon: project.manifest.app.window_icon.clone(),
     };
 
     RunaApp::run_with_config(world, config).expect("Failed to run project");

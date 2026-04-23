@@ -1,10 +1,14 @@
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g clip-path="url(#clip0_20_135)">
-<path d="M10.5 5.5V14.5H1.5V5.5H10.5Z" fill="#D0D0D0" stroke="#6BFF9C"/>
-<path d="M13.793 1.5L10.793 4.5H2.06738L4.56836 1.5H13.793Z" fill="#D9D9D9" stroke="#6BFF9C"/>
-<path d="M14.5 10.793L11.5 13.793V5.20703L14.5 2.20703V10.793Z" fill="#B2B2B2" stroke="#6BFF9C"/>
+<circle cx="5" cy="11" r="1" fill="#FF9500" fill-opacity="0.5"/>
+<path d="M10.25 5.75V14.25H1.75V5.75H10.25Z" stroke="#6BFF9C" stroke-width="1.5"/>
+<path d="M14.5 1.5V10.5H5.5V1.5H14.5Z" stroke="#6BFF9C" stroke-opacity="0.5"/>
+<path d="M13.1895 1.75L10.6895 4.25H2.81055L5.31055 1.75H13.1895Z" stroke="#6BFF9C" stroke-width="1.5"/>
+<path d="M13.793 11.5L10.793 14.5H2.20703L5.20703 11.5H13.793Z" stroke="#6BFF9C" stroke-opacity="0.5"/>
+<path d="M14.25 10.6895L11.75 13.1895V5.31055L14.25 2.81055V10.6895Z" stroke="#6BFF9C" stroke-width="1.5"/>
+<path d="M4.5 10.793L1.5 13.793V5.20703L4.5 2.20703V10.793Z" stroke="#6BFF9C" stroke-opacity="0.5"/>
 <circle cx="1" cy="5" r="1" fill="#FF9500"/>
-<circle cx="4" cy="1" r="1" fill="#FF9500"/>
+<circle cx="5" cy="1" r="1" fill="#FF9500"/>
 <circle cx="15" cy="1" r="1" fill="#FF9500"/>
 <circle cx="15" cy="11" r="1" fill="#FF9500"/>
 <circle cx="11" cy="15" r="1" fill="#FF9500"/>

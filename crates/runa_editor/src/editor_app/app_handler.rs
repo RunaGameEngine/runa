@@ -52,6 +52,12 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
         self.renderer = Some(renderer);
         self.egui_renderer = Some(egui_renderer);
         self.egui_state = Some(egui_state);
+        let mut fonts = egui::FontDefinitions::default();
+        if let Ok(data) = std::fs::read(r"C:\Windows\Fonts\arialbd.ttf") {
+            fonts.font_data.insert("arial_bold".to_owned(), egui::FontData::from_owned(data).into());
+            fonts.families.entry(egui::FontFamily::Name("Arial Bold".into())).or_default().insert(0, "arial_bold".to_owned());
+        }
+        self.egui_ctx.set_fonts(fonts);
         style::apply_editor_style(&self.egui_ctx);
         self.egui_ctx.set_zoom_factor(self.settings.ui_scale);
         self.content_browser.refresh(&self.settings);
@@ -98,6 +104,10 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
             WindowEvent::CloseRequested => {
                 let shutdown_window = window.clone();
                 self.stop_project();
+                if let Some(mut child) = self.build_process.take() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
                 self.editor_camera.shutdown(&shutdown_window);
                 event_loop.exit();
             }
@@ -124,6 +134,7 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
         self.poll_output();
         self.poll_project_load();
         self.update_runtime_process_state();
+        self.update_build_process_state();
         self.refresh_project_metadata(false);
         self.poll_place_object_refresh();
         if let Some(window) = self.window.as_ref() {

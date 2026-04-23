@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - scripts
   - Added inspector separation for `Object`, `Transform`, `Components`, and `Scripts`
   - Added bottom inspector actions for adding components and scripts
+  - Added manifest-backed `Project Settings` for `RunaAppConfig` values used by `Play In Window`
+  - Added `Build Settings` and `Build Game` flow for cargo-driven project builds
+  - Added `Content Browser -> Live Rust` split between script-file and archetype-file creation
 
 ### Changed
 
@@ -50,9 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Mesh renderer editing now supports selecting built-in meshes from the inspector
 
 - **Examples and scaffolding**
-  - Project scaffolding now generates typed-archetype-first runtime bootstrap
-  - Bundled examples were updated to the newer camera constructors and typed archetype flow
-  - `sandbox` camera follow now runs in `late_update()`
+- Project scaffolding now generates typed-archetype-first runtime bootstrap
+- Project scaffolding now writes manifest-backed window config and Windows release subsystem setup
+- Bundled examples were updated to the newer camera constructors and typed archetype flow
+- `sandbox` camera follow now runs in `late_update()`
 
 ### Fixed
 
@@ -62,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime/editor mismatch when using orthographic cameras with resized viewports
 - Editor/project metadata refresh now updates archetype/component/script lists from project bootstrap metadata
 - Project scripts and serialized fields are now visible again in editor-backed inspection flows
+- Serialized script/component overrides now reapply onto existing runtime instances during world loading
+- Archetype-backed world objects now preserve serialized script/component override data through editor reconstruction
 - Final game rendering now matches source sprite colors more closely than the old editor viewport path
 
 ## [0.3.0-alpha.1] - 2026-04-20

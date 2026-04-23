@@ -44,15 +44,34 @@ impl<'window> EditorApp<'window> {
                 });
                 ui.menu_button("Edit", |ui| {
                     if ui.button("Editor Settings").clicked() {
-                        self.settings_open = true;
+                        self.editor_settings_open = true;
                         ui.close();
                     }
                     if ui.button("Project Settings").clicked() {
-                        self.settings_open = true;
+                        self.project_settings_open = true;
                         ui.close();
                     }
                 });
-                ui.menu_button("Build", |ui| if ui.button("Building Settings").clicked() {});
+                ui.menu_button("Build", |ui| {
+                    if ui.button("Build Settings").clicked() {
+                        self.build_settings_open = true;
+                        ui.close();
+                    }
+                    let build_enabled =
+                        self.project_session.is_some() && self.build_process.is_none();
+                    let build_label = if self.build_process.is_some() {
+                        "Building..."
+                    } else {
+                        "Build Game"
+                    };
+                    if ui
+                        .add_enabled(build_enabled, egui::Button::new(build_label))
+                        .clicked()
+                    {
+                        self.build_project();
+                        ui.close();
+                    }
+                });
                 ui.menu_button("View", |ui| {
                     ui.checkbox(&mut self.panels.hierarchy, "Hierarchy");
                     ui.checkbox(&mut self.panels.inspector, "Inspector");
@@ -388,7 +407,9 @@ impl<'window> EditorApp<'window> {
         self.viewport_settings_window(ctx);
         self.rendering_settings_window(ctx);
         self.gizmo_settings_window(ctx);
-        self.settings_window(ctx);
+        self.editor_settings_window(ctx);
+        self.project_settings_window(ctx);
+        self.build_settings_window(ctx);
         self.project_dialog_window(ctx);
         self.project_loading_overlay(ctx);
     }
@@ -673,12 +694,12 @@ impl<'window> EditorApp<'window> {
         });
     }
 
-    fn settings_window(&mut self, ctx: &egui::Context) {
-        if !self.settings_open {
+    fn editor_settings_window(&mut self, ctx: &egui::Context) {
+        if !self.editor_settings_open {
             return;
         }
 
-        let mut open = self.settings_open;
+        let mut open = self.editor_settings_open;
         egui::Window::new("Editor Settings")
             .open(&mut open)
             .resizable(true)
@@ -686,24 +707,23 @@ impl<'window> EditorApp<'window> {
             .movable(true)
             .default_width(460.0)
             .show(ctx, |ui| {
-                ui.heading("External Editor");
-                ui.horizontal(|ui| {
-                    ui.label("Executable");
+                ui.heading("Code Editor");
+                property_row_like(ui, "Executable", |ui| {
                     ui.text_edit_singleline(&mut self.settings.external_editor_executable);
                 });
                 ui.label("Arguments");
-                ui.label("One argument per line. Use {file} as placeholder.");
+                ui.small("Use one argument per line. Use {file} as placeholder.");
                 ui.add(
                     egui::TextEdit::multiline(&mut self.settings.external_editor_args)
                         .desired_rows(3)
                         .desired_width(f32::INFINITY),
                 );
-                ui.horizontal(|ui| {
-                    if ui.button("Use Zed").clicked() {
+                property_row_like(ui, "Presets", |ui| {
+                    if ui.button("Zed").clicked() {
                         self.settings.external_editor_executable = "zed".to_string();
                         self.settings.external_editor_args = "{file}".to_string();
                     }
-                    if ui.button("Use VS Code").clicked() {
+                    if ui.button("VS Code").clicked() {
                         self.settings.external_editor_executable = "code".to_string();
                         self.settings.external_editor_args = "--goto\n{file}".to_string();
                     }
@@ -722,8 +742,7 @@ impl<'window> EditorApp<'window> {
                     (1.75, "175%"),
                     (2.00, "200%"),
                 ];
-                ui.horizontal(|ui| {
-                    ui.label("UI Scale");
+                property_row_like(ui, "UI Scale", |ui| {
                     egui::ComboBox::from_id_salt("editor_ui_scale")
                         .selected_text(
                             UI_SCALE_OPTIONS
@@ -750,19 +769,20 @@ impl<'window> EditorApp<'window> {
                             }
                         });
                 });
-                ui.horizontal(|ui| {
-                    ui.label("Icon Size");
+                property_row_like(ui, "Icon Size", |ui| {
                     ui.add(
                         egui::Slider::new(&mut self.settings.content_icon_size, 32.0..=96.0)
                             .step_by(1.0),
                     );
                 });
-                if ui
-                    .checkbox(&mut self.settings.show_hidden_files, "Show Hidden Files")
-                    .changed()
-                {
-                    self.content_browser.refresh(&self.settings);
-                }
+                property_row_like(ui, "Hidden Files", |ui| {
+                    if ui
+                        .checkbox(&mut self.settings.show_hidden_files, "Show")
+                        .changed()
+                    {
+                        self.content_browser.refresh(&self.settings);
+                    }
+                });
 
                 ui.separator();
                 if ui.button("Save Settings").clicked() {
@@ -777,7 +797,173 @@ impl<'window> EditorApp<'window> {
                     }
                 }
             });
-        self.settings_open = open;
+        self.editor_settings_open = open;
+    }
+
+    fn project_settings_window(&mut self, ctx: &egui::Context) {
+        if !self.project_settings_open {
+            return;
+        }
+
+        let Some(session) = self.project_session.as_mut() else {
+            self.project_settings_open = false;
+            return;
+        };
+
+        let mut open = self.project_settings_open;
+        egui::Window::new("Project Settings")
+            .open(&mut open)
+            .resizable(true)
+            .anchor(Align2::CENTER_CENTER, [0., 0.])
+            .default_width(540.0)
+            .show(ctx, |ui| {
+                ui.heading("Project");
+                property_row_like(ui, "Name", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.name);
+                });
+                property_row_like(ui, "Binary", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.binary_name);
+                });
+                property_row_like(ui, "Startup World", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.startup_world);
+                });
+                property_row_like(ui, "Assets Dir", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.assets_dir);
+                });
+                property_row_like(ui, "Worlds Dir", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.worlds_dir);
+                });
+                property_row_like(ui, "Scripts Dir", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.scripts_dir);
+                });
+
+                ui.separator();
+                ui.heading("RunaAppConfig");
+                property_row_like(ui, "Window Title", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.app.window_title);
+                });
+                property_row_like(ui, "Window Size", |ui| {
+                    ui.add_sized(
+                        [90.0, 22.0],
+                        egui::DragValue::new(&mut session.project.manifest.app.width).range(1..=8192),
+                    );
+                    ui.add_sized(
+                        [90.0, 22.0],
+                        egui::DragValue::new(&mut session.project.manifest.app.height).range(1..=8192),
+                    );
+                });
+                property_row_like(ui, "Fullscreen", |ui| {
+                    ui.checkbox(&mut session.project.manifest.app.fullscreen, "");
+                });
+                property_row_like(ui, "VSync", |ui| {
+                    ui.checkbox(&mut session.project.manifest.app.vsync, "");
+                });
+                property_row_like(ui, "Show FPS", |ui| {
+                    ui.checkbox(&mut session.project.manifest.app.show_fps_in_title, "");
+                });
+                property_row_like(ui, "Window Icon", |ui| {
+                    let mut icon = session
+                        .project
+                        .manifest
+                        .app
+                        .window_icon
+                        .clone()
+                        .unwrap_or_default();
+                    let response = ui.text_edit_singleline(&mut icon);
+                    if response.changed() {
+                        session.project.manifest.app.window_icon =
+                            (!icon.trim().is_empty()).then_some(icon);
+                    }
+                });
+
+                ui.separator();
+                if ui.button("Save Project Settings").clicked() {
+                    match session.project.save_manifest() {
+                        Ok(()) => {
+                            self.status_line = "Project settings saved.".to_string();
+                        }
+                        Err(error) => {
+                            self.status_line =
+                                format!("Failed to save project settings: {error}");
+                        }
+                    }
+                }
+            });
+        self.project_settings_open = open;
+    }
+
+    fn build_settings_window(&mut self, ctx: &egui::Context) {
+        if !self.build_settings_open {
+            return;
+        }
+
+        let Some(session) = self.project_session.as_mut() else {
+            self.build_settings_open = false;
+            return;
+        };
+
+        let mut open = self.build_settings_open;
+        let mut save_clicked = false;
+        let mut build_clicked = false;
+        egui::Window::new("Build Settings")
+            .open(&mut open)
+            .resizable(true)
+            .anchor(Align2::CENTER_CENTER, [0., 0.])
+            .default_width(520.0)
+            .show(ctx, |ui| {
+                ui.heading("Build");
+                property_row_like(ui, "Profile", |ui| {
+                    ui.selectable_value(&mut session.project.manifest.build.release, true, "Release");
+                    ui.selectable_value(&mut session.project.manifest.build.release, false, "Debug");
+                });
+                property_row_like(ui, "Output Dir", |ui| {
+                    ui.text_edit_singleline(&mut session.project.manifest.build.output_dir);
+                });
+                property_row_like(ui, "Hide Console", |ui| {
+                    ui.checkbox(
+                        &mut session.project.manifest.build.hide_console_window_on_windows,
+                        "Windows release build",
+                    );
+                });
+                ui.small("Built executable will be copied from cargo target output into the configured output directory.");
+
+                ui.separator();
+                if ui.button("Save Build Settings").clicked() {
+                    save_clicked = true;
+                }
+                let build_enabled = self.build_process.is_none();
+                let build_label = if self.build_process.is_some() {
+                    "Build Running..."
+                } else {
+                    "Build Game"
+                };
+                if ui
+                    .add_enabled(build_enabled, egui::Button::new(build_label))
+                    .clicked()
+                {
+                    build_clicked = true;
+                }
+            });
+        self.build_settings_open = open;
+
+        if save_clicked {
+            let result = ensure_release_windows_subsystem(
+                &session.project.root_dir,
+                session.project.manifest.build.hide_console_window_on_windows,
+            )
+            .and_then(|_| session.project.save_manifest());
+            match result {
+                Ok(()) => {
+                    self.status_line = "Build settings saved.".to_string();
+                }
+                Err(error) => {
+                    self.status_line = format!("Failed to save build settings: {error}");
+                }
+            }
+        }
+        if build_clicked {
+            self.build_project();
+        }
     }
 
     fn project_dialog_window(&mut self, ctx: &egui::Context) {
