@@ -56,7 +56,7 @@ impl Script for Player {
 pub fn create_player() -> Object {
     Object::new("Player")
         .with(AudioListener::new())
-        .with(Camera::new_ortho(320.0, 180.0))
+        .with(Camera::new_ortho(32.0, 18.0))
         .with(ActiveCamera)
         .with(SpriteRenderer {
             texture: Some(load_image!("assets/art/Charactert.png")),

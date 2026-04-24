@@ -10,7 +10,7 @@ use runa_engine::RunaArchetype;
 pub fn create_tilemap_tester() -> Object {
     let tilemap = {
         let tilesize = 10;
-        let mut tilemap = Tilemap::centered(tilesize, tilesize, USizeVec2::new(2, 2));
+        let mut tilemap = Tilemap::centered(tilesize, tilesize, USizeVec2::new(32, 32));
         let mut layer = TilemapLayer::new("Test".into(), tilesize, tilesize);
         let mut layer2 = TilemapLayer::new("Test2".into(), tilesize, tilesize);
 

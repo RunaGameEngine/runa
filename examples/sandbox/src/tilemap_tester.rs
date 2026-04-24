@@ -12,7 +12,7 @@ pub fn create_tilemap_tester() -> Object {
         let tilesize = 10;
         // The sandbox tilemap intentionally uses simple 2x2 world-unit tiles so
         // sprite/camera alignment bugs are easy to spot while moving around.
-        let mut tilemap = Tilemap::centered(tilesize, tilesize, USizeVec2::new(2, 2));
+        let mut tilemap = Tilemap::centered(tilesize, tilesize, USizeVec2::new(32, 32));
         let mut layer = TilemapLayer::new("Test".into(), tilesize, tilesize);
         let mut layer2 = TilemapLayer::new("Test2".into(), tilesize, tilesize);
 
