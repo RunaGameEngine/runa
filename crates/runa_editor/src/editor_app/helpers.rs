@@ -33,11 +33,10 @@ pub(super) fn create_preview_world() -> World {
 }
 
 pub(super) fn object_title(object: &Object) -> String {
-    match (object.id(), object.name.is_empty()) {
-        (Some(id), true) => format!("Object {id}"),
-        (Some(id), false) => format!("{id}: {}", object.name),
-        (None, true) => "Object".to_string(),
-        (None, false) => object.name.clone(),
+    if object.name.trim().is_empty() {
+        "Object".to_string()
+    } else {
+        object.name.clone()
     }
 }
 

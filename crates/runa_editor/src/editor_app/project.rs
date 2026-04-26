@@ -11,7 +11,7 @@ impl<'window> EditorApp<'window> {
         self.world = helpers::create_preview_world();
         self.world
             .set_runtime_registry(Arc::new(self.runtime_engine.runtime_registry().clone()));
-        self.selection = self.first_object_id();
+        self.set_primary_selection(self.first_object_id());
         self.project_session = None;
         self.project_version_prompt = None;
         self.place_object = PlaceObjectState::default();
@@ -47,7 +47,7 @@ impl<'window> EditorApp<'window> {
     pub(super) fn new_world(&mut self) {
         self.world = create_empty_world();
         self.ensure_world_runtime_registry();
-        self.selection = self.first_object_id();
+        self.set_primary_selection(self.first_object_id());
         if let Some(session) = self.project_session.as_mut() {
             session.current_world_path = None;
         }
@@ -112,7 +112,7 @@ impl<'window> EditorApp<'window> {
         };
         self.world = world;
         self.ensure_world_runtime_registry();
-        self.selection = self.first_object_id();
+        self.set_primary_selection(self.first_object_id());
         self.content_browser
             .set_project_root(project.root_dir.clone(), &self.settings);
         let merged_records =
@@ -157,7 +157,7 @@ impl<'window> EditorApp<'window> {
             Ok(world) => {
                 self.world = world;
                 self.ensure_world_runtime_registry();
-                self.selection = self.first_object_id();
+                self.set_primary_selection(self.first_object_id());
                 if let Some(session) = self.project_session.as_mut() {
                     session.current_world_path = Some(path.clone());
                 }
@@ -174,6 +174,37 @@ impl<'window> EditorApp<'window> {
             self.save_world_to_path(path);
         } else {
             self.save_world_as_dialog();
+        }
+    }
+
+    fn save_current_world_for_play_traced(&mut self, project_root: &std::path::Path) -> bool {
+        self.play_launch_trace(project_root, "save_current_world: started");
+        let Some(path) = self.current_world_path() else {
+            self.status_line = "Save the world before starting Play mode.".to_string();
+            self.play_launch_trace(
+                project_root,
+                "save_current_world: failed, no current world path",
+            );
+            return false;
+        };
+        self.play_launch_trace(
+            project_root,
+            format!("save_current_world: resolved path {}", path.display()),
+        );
+
+        match self.save_world_data_to_path_traced(path, Some(project_root)) {
+            Ok(()) => {
+                self.play_launch_trace(project_root, "save_current_world: completed");
+                true
+            }
+            Err(error) => {
+                self.status_line = format!("Failed to save world before Play mode: {error}");
+                self.play_launch_trace(
+                    project_root,
+                    format!("save_current_world: failed, {error}"),
+                );
+                false
+            }
         }
     }
 
@@ -194,20 +225,8 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn save_world_to_path(&mut self, path: PathBuf) {
-        match save_world(&path, &self.world) {
+        match self.save_world_data_to_path(path.clone()) {
             Ok(()) => {
-                if let Some(session) = self.project_session.as_mut() {
-                    session.current_world_path = Some(path.clone());
-                    if let Ok(relative) = path.strip_prefix(&session.project.root_dir) {
-                        session.project.manifest.startup_world =
-                            relative.to_string_lossy().replace('\\', "/");
-                        if let Err(error) = session.project.save_manifest() {
-                            self.status_line =
-                                format!("World saved but failed to update startup world: {error}");
-                            return;
-                        }
-                    }
-                }
                 if let Err(error) = self.save_project_preview() {
                     self.push_output(format!("Project preview update skipped: {error}"));
                 }
@@ -219,45 +238,185 @@ impl<'window> EditorApp<'window> {
         }
     }
 
+    fn save_world_data_to_path(&mut self, path: PathBuf) -> Result<(), String> {
+        self.save_world_data_to_path_traced(path, None)
+    }
+
+    fn save_world_data_to_path_traced(
+        &mut self,
+        path: PathBuf,
+        play_log_project_root: Option<&std::path::Path>,
+    ) -> Result<(), String> {
+        if let Some(project_root) = play_log_project_root {
+            self.play_launch_trace(
+                project_root,
+                "save_world_data: refresh_object_world_ptrs started",
+            );
+        }
+        self.world.refresh_object_world_ptrs();
+        if let Some(project_root) = play_log_project_root {
+            self.play_launch_trace(
+                project_root,
+                "save_world_data: refresh_object_world_ptrs completed",
+            );
+        }
+        if let Some(project_root) = play_log_project_root {
+            self.play_launch_trace(project_root, "save_world_data: repair_hierarchy started");
+        }
+        self.world.repair_hierarchy();
+        if let Some(project_root) = play_log_project_root {
+            let object_count = self.world.query::<Transform>().len();
+            self.play_launch_trace(
+                project_root,
+                format!("save_world_data: repair_hierarchy completed, objects={object_count}"),
+            );
+            self.play_launch_trace(
+                project_root,
+                format!(
+                    "save_world_data: save_world started, path={}",
+                    path.display()
+                ),
+            );
+        }
+        save_world(&path, &self.world).map_err(|error| error.to_string())?;
+        if let Some(project_root) = play_log_project_root {
+            self.play_launch_trace(project_root, "save_world_data: save_world completed");
+        }
+        let startup_world = self.project_session.as_ref().and_then(|session| {
+            path.strip_prefix(&session.project.root_dir)
+                .ok()
+                .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+        });
+
+        if let Some(startup_world) = startup_world.as_ref() {
+            if let Some(project_root) = play_log_project_root {
+                self.play_launch_trace(
+                    project_root,
+                    format!(
+                        "save_world_data: manifest startup_world update started, value={startup_world}"
+                    ),
+                );
+            }
+        } else if let Some(project_root) = play_log_project_root {
+            self.play_launch_trace(
+                project_root,
+                "save_world_data: manifest startup_world update skipped, path is outside project root",
+            );
+        }
+
+        let manifest_update_result = if let Some(session) = self.project_session.as_mut() {
+            session.current_world_path = Some(path.clone());
+            if let Some(startup_world) = startup_world.as_ref() {
+                session.project.manifest.startup_world = startup_world.clone();
+                session.project.save_manifest().map_err(|error| {
+                    format!("world saved but failed to update startup world: {error}")
+                })
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        };
+        manifest_update_result?;
+
+        if startup_world.is_some() {
+            if let Some(project_root) = play_log_project_root {
+                self.play_launch_trace(
+                    project_root,
+                    "save_world_data: manifest startup_world update completed",
+                );
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn play_project(&mut self) {
         let Some(session) = self.project_session.as_ref().cloned() else {
             self.status_line = "Open a project before starting Play mode.".to_string();
             return;
         };
+        let project_root = session.project.root_dir.clone();
+        self.reset_play_launch_log(&project_root);
+        self.play_launch_trace(
+            &project_root,
+            format!(
+                "play_project: clicked, project={}, root={}, binary={}, world={}",
+                session.project.manifest.name,
+                project_root.display(),
+                session.project.manifest.binary_name,
+                session
+                    .current_world_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<none>".to_string())
+            ),
+        );
 
         if self.runtime_process.is_some() {
+            self.play_launch_trace(&project_root, "stop_existing_runtime: started");
             self.stop_project();
+            self.play_launch_trace(&project_root, "stop_existing_runtime: completed");
+        } else {
+            self.play_launch_trace(&project_root, "stop_existing_runtime: skipped, no process");
         }
 
+        self.play_launch_trace(&project_root, "ensure_editor_bridge_files: started");
         if let Err(error) = ensure_editor_bridge_files(&session.project.root_dir) {
             self.status_line = format!("Failed to refresh project runtime bootstrap: {error}");
-            self.push_output(self.status_line.clone());
+            self.play_launch_trace(
+                &project_root,
+                format!("ensure_editor_bridge_files: failed, {error}"),
+            );
+            return;
+        }
+        self.play_launch_trace(&project_root, "ensure_editor_bridge_files: completed");
+
+        if !self.save_current_world_for_play_traced(&project_root) {
+            self.play_launch_trace(&project_root, "play_project: aborted before command spawn");
             return;
         }
 
-        self.save_current_world();
-
+        self.play_launch_trace(&project_root, "command_setup: started");
         let mut command = Command::new("cargo");
         command
             .args(["run", "--bin", &session.project.manifest.binary_name])
             .current_dir(&session.project.root_dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            // Play mode should not keep live cargo output pipes attached to the editor UI loop.
+            // This avoids native crashes in pipe-reader callbacks while the game process starts.
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        self.play_launch_trace(
+            &project_root,
+            format!(
+                "command_setup: completed, command=cargo run --bin {}, cwd={}",
+                session.project.manifest.binary_name,
+                session.project.root_dir.display()
+            ),
+        );
+        self.play_launch_trace(&project_root, "configure_background_command: started");
         placeables::configure_background_command(&mut command);
+        self.play_launch_trace(&project_root, "configure_background_command: completed");
 
+        self.play_launch_trace(&project_root, "command_spawn: started");
         match command.spawn() {
             Ok(child) => {
+                let child_id = child.id();
+                self.play_launch_trace(
+                    &project_root,
+                    format!("command_spawn: completed, pid={child_id}"),
+                );
                 self.runtime_process = Some(child);
-                if let Some(child_ref) = self.runtime_process.as_mut() {
-                    placeables::attach_child_output(child_ref, self.output_tx.clone(), "play");
-                }
+                self.play_launch_trace(&project_root, "runtime_process_store: completed");
                 self.status_line =
                     format!("Started Play mode for {}.", session.project.manifest.name);
-                self.push_output(self.status_line.clone());
+                self.play_launch_trace(
+                    &project_root,
+                    format!("play_project: completed, {}", self.status_line),
+                );
             }
             Err(error) => {
                 self.status_line = format!("Failed to start Play mode: {error}");
-                self.push_output(self.status_line.clone());
+                self.play_launch_trace(&project_root, format!("command_spawn: failed, {error}"));
             }
         }
     }
@@ -498,6 +657,44 @@ impl<'window> EditorApp<'window> {
             .and_then(|session| session.current_world_path.clone())
     }
 
+    fn reset_play_launch_log(&mut self, project_root: &std::path::Path) {
+        let path = play_launch_log_path(project_root);
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        match std::fs::File::create(&path) {
+            Ok(mut file) => {
+                let _ = writeln!(file, "Runa Editor Play launch log");
+                let _ = writeln!(file, "started_at_unix_ms={}", unix_time_millis());
+                let _ = writeln!(file, "log_path={}", path.display());
+            }
+            Err(error) => {
+                self.push_output(format!(
+                    "[play-launch] failed to reset log {}: {error}",
+                    path.display()
+                ));
+            }
+        }
+    }
+
+    fn play_launch_trace(&mut self, project_root: &std::path::Path, message: impl Into<String>) {
+        let line = format!("[play-launch] {}", message.into());
+        self.push_output(line.clone());
+
+        let path = play_launch_log_path(project_root);
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let _ = writeln!(file, "{} {}", unix_time_millis(), line);
+            let _ = file.flush();
+        }
+    }
+
     pub(super) fn window_title(&self) -> String {
         let version = env!("CARGO_PKG_VERSION");
         if let Some(session) = self.project_session.as_ref() {
@@ -624,6 +821,17 @@ pub(super) fn project_preview_path(project_root: &std::path::Path) -> PathBuf {
     project_root
         .join(".runa_editor")
         .join("project-preview.png")
+}
+
+pub(super) fn play_launch_log_path(project_root: &std::path::Path) -> PathBuf {
+    project_root.join(".runa_editor").join("play-launch.log")
+}
+
+fn unix_time_millis() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
 }
 
 fn chrono_like_timestamp() -> Result<String, String> {

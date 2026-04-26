@@ -341,8 +341,19 @@ impl<'window> EditorApp<'window> {
                             let scroll_start = ui.cursor().min;
                             let mut root_ids = self.world.root_object_ids();
                             root_ids.sort_unstable();
+                            let mut visited = std::collections::HashSet::new();
                             for object_id in root_ids {
-                                self.hierarchy_object_row(ui, object_id, 0);
+                                self.hierarchy_object_row(ui, object_id, 0, &mut visited);
+                            }
+                            for object_id in self.world_object_ids() {
+                                let has_valid_parent = self
+                                    .world
+                                    .get(object_id)
+                                    .and_then(|object| object.parent())
+                                    .is_some_and(|parent_id| self.world.get(parent_id).is_some());
+                                if !visited.contains(&object_id) && !has_valid_parent {
+                                    self.hierarchy_object_row(ui, object_id, 0, &mut visited);
+                                }
                             }
                             let blank_height = (ui.clip_rect().bottom() - ui.cursor().min.y)
                                 .max(24.0)
@@ -352,7 +363,7 @@ impl<'window> EditorApp<'window> {
                                 egui::Sense::click(),
                             );
                             if blank_response.clicked() && ui.cursor().min.y > scroll_start.y {
-                                self.selection = None;
+                                self.clear_selection();
                             }
                             if blank_response.hovered()
                                 && ui.input(|input| input.pointer.any_released())
@@ -1016,7 +1027,11 @@ impl<'window> EditorApp<'window> {
 
     fn hierarchy_context_menu_ui(&mut self, ui: &mut egui::Ui, target_id: Option<ObjectId>) {
         if ui.button("Create Empty Object").clicked() {
-            self.create_empty_object();
+            if let Some(parent_id) = target_id {
+                self.create_empty_child_object(parent_id);
+            } else {
+                self.create_empty_object();
+            }
             ui.close();
             return;
         }
@@ -1024,6 +1039,11 @@ impl<'window> EditorApp<'window> {
         ui.separator();
 
         if let Some(object_id) = target_id {
+            if ui.button("Rename").clicked() {
+                self.begin_hierarchy_rename(object_id);
+                ui.close();
+            }
+            ui.separator();
             if ui.button("Copy").clicked() {
                 self.copy_object(object_id, false);
                 ui.close();
@@ -1060,7 +1080,16 @@ impl<'window> EditorApp<'window> {
         }
     }
 
-    fn hierarchy_object_row(&mut self, ui: &mut egui::Ui, object_id: ObjectId, depth: usize) {
+    fn hierarchy_object_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        object_id: ObjectId,
+        depth: usize,
+        visited: &mut std::collections::HashSet<ObjectId>,
+    ) {
+        if !visited.insert(object_id) {
+            return;
+        }
         let Some(object) = self.world.get(object_id) else {
             return;
         };
@@ -1068,31 +1097,92 @@ impl<'window> EditorApp<'window> {
         let mut children = object.children().to_vec();
         children.sort_unstable();
         let has_children = !children.is_empty();
+        let mut expanded = self.hierarchy_expanded.contains(&object_id);
+        let mut child_state = egui::collapsing_header::CollapsingState::load_with_default_open(
+            ui.ctx(),
+            ui.make_persistent_id(("hierarchy_children", object_id)),
+            expanded,
+        );
+        child_state.set_open(expanded);
 
         ui.horizontal(|ui| {
             ui.add_space(depth as f32 * 16.0);
             if has_children {
-                ui.label("▾");
+                let arrow = if child_state.openness(ui.ctx()) > 0.5 {
+                    "v"
+                } else {
+                    ">"
+                };
+                let arrow_response = ui.add_sized(
+                    egui::vec2(16.0, 18.0),
+                    egui::Button::new(arrow).frame(false),
+                );
+                if arrow_response.clicked() {
+                    if expanded {
+                        self.hierarchy_expanded.remove(&object_id);
+                    } else {
+                        self.hierarchy_expanded.insert(object_id);
+                    }
+                    expanded = !expanded;
+                    child_state.set_open(expanded);
+                }
             } else {
-                ui.label(" ");
+                ui.add_space(16.0);
             }
 
-            let selected = self.selection == Some(object_id);
-            let (rect, response) = ui.allocate_exact_size(
-                egui::vec2(ui.available_width().max(80.0), 22.0),
-                egui::Sense::click_and_drag(),
-            );
-            let visuals = ui.style().interact_selectable(&response, selected);
-            ui.painter().rect_filled(rect, 3.0, visuals.bg_fill);
-            ui.painter().text(
-                rect.left_center() + egui::vec2(4.0, 0.0),
-                egui::Align2::LEFT_CENTER,
-                title,
-                egui::TextStyle::Button.resolve(ui.style()),
-                visuals.text_color(),
-            );
+            let selected = self.selected_objects.contains(&object_id);
+            let response = if self.hierarchy_renaming == Some(object_id) {
+                let response = ui.add_sized(
+                    egui::vec2(ui.available_width().max(80.0), 22.0),
+                    egui::TextEdit::singleline(&mut self.hierarchy_rename_buffer)
+                        .desired_width(f32::INFINITY),
+                );
+                response.request_focus();
+                let commit =
+                    response.lost_focus() || ui.input(|input| input.key_pressed(egui::Key::Enter));
+                let cancel = ui.input(|input| input.key_pressed(egui::Key::Escape));
+                if commit {
+                    self.commit_hierarchy_rename(object_id);
+                } else if cancel {
+                    self.hierarchy_renaming = None;
+                }
+                response
+            } else {
+                let (rect, response) = ui.allocate_exact_size(
+                    egui::vec2(ui.available_width().max(80.0), 22.0),
+                    egui::Sense::click_and_drag(),
+                );
+                let pointer_hovered = ui
+                    .input(|input| input.pointer.hover_pos())
+                    .is_some_and(|position| rect.contains(position));
+                let is_drag_target = self.hierarchy_dragging_object.is_some()
+                    && self.hierarchy_dragging_object != Some(object_id)
+                    && pointer_hovered;
+                let bg_fill = if is_drag_target || (!selected && pointer_hovered) {
+                    style::HOVER_BACKGROUND
+                } else if selected {
+                    style::SELECTION_BACKGROUND
+                } else {
+                    egui::Color32::TRANSPARENT
+                };
+                if bg_fill != egui::Color32::TRANSPARENT {
+                    ui.painter().rect_filled(rect, 3.0, bg_fill);
+                }
+                ui.painter().text(
+                    rect.left_center() + egui::vec2(4.0, 0.0),
+                    egui::Align2::LEFT_CENTER,
+                    title,
+                    egui::TextStyle::Button.resolve(ui.style()),
+                    ui.visuals().text_color(),
+                );
+                response
+            };
             if response.clicked() {
-                self.selection = Some(object_id);
+                let additive = ui.input(|input| input.modifiers.shift);
+                self.select_object(object_id, additive);
+            }
+            if response.double_clicked() {
+                self.begin_hierarchy_rename(object_id);
             }
             if response.drag_started() {
                 self.hierarchy_dragging_object = Some(object_id);
@@ -1101,20 +1191,49 @@ impl<'window> EditorApp<'window> {
                 if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
                     if dragged_id != object_id && self.world.set_parent(dragged_id, Some(object_id))
                     {
-                        self.selection = Some(dragged_id);
+                        self.set_primary_selection(Some(dragged_id));
                         self.status_line = "Reparented object.".to_string();
                     }
                 }
             }
             response.context_menu(|ui| {
-                self.selection = Some(object_id);
+                self.select_object(object_id, false);
                 self.hierarchy_context_menu_ui(ui, Some(object_id));
             });
         });
 
-        for child_id in children {
-            self.hierarchy_object_row(ui, child_id, depth + 1);
+        if has_children {
+            child_state.show_body_unindented(ui, |ui| {
+                for child_id in children {
+                    self.hierarchy_object_row(ui, child_id, depth + 1, visited);
+                }
+            });
+        } else if expanded {
+            for child_id in children {
+                self.hierarchy_object_row(ui, child_id, depth + 1, visited);
+            }
         }
+    }
+
+    fn begin_hierarchy_rename(&mut self, object_id: ObjectId) {
+        let Some(object) = self.world.get(object_id) else {
+            return;
+        };
+        self.hierarchy_renaming = Some(object_id);
+        self.hierarchy_rename_buffer = helpers::object_title(object);
+    }
+
+    fn commit_hierarchy_rename(&mut self, object_id: ObjectId) {
+        let name = self.hierarchy_rename_buffer.trim();
+        if let Some(object) = self.world.get_mut(object_id) {
+            object.name = if name.is_empty() {
+                "Object".to_string()
+            } else {
+                name.to_string()
+            };
+        }
+        self.hierarchy_renaming = None;
+        self.status_line = "Renamed object.".to_string();
     }
 
     fn inspector_actions_ui(&mut self, ui: &mut egui::Ui, object_id: ObjectId) {
@@ -1914,6 +2033,14 @@ impl<'window> EditorApp<'window> {
                 ui.checkbox(&mut self.gizmo_enabled, "Enabled");
                 ui.checkbox(&mut self.show_viewport_grid, "Show Grid");
                 ui.checkbox(&mut self.show_component_icons, "Component Icons");
+                property_row_like(ui, "Icon Size", |ui| {
+                    ui.add_sized(
+                        [120.0, 22.0],
+                        egui::DragValue::new(&mut self.viewport_component_icon_size)
+                            .speed(0.5)
+                            .range(8.0..=64.0),
+                    );
+                });
                 ui.checkbox(&mut self.snap_enabled, "Snap");
                 property_row_like(ui, "Snap Step", |ui| {
                     ui.add_sized(

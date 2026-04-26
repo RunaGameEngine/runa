@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::command::WorldCommand;
@@ -70,6 +71,13 @@ impl World {
 
     pub fn set_runtime_registry(&mut self, runtime_registry: Arc<RuntimeRegistry>) {
         self.runtime_registry = Some(runtime_registry);
+    }
+
+    pub fn refresh_object_world_ptrs(&mut self) {
+        let world_ptr = self as *mut World;
+        for object in &mut self.objects {
+            object.set_world(unsafe { &mut *world_ptr });
+        }
     }
 
     pub fn runtime_registry(&self) -> Option<&RuntimeRegistry> {
@@ -514,9 +522,55 @@ impl World {
         true
     }
 
+    pub fn repair_hierarchy(&mut self) {
+        let ids: HashSet<ObjectId> = self.objects.iter().filter_map(Object::id).collect();
+        let mut parent_map = std::collections::HashMap::new();
+
+        for object in &self.objects {
+            let Some(object_id) = object.id() else {
+                continue;
+            };
+            let Some(parent_id) = object.parent() else {
+                continue;
+            };
+            if parent_id != object_id && ids.contains(&parent_id) {
+                parent_map.insert(object_id, parent_id);
+            }
+        }
+
+        let children: Vec<_> = parent_map.keys().copied().collect();
+        for child_id in children {
+            let mut visited = HashSet::new();
+            let mut current = Some(child_id);
+            while let Some(object_id) = current {
+                if !visited.insert(object_id) {
+                    parent_map.remove(&child_id);
+                    break;
+                }
+                current = parent_map.get(&object_id).copied();
+            }
+        }
+
+        for object in &mut self.objects {
+            let parent = object.id().and_then(|id| parent_map.get(&id).copied());
+            object.set_parent_id(parent);
+            object.clear_children();
+        }
+
+        for (child_id, parent_id) in parent_map {
+            if let Some(parent) = self.get_mut(parent_id) {
+                parent.add_child_id(child_id);
+            }
+        }
+    }
+
     pub fn is_descendant_of(&self, child_id: ObjectId, ancestor_id: ObjectId) -> bool {
         let mut current = self.get(child_id).and_then(Object::parent);
+        let mut visited = HashSet::new();
         while let Some(parent_id) = current {
+            if !visited.insert(parent_id) {
+                return false;
+            }
             if parent_id == ancestor_id {
                 return true;
             }
@@ -530,8 +584,8 @@ impl World {
         object_id: ObjectId,
         interpolation_factor: f32,
     ) -> Option<Mat4> {
-        let object = self.get(object_id)?;
-        self.world_transform_matrix_for_object(object, interpolation_factor)
+        let mut visited = HashSet::new();
+        self.world_transform_matrix_checked(object_id, interpolation_factor, &mut visited)
     }
 
     pub fn take_object(&mut self, id: ObjectId) -> Option<Object> {
@@ -656,23 +710,76 @@ impl World {
         object: &Object,
         interpolation_factor: f32,
     ) -> Option<Mat4> {
+        let object_id = object.id()?;
+        let mut visited = HashSet::new();
+        self.world_transform_matrix_for_object_checked(
+            object_id,
+            object,
+            interpolation_factor,
+            &mut visited,
+        )
+    }
+
+    fn world_transform_matrix_checked(
+        &self,
+        object_id: ObjectId,
+        interpolation_factor: f32,
+        visited: &mut HashSet<ObjectId>,
+    ) -> Option<Mat4> {
+        if !visited.insert(object_id) {
+            return None;
+        }
+        let object = self.get(object_id)?;
+        self.world_transform_matrix_for_object_checked(
+            object_id,
+            object,
+            interpolation_factor,
+            visited,
+        )
+    }
+
+    fn world_transform_matrix_for_object_checked(
+        &self,
+        object_id: ObjectId,
+        object: &Object,
+        interpolation_factor: f32,
+        visited: &mut HashSet<ObjectId>,
+    ) -> Option<Mat4> {
         let transform = object.get_component::<Transform>()?;
         let local = local_transform_matrix(transform, interpolation_factor);
         let Some(parent_id) = object.parent() else {
             return Some(local);
         };
-        Some(self.world_transform_matrix(parent_id, interpolation_factor)? * local)
+        if parent_id == object_id {
+            return None;
+        }
+        Some(self.world_transform_matrix_checked(parent_id, interpolation_factor, visited)? * local)
     }
 
     fn descendant_ids(&self, object_id: ObjectId) -> Vec<ObjectId> {
+        let mut visited = HashSet::new();
+        self.descendant_ids_checked(object_id, &mut visited)
+    }
+
+    fn descendant_ids_checked(
+        &self,
+        object_id: ObjectId,
+        visited: &mut HashSet<ObjectId>,
+    ) -> Vec<ObjectId> {
         let mut result = Vec::new();
+        if !visited.insert(object_id) {
+            return result;
+        }
         let Some(object) = self.get(object_id) else {
             return result;
         };
 
         for child_id in object.children() {
+            if visited.contains(child_id) {
+                continue;
+            }
             result.push(*child_id);
-            result.extend(self.descendant_ids(*child_id));
+            result.extend(self.descendant_ids_checked(*child_id, visited));
         }
 
         result

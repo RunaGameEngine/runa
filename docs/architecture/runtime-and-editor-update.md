@@ -1,6 +1,6 @@
 # Runtime And Editor Update Notes
 
-This document summarizes the larger runtime/editor changes that landed in `0.5.0-alpha.1`.
+This document summarizes the larger runtime/editor changes that landed in `0.5.1-alpha.1`.
 
 ## Runtime
 

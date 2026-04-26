@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1-alpha.1] - 2026-04-26
+
+### Added
+
+- Added safer editor Play launch logging for diagnosing project startup failures.
+- Added hierarchy expand/collapse, inline rename, child object creation, and multi-selection.
+- Added viewport object picking and configurable viewport component icon size.
+
+### Fixed
+
+- Fixed editor crashes during Play/world save caused by stale object-to-world pointers after replacing the runtime world.
+- Hardened object hierarchy traversal against cycles and invalid parent links.
+- Fixed hierarchy drag-and-drop scrolling/hover behavior and collapsed child rendering.
+
 ## [0.5.0-alpha.1] - 2026-04-26
 
 ### Added

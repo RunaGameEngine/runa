@@ -7,8 +7,8 @@ mod viewport;
 mod world_ops;
 
 use std::any::TypeId;
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::collections::{HashMap, HashSet};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
@@ -173,6 +173,7 @@ pub struct EditorApp<'window> {
     world: World,
     scene_queue: RenderQueue,
     selection: Option<ObjectId>,
+    selected_objects: HashSet<ObjectId>,
     content_browser: ContentBrowserState,
     panels: PanelState,
     settings: EditorSettings,
@@ -189,6 +190,9 @@ pub struct EditorApp<'window> {
     place_object: PlaceObjectState,
     hierarchy_clipboard: Option<ObjectClipboard>,
     hierarchy_dragging_object: Option<ObjectId>,
+    hierarchy_expanded: HashSet<ObjectId>,
+    hierarchy_renaming: Option<ObjectId>,
+    hierarchy_rename_buffer: String,
     output_lines: Vec<String>,
     output_tx: Sender<String>,
     output_rx: Receiver<String>,
@@ -202,6 +206,7 @@ pub struct EditorApp<'window> {
     viewport_edit_mode: ViewportEditMode,
     gizmo_enabled: bool,
     show_component_icons: bool,
+    viewport_component_icon_size: f32,
     show_viewport_grid: bool,
     tile_paint: TilePaintToolState,
     snap_enabled: bool,
@@ -230,6 +235,35 @@ impl<'window> EditorApp<'window> {
         self.world.find_first_with::<Transform>()
     }
 
+    fn select_object(&mut self, object_id: ObjectId, additive: bool) {
+        if additive {
+            if self.selected_objects.contains(&object_id) {
+                self.selected_objects.remove(&object_id);
+                if self.selection == Some(object_id) {
+                    self.selection = self.selected_objects.iter().next().copied();
+                }
+                return;
+            }
+        } else {
+            self.selected_objects.clear();
+        }
+        self.selected_objects.insert(object_id);
+        self.selection = Some(object_id);
+    }
+
+    fn set_primary_selection(&mut self, object_id: Option<ObjectId>) {
+        self.selected_objects.clear();
+        if let Some(object_id) = object_id {
+            self.selected_objects.insert(object_id);
+        }
+        self.selection = object_id;
+    }
+
+    fn clear_selection(&mut self) {
+        self.selection = None;
+        self.selected_objects.clear();
+    }
+
     fn new(project_path: Option<PathBuf>) -> Self {
         let startup_root = std::env::current_dir().unwrap_or_default();
         let (output_tx, output_rx) = mpsc::channel();
@@ -241,6 +275,7 @@ impl<'window> EditorApp<'window> {
         let mut world = helpers::create_preview_world();
         world.set_runtime_registry(Arc::new(runtime_engine.runtime_registry().clone()));
         let selection = world.find_first_with::<Transform>();
+        let selected_objects = selection.into_iter().collect();
         let project_dialog = ProjectDialogState {
             open: false,
             name: "MyGame".to_string(),
@@ -266,6 +301,9 @@ impl<'window> EditorApp<'window> {
             place_object: PlaceObjectState::default(),
             hierarchy_clipboard: None,
             hierarchy_dragging_object: None,
+            hierarchy_expanded: HashSet::new(),
+            hierarchy_renaming: None,
+            hierarchy_rename_buffer: String::new(),
             window: None,
             renderer: None,
             egui_state: None,
@@ -275,6 +313,7 @@ impl<'window> EditorApp<'window> {
             world,
             scene_queue: RenderQueue::new(),
             selection,
+            selected_objects,
             content_browser: ContentBrowserState::new(
                 dirs::document_dir().unwrap_or_else(|| startup_root.clone()),
             ),
@@ -288,6 +327,7 @@ impl<'window> EditorApp<'window> {
             viewport_edit_mode: ViewportEditMode::Position,
             gizmo_enabled: true,
             show_component_icons: true,
+            viewport_component_icon_size: 18.0,
             show_viewport_grid: true,
             tile_paint: TilePaintToolState::default(),
             snap_enabled: false,

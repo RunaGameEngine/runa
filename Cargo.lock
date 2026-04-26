@@ -4020,7 +4020,7 @@ checksum = "7204ed6420f698836b76d4d5c2ec5dec7585fd5c3a788fd1cde855d1de598239"
 
 [[package]]
 name = "runa_app"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "runa_asset",
  "runa_core",
@@ -4031,7 +4031,7 @@ dependencies = [
 
 [[package]]
 name = "runa_asset"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "image 0.24.9",
  "rodio",
@@ -4042,7 +4042,7 @@ dependencies = [
 
 [[package]]
 name = "runa_core"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "bytemuck",
  "glam",
@@ -4057,7 +4057,7 @@ dependencies = [
 
 [[package]]
 name = "runa_editor"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "dirs",
  "egui 0.34.1",
@@ -4083,7 +4083,7 @@ dependencies = [
 
 [[package]]
 name = "runa_engine"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "glam",
  "runa_app",
@@ -4095,7 +4095,7 @@ dependencies = [
 
 [[package]]
 name = "runa_hub"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "dirs",
  "eframe",
@@ -4112,7 +4112,7 @@ dependencies = [
 
 [[package]]
 name = "runa_macros"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4121,7 +4121,7 @@ dependencies = [
 
 [[package]]
 name = "runa_project"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "ron 0.8.1",
  "runa_asset",
@@ -4131,7 +4131,7 @@ dependencies = [
 
 [[package]]
 name = "runa_render"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "bytemuck",
  "glam",
@@ -4144,7 +4144,7 @@ dependencies = [
 
 [[package]]
 name = "runa_render_api"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "bytemuck",
  "glam",
@@ -4224,7 +4224,7 @@ dependencies = [
 
 [[package]]
 name = "sandbox"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "runa_app",
  "runa_asset",
@@ -4237,7 +4237,7 @@ dependencies = [
 
 [[package]]
 name = "sandbox_3d"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "runa_app",
  "runa_asset",
@@ -4250,7 +4250,7 @@ dependencies = [
 
 [[package]]
 name = "sandbox_soundtest"
-version = "0.5.0-alpha.1"
+version = "0.5.1-alpha.1"
 dependencies = [
  "runa_app",
  "runa_asset",

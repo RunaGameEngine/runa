@@ -92,8 +92,17 @@ impl<'window> EditorApp<'window> {
 
     pub(super) fn create_empty_object(&mut self) {
         let object_id = self.world.spawn(Object::new("Empty"));
-        self.selection = Some(object_id);
+        self.set_primary_selection(Some(object_id));
         self.status_line = "Created empty object.".to_string();
+    }
+
+    pub(super) fn create_empty_child_object(&mut self, parent_id: ObjectId) {
+        let object_id = self.world.spawn(Object::new("Empty"));
+        if self.world.set_parent(object_id, Some(parent_id)) {
+            self.hierarchy_expanded.insert(parent_id);
+        }
+        self.set_primary_selection(Some(object_id));
+        self.status_line = "Created child object.".to_string();
     }
 
     pub(super) fn create_from_archetype_menu_ui(&mut self, ui: &mut egui::Ui) {
@@ -123,7 +132,7 @@ impl<'window> EditorApp<'window> {
                 let key = archetype.key().clone();
                 if ui.button(&name).clicked() {
                     if let Some(object_id) = self.world.spawn_archetype_by_key(&key) {
-                        self.selection = Some(object_id);
+                        self.set_primary_selection(Some(object_id));
                         self.status_line = format!("Created object from archetype {name}.");
                     } else {
                         self.status_line =
@@ -154,6 +163,7 @@ impl<'window> EditorApp<'window> {
             self.world
                 .set_runtime_registry(Arc::new(self.runtime_engine.runtime_registry().clone()));
         }
+        self.world.refresh_object_world_ptrs();
     }
 
     pub(super) fn runtime_registry(&self) -> &RuntimeRegistry {
@@ -199,13 +209,13 @@ impl<'window> EditorApp<'window> {
         if let Some(target_id) = target_id {
             self.world.set_parent(new_id, Some(target_id));
         }
-        self.selection = Some(new_id);
+        self.set_primary_selection(Some(new_id));
         self.status_line = "Pasted object.".to_string();
     }
 
     pub(super) fn delete_object(&mut self, object_id: ObjectId) {
         self.world.despawn(object_id);
-        self.selection = self.first_object_id();
+        self.set_primary_selection(self.first_object_id());
         self.status_line = "Deleted object.".to_string();
     }
 
@@ -285,7 +295,7 @@ impl<'window> EditorApp<'window> {
         }
 
         let object_id = self.world.spawn(world_object);
-        self.selection = Some(object_id);
+        self.set_primary_selection(Some(object_id));
         self.status_line = format!("Placed object {}.", object.name);
     }
 

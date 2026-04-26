@@ -58,6 +58,7 @@ impl<'window> EditorApp<'window> {
         self.viewport_camera = Some(camera);
         let virtual_size = Vec2::new(target.size().0 as f32, target.size().1 as f32);
 
+        self.world.repair_hierarchy();
         self.scene_queue.clear();
         self.world.render(&mut self.scene_queue, 1.0);
         renderer.draw_to_target(target, &self.scene_queue, camera.matrix(), virtual_size);
@@ -87,6 +88,17 @@ impl<'window> EditorApp<'window> {
             if self.gizmo_drag.is_some() && ctx.input(|input| input.pointer.primary_down()) {
                 let delta = ctx.input(|input| input.pointer.delta());
                 self.drag_selected_object_3d(delta);
+            }
+            if response.clicked_by(egui::PointerButton::Primary) && self.gizmo_drag.is_none() {
+                if let Some(pointer_pos) = response.interact_pointer_pos() {
+                    let additive = ctx.input(|input| input.modifiers.shift);
+                    let picked = self.pick_object_at_screen(response.rect, camera, pointer_pos);
+                    if let Some(object_id) = picked {
+                        self.select_object(object_id, additive);
+                    } else if !additive {
+                        self.clear_selection();
+                    }
+                }
             }
             self.draw_viewport_overlay(ui, response.rect, camera);
             return;
@@ -137,7 +149,12 @@ impl<'window> EditorApp<'window> {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
                 let world_pos = self.viewport_world_pos(response.rect, pointer_pos);
                 if self.gizmo_drag.is_none() {
-                    self.selection = self.pick_object_at_world(world_pos);
+                    let additive = ctx.input(|input| input.modifiers.shift);
+                    if let Some(object_id) = self.pick_object_at_world(world_pos) {
+                        self.select_object(object_id, additive);
+                    } else if !additive {
+                        self.clear_selection();
+                    }
                 }
             }
         }
@@ -250,7 +267,7 @@ impl<'window> EditorApp<'window> {
         }
         self.draw_directional_light_arrows(&painter, rect, camera);
 
-        if let Some(object_id) = self.selection {
+        for object_id in self.selected_objects.iter().copied().collect::<Vec<_>>() {
             self.draw_selected_camera_overlay(&painter, rect, camera, object_id);
             if self.editor_camera.is_orthographic() {
                 if let Some(screen_rect) = self.object_screen_rect(rect, camera, object_id) {
@@ -264,7 +281,9 @@ impl<'window> EditorApp<'window> {
             } else {
                 self.draw_perspective_outline(&painter, rect, camera, object_id);
             }
+        }
 
+        if let Some(object_id) = self.selection {
             if self.gizmo_enabled && self.editor_camera.is_orthographic() {
                 self.draw_transform_gizmo(&painter, rect, camera, object_id);
             } else if self.gizmo_enabled {
@@ -769,6 +788,63 @@ impl<'window> EditorApp<'window> {
         best.map(|entry| entry.0)
     }
 
+    fn pick_object_at_screen(
+        &self,
+        rect: egui::Rect,
+        camera: Camera,
+        pointer_pos: egui::Pos2,
+    ) -> Option<ObjectId> {
+        let mut best: Option<(ObjectId, f32)> = None;
+        for object_id in self.world_object_ids() {
+            let Some(screen_rect) = self.object_screen_rect_any(rect, camera, object_id) else {
+                continue;
+            };
+            if !screen_rect.contains(pointer_pos) {
+                continue;
+            }
+            let area = screen_rect.width().abs() * screen_rect.height().abs();
+            match best {
+                Some((_, best_area)) if area >= best_area => {}
+                _ => best = Some((object_id, area)),
+            }
+        }
+        best.map(|entry| entry.0)
+    }
+
+    fn object_screen_rect_any(
+        &self,
+        rect: egui::Rect,
+        camera: Camera,
+        object_id: ObjectId,
+    ) -> Option<egui::Rect> {
+        if self.editor_camera.is_orthographic() {
+            return self.object_screen_rect(rect, camera, object_id);
+        }
+
+        let object = self.world.get(object_id)?;
+        let (min, max) = helpers::object_world_bounds_3d(object)?;
+        let matrix = self.world.world_transform_matrix(object_id, 1.0)?;
+        let local_position = object.get_component::<Transform>()?.position;
+        let local_matrix = Mat4::from_translation(-local_position);
+        let to_world = matrix * local_matrix;
+
+        let mut min_screen = egui::pos2(f32::INFINITY, f32::INFINITY);
+        let mut max_screen = egui::pos2(f32::NEG_INFINITY, f32::NEG_INFINITY);
+        let mut projected_any = false;
+        for corner in helpers::aabb_corners(min, max) {
+            let world = to_world.transform_point3(corner);
+            let Some(screen) = helpers::world3_to_screen(rect, camera, world) else {
+                continue;
+            };
+            min_screen.x = min_screen.x.min(screen.x);
+            min_screen.y = min_screen.y.min(screen.y);
+            max_screen.x = max_screen.x.max(screen.x);
+            max_screen.y = max_screen.y.max(screen.y);
+            projected_any = true;
+        }
+        projected_any.then(|| egui::Rect::from_min_max(min_screen, max_screen).expand(4.0))
+    }
+
     fn object_screen_rect(
         &self,
         rect: egui::Rect,
@@ -1026,7 +1102,12 @@ impl<'window> EditorApp<'window> {
                 );
                 let offset = helpers::icon_offset(visible_count);
                 let position = screen_anchor + offset;
-                helpers::draw_component_icon(painter, texture.id(), position, 18.0);
+                helpers::draw_component_icon(
+                    painter,
+                    texture.id(),
+                    position,
+                    self.viewport_component_icon_size,
+                );
                 visible_count += 1;
             }
         }
