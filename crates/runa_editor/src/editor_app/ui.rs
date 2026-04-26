@@ -332,6 +332,10 @@ impl<'window> EditorApp<'window> {
                     ui.separator();
                     egui::ScrollArea::vertical()
                         .auto_shrink([false, false])
+                        .scroll_source(egui::containers::scroll_area::ScrollSource {
+                            drag: false,
+                            ..Default::default()
+                        })
                         .id_salt("hierarchy_scroll")
                         .show(ui, |ui| {
                             let scroll_start = ui.cursor().min;
@@ -1074,7 +1078,19 @@ impl<'window> EditorApp<'window> {
             }
 
             let selected = self.selection == Some(object_id);
-            let response = ui.selectable_label(selected, title);
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(ui.available_width().max(80.0), 22.0),
+                egui::Sense::click_and_drag(),
+            );
+            let visuals = ui.style().interact_selectable(&response, selected);
+            ui.painter().rect_filled(rect, 3.0, visuals.bg_fill);
+            ui.painter().text(
+                rect.left_center() + egui::vec2(4.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                title,
+                egui::TextStyle::Button.resolve(ui.style()),
+                visuals.text_color(),
+            );
             if response.clicked() {
                 self.selection = Some(object_id);
             }
