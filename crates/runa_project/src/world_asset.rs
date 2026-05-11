@@ -13,7 +13,7 @@ use runa_core::components::{
     WorldAtmosphere, DEFAULT_SPRITE_PIXELS_PER_UNIT,
 };
 use runa_core::glam::{IVec2, Quat, USizeVec2, Vec2, Vec3};
-use runa_core::ocs::Object;
+use runa_core::ocs::{Object, ObjectComponentInfo};
 use runa_core::World;
 use serde::{Deserialize, Serialize};
 
@@ -238,6 +238,8 @@ pub struct SpriteAnimationClipAsset {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SortingAsset {
     pub order: i32,
+    pub y_sort: bool,
+    pub y_offset: f32,
 }
 
 fn default_sprite_sheet_columns() -> u32 {
@@ -349,6 +351,7 @@ pub struct TilemapLayerAsset {
     pub opacity: f32,
     #[serde(default)]
     pub tiles: Vec<Option<u32>>,
+    pub self_order: i32,
 }
 
 pub fn create_empty_world() -> World {
@@ -417,7 +420,7 @@ impl WorldAsset {
             atmosphere: WorldAtmosphereAsset::from_atmosphere(world.atmosphere()),
             objects: object_ids
                 .into_iter()
-                .filter_map(|object_id| world.get(object_id))
+                .filter_map(|object_id| world.object(object_id))
                 .map(|object| WorldObjectAsset::from_object_with_parent_map(object, &object_index))
                 .collect(),
         }
@@ -654,12 +657,12 @@ impl WorldObjectAsset {
             parent: _,
         } = self;
 
-        if let (Some(archetype_id), Some(registry)) = (object_id.as_ref(), runtime_registry) {
-            let key = runa_core::registry::ArchetypeKey::from(archetype_id.clone());
+        if let (Some(object_def_id), Some(registry)) = (object_id.as_ref(), runtime_registry) {
+            let key = runa_core::registry::ObjectDefKey::from(object_def_id.clone());
             if registry.archetypes().contains_key(&key) {
                 let mut temp_world = World::default();
                 temp_world.set_runtime_registry(Arc::new(registry.clone()));
-                if let Some(spawned_id) = temp_world.spawn_archetype_by_key(&key) {
+                if let Some(spawned_id) = temp_world.spawn_def_by_key(&key) {
                     if let Some(object) = temp_world.take_object(spawned_id) {
                         return apply_asset_overrides_to_object(
                             object,
@@ -881,14 +884,7 @@ fn collect_serialized_type_assets(
 ) -> Vec<SerializedObjectTypeAsset> {
     let mut assets = Vec::new();
     for info in object.component_infos() {
-        let matches_kind = match kind {
-            SerializedTypeKind::Component => {
-                info.kind() == runa_core::components::ComponentRuntimeKind::Component
-            }
-            SerializedTypeKind::Script => {
-                info.kind() == runa_core::components::ComponentRuntimeKind::Script
-            }
-        };
+        let matches_kind = get_matches_type(kind, info);
         if !matches_kind || is_builtin_serialized_type(info.type_id()) {
             continue;
         }
@@ -898,8 +894,7 @@ fn collect_serialized_type_assets(
         {
             let type_name = object
                 .runtime_registry()
-                .and_then(|registry| registry.types().get_by_id(info.type_id()))
-                .map(|metadata| metadata.type_name().to_string())
+                .and_then(|registry| registry.types().get_by_id(info.type_id()).map(|metadata| metadata.type_name().to_string()))
                 .unwrap_or_else(|| info.type_name().to_string());
             assets.push(SerializedObjectTypeAsset { type_name, fields });
         }
@@ -915,6 +910,17 @@ fn collect_serialized_type_assets(
     }
 
     dedup_serialized_assets(assets)
+}
+
+fn get_matches_type(kind: SerializedTypeKind, info: ObjectComponentInfo) -> bool {
+    match kind {
+        SerializedTypeKind::Component => {
+            info.kind() == runa_core::components::ComponentRuntimeKind::Component
+        }
+        SerializedTypeKind::Script => {
+            info.kind() == runa_core::components::ComponentRuntimeKind::Script
+        }
+    }
 }
 
 fn dedup_serialized_assets(
@@ -942,11 +948,7 @@ fn apply_serialized_type_assets(
 ) {
     for asset in assets {
         if let Some(type_id) = find_existing_object_type_id(object, kind, &asset.type_name) {
-            for field in &asset.fields {
-                let _ = object.with_component_mut_by_type_id(type_id, |component| {
-                    component.set_serialized_field(&field.name, field.value.clone())
-                });
-            }
+            for_field(object, &asset, type_id);
             continue;
         }
 
@@ -956,11 +958,7 @@ fn apply_serialized_type_assets(
                 let has_runtime_instance =
                     object.with_component_by_type_id(type_id, |_| ()).is_some();
                 if has_runtime_instance || registry.add_type_to_object(object, type_id) {
-                    for field in &asset.fields {
-                        let _ = object.with_component_mut_by_type_id(type_id, |component| {
-                            component.set_serialized_field(&field.name, field.value.clone())
-                        });
-                    }
+                    for_field(object, &asset, type_id);
                     continue;
                 }
             }
@@ -976,9 +974,17 @@ fn apply_serialized_type_assets(
             fields: asset.fields,
         });
         if object.get_component::<SerializedTypeStorage>().is_some() {
-            object.remove_component_type_id(std::any::TypeId::of::<SerializedTypeStorage>());
+            object.remove_component_type_id(TypeId::of::<SerializedTypeStorage>());
         }
         object.add_component(storage);
+    }
+}
+
+fn for_field(object: &mut Object, asset: &SerializedObjectTypeAsset, type_id: TypeId) {
+    for field in &asset.fields {
+        let _ = object.with_component_mut_by_type_id(type_id, |component| {
+            component.set_serialized_field(&field.name, field.value.clone())
+        });
     }
 }
 
@@ -987,7 +993,7 @@ fn find_existing_object_type_id(
     kind: SerializedTypeKind,
     type_name: &str,
 ) -> Option<TypeId> {
-    let matches_kind = |info: &runa_core::ocs::ObjectComponentInfo| match kind {
+    let matches_kind = |info: &ObjectComponentInfo| match kind {
         SerializedTypeKind::Component => {
             info.kind() == runa_core::components::ComponentRuntimeKind::Component
         }
@@ -1020,12 +1026,12 @@ fn find_existing_object_type_id(
     Some(first.type_id())
 }
 
-fn find_registered_type_metadata<'a>(
-    registry: &'a runa_core::registry::RuntimeRegistry,
+fn find_registered_type_metadata(
+    registry: &runa_core::registry::RuntimeRegistry,
     type_name: &str,
-) -> Option<&'a runa_core::registry::TypeMetadata> {
+) -> Option<runa_core::registry::TypeMetadata> {
     if let Some(metadata) = registry.types().get_by_name(type_name) {
-        return Some(metadata);
+        return Some(metadata.clone());
     }
 
     let short_name = short_type_name(type_name);
@@ -1040,14 +1046,14 @@ fn find_registered_type_metadata<'a>(
         return None;
     }
 
-    registry.types().get_by_id(first.type_id())
+    Some(first)
 }
 
 fn short_type_name(type_name: &str) -> &str {
     type_name.rsplit("::").next().unwrap_or(type_name)
 }
 
-fn is_builtin_serialized_type(type_id: std::any::TypeId) -> bool {
+fn is_builtin_serialized_type(type_id: TypeId) -> bool {
     use std::any::TypeId;
 
     [
@@ -1091,7 +1097,7 @@ impl TransformAsset {
 
 impl MeshRendererAsset {
     fn from_component(component: &MeshRenderer) -> Option<Self> {
-        let primitive = infer_mesh_primitive(&component.mesh)?;
+        let primitive = infer_mesh_primitive(component.get_mesh_handle())?;
         Some(Self {
             primitive,
             color: component.color,
@@ -1110,11 +1116,10 @@ impl MeshRendererAsset {
             } => Mesh::pyramid(width, height, depth),
         };
 
-        MeshRenderer {
-            mesh,
-            material: Material::default(),
-            color: self.color,
-        }
+        let mut renderer = MeshRenderer::new(mesh);
+        renderer.set_material(0, Material::default());
+        renderer.color = self.color;
+        renderer
     }
 }
 
@@ -1208,11 +1213,17 @@ impl SortingAsset {
     fn from_component(component: &Sorting) -> Self {
         Self {
             order: component.order,
+            y_sort: component.y_sort,
+            y_offset: component.y_offset,
         }
     }
 
     fn into_component(self) -> Sorting {
-        Sorting { order: self.order }
+        Sorting {
+            order: self.order,
+            y_sort: false,
+            y_offset: 0.0
+        }
     }
 }
 
@@ -1223,7 +1234,7 @@ impl CameraAsset {
             target: camera.target.to_array(),
             up: camera.up.to_array(),
             perspective: matches!(camera.projection, ProjectionType::Perspective),
-            ortho_size: camera.ortho_size.to_array(),
+            ortho_size: camera.orthographic_size.to_array(),
             near: camera.near,
             far: camera.far,
             fov_radians: camera.fov,
@@ -1250,7 +1261,7 @@ impl CameraAsset {
             camera.resize(self.viewport_size[0], self.viewport_size[1]);
             camera
         } else {
-            let mut camera = Camera::new_ortho(self.ortho_size[0], self.ortho_size[1]);
+            let mut camera = Camera::new_orthographic(self.ortho_size[0], self.ortho_size[1]);
             camera.position = local_position;
             camera.target = local_target;
             camera.up = local_up;
@@ -1320,7 +1331,7 @@ impl AudioSourceAsset {
                 if let Ok(asset) =
                     AudioAsset::from_file(project_root.to_string_lossy().as_ref(), &path)
                 {
-                    audio.set_asset_with_path(Some(std::sync::Arc::new(asset)), Some(path));
+                    audio.set_asset_with_path(Some(Arc::new(asset)), Some(path));
                 } else {
                     audio.source_path = Some(path);
                 }
@@ -1403,6 +1414,7 @@ impl TilemapLayerAsset {
                         .and_then(|atlas| atlas.tile_index_for_uv(tile.uv_rect))
                 })
                 .collect(),
+            self_order: layer.self_order,
         }
     }
 
@@ -1410,6 +1422,7 @@ impl TilemapLayerAsset {
         let mut layer = TilemapLayer::new(self.name, width, height);
         layer.visible = self.visible;
         layer.opacity = self.opacity;
+        layer.self_order = self.self_order;
         for (index, frame) in self.tiles.into_iter().enumerate() {
             let Some(frame) = frame else {
                 continue;
@@ -1425,9 +1438,9 @@ impl TilemapLayerAsset {
     }
 }
 
-fn infer_mesh_primitive(mesh: &Mesh) -> Option<MeshPrimitiveAsset> {
-    let hint = mesh.primitive_hint?;
-    let (min, max) = mesh_bounds(mesh)?;
+fn infer_mesh_primitive(mesh: Handle<Mesh>) -> Option<MeshPrimitiveAsset> {
+    let hint = mesh.inner.primitive_hint?;
+    let (min, max) = mesh_bounds(mesh.inner.as_ref())?;
     let size = max - min;
     match hint {
         runa_core::components::BuiltinMeshPrimitive::Cube => Some(MeshPrimitiveAsset::Cube {
@@ -1471,7 +1484,7 @@ fn project_root_for_world_path(path: &Path) -> Option<PathBuf> {
 fn load_texture_handle(project_root: &Path, relative_path: &str) -> Option<Handle<TextureAsset>> {
     let texture = TextureAsset::load(&project_root.join(relative_path)).ok()?;
     Some(Handle {
-        inner: std::sync::Arc::new(texture),
+        inner: Arc::new(texture),
     })
 }
 
@@ -1605,6 +1618,7 @@ mod tests {
             physics_collision: None,
             serialized_components: Vec::new(),
             serialized_scripts: Vec::new(),
+            parent: None,
         };
 
         let object = asset.into_object_with_runtime_registry(None, Some(&registry));
@@ -1647,6 +1661,7 @@ mod tests {
                     value: SerializedFieldValue::F32(0.0),
                 }],
             }],
+            parent: None,
         };
 
         let object = asset.into_object_with_runtime_registry(None, Some(&registry));
@@ -1687,6 +1702,7 @@ mod tests {
                     value: SerializedFieldValue::F32(3.25),
                 }],
             }],
+            parent: None,
         };
 
         let object = asset.into_object_with_runtime_registry(None, Some(&registry));
@@ -1699,3 +1715,4 @@ mod tests {
         assert!(object.get_component::<SerializedTypeStorage>().is_none());
     }
 }
+

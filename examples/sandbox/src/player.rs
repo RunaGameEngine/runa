@@ -1,13 +1,19 @@
 use runa_asset::load_image;
 use runa_core::{
     components::{
-        ui::CanvasSpace, ActiveCamera, Camera, Canvas, Collider2D, SpriteRenderer, Transform,
+        ui::CanvasSpace, ActiveCamera, Camera, CanvasRenderer, Collider2D, SpriteRenderer, Transform,
     },
     glam::Vec3,
     input_system::*,
     ocs::{Object, Script, ScriptContext, World},
 };
+use runa_core::systems::event_system::Event;
 use runa_engine::{Engine, RunaArchetype, RunaComponent, RunaScript};
+
+// Custom Event
+pub(crate) struct EventChangedDirectionX;
+// Just implement Event for your structure
+impl Event for EventChangedDirectionX { }
 
 #[derive(Default, RunaComponent)]
 pub struct Health {
@@ -67,6 +73,12 @@ impl Script for PlayerController {
             self.direction.x = -1.0;
         }
 
+        // Press E to emit EventChangedDirectionX event
+        if Input::is_key_pressed(KeyCode::KeyE) {
+            ctx.emit_event(EventChangedDirectionX);
+        }
+
+
         let Some(current_position) = ctx
             .get_component::<Transform>()
             .map(|transform| transform.position)
@@ -77,10 +89,8 @@ impl Script for PlayerController {
         let movement = self.direction.normalize_or_zero() * self.speed * _dt;
         let next_position = current_position + movement;
 
-        if !ctx.would_collide_2d_at(next_position.truncate()) {
-            if let Some(transform) = ctx.get_component_mut::<Transform>() {
-                transform.position = next_position;
-            }
+        if let Some(transform) = ctx.get_component_mut::<Transform>() {
+            transform.position = next_position;
         }
     }
 }
@@ -108,12 +118,10 @@ impl Script for PlayerCameraFollow {
         let Some(player_id) = ctx.find_first_with::<PlayerController>() else {
             return;
         };
-        let Some(player_position) = ctx
-            .get_object(player_id)
-            .and_then(|player| player.get_component::<Transform>())
-            .map(|transform| transform.position)
-        else {
-            return;
+        let player_position = {
+            let Some(player) = ctx.get_object(player_id) else { return; };
+            let Some(transform) = player.get_component::<Transform>() else { return; };
+            transform.position
         };
         let Some(transform) = ctx.get_component_mut::<Transform>() else {
             return;
@@ -141,9 +149,9 @@ pub fn create_player_camera() -> Object {
     Object::new("Player Camera")
         // A wider ortho view keeps sandbox movement readable while still making
         // camera-follow interpolation problems obvious during debugging.
-        .with(Camera::new_ortho(32.0, 18.0))
+        .with(Camera::new_orthographic(32.0, 18.0))
         .with(ActiveCamera)
-        .with(Canvas::new(CanvasSpace::Camera))
+        .with(CanvasRenderer::new(CanvasSpace::Camera))
         .with(PlayerCameraFollow::new())
 }
 

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub struct TextureAsset {
     pub width: u32,
     pub height: u32,
@@ -20,5 +21,14 @@ impl TextureAsset {
             pixels: img.into_raw(),
             path: path.clone(),
         })
+    }
+
+    pub fn from_rgba8(path: PathBuf, width: u32, height: u32, pixels: Vec<u8>) -> Self {
+        Self {
+            width,
+            height,
+            pixels,
+            path,
+        }
     }
 }

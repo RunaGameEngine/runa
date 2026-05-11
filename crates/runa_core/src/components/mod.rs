@@ -46,8 +46,10 @@ pub use tilemap::TilemapLayer;
 pub use tilemap::TilemapRenderer;
 pub use transform::Transform;
 pub use world_atmosphere::{BackgroundMode, WorldAtmosphere};
+pub use mesh_renderer::Vertex3D;
+pub use mesh_renderer::AlphaMode;
 
-pub use ui::Canvas;
+pub use ui::CanvasRenderer;
 
 macro_rules! impl_component {
     ($($ty:ty),+ $(,)?) => {
@@ -83,5 +85,5 @@ impl_component!(
     Tilemap,
     TilemapRenderer,
     Transform,
-    Canvas,
+    CanvasRenderer,
 );

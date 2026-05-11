@@ -3,19 +3,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
-
-<div align="center">
-  <img src="TheRunaGameEngine.png" alt="https://github.com/RunaGameEngine/runa">
-</div>
+ 
+[![RunaGameEngine](TheRunaGameEngine.png)](https://github.com/RunaGameEngine/runa)
 
 Runa Engine is an experimental Rust game engine workspace built around a code-first runtime, a `wgpu` renderer, project tooling, and an optional editor.
 
 > Status: pre-alpha. APIs are still evolving. The runtime is usable for prototypes and internal tools, but the engine is not production-ready yet.
 
-## What Runa Is
+## What Runa Is 
 
 Runa is a workspace, not just one crate. It currently includes:
-
+ 
 - `runa_core`: world, objects, components, scripts, input, audio
 - `runa_app`: runtime app loop and window bootstrap
 - `runa_render`: `wgpu` renderer
@@ -181,7 +179,7 @@ impl Script for PlayerController {
 
 fn create_player() -> Object {
     Object::new("Player")
-        .with(Camera::new_ortho(320.0, 180.0))
+        .with(Camera::new_orthographic(320.0, 180.0))
         .with(ActiveCamera)
         .with(SpriteRenderer::new(Some(load_image!("assets/art/player.png"))))
         .with(PlayerController::new())

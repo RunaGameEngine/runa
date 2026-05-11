@@ -61,6 +61,7 @@ pub struct TilemapLayer {
     pub tiles: Vec<Tile>, // width * height elements
     pub visible: bool,
     pub opacity: f32,
+    pub self_order: i32,
 }
 
 impl TilemapLayer {
@@ -72,6 +73,7 @@ impl TilemapLayer {
             tiles: vec![Tile::empty(); (width * height) as usize],
             visible: true,
             opacity: 1.0,
+            self_order: 0,
         }
     }
 

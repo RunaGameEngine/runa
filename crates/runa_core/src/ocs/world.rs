@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use super::command::WorldCommand;
@@ -8,45 +10,80 @@ use runa_render_api::RenderQueue;
 use crate::{
     audio::{AudioEngine, SoundId},
     components::{
-        ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, Canvas, Collider2D,
+        ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, CanvasRenderer, Collider2D,
         DirectionalLight, MeshRenderer, PointLight, Sorting, SpriteAnimator, SpriteRenderer,
         Tilemap, Transform, WorldAtmosphere,
     },
     debug_renderer::DebugRenderer,
     ocs::{Object, ObjectId, Script},
-    registry::{ArchetypeKey, RunaArchetype, RuntimeRegistry},
+    registry::{ArchetypeKey, ObjectDef, RunaArchetype, RuntimeRegistry},
 };
+use crate::systems::event_system::EventBus;
 
 pub struct World {
     objects: Vec<Object>,
     debug_renderer: DebugRenderer,
     pub audio_engine: AudioEngine,
+    pub events: RefCell<EventBus>,
     next_object_id: u64,
     command_queue: Vec<WorldCommand>,
     processing_lifecycle: bool,
     started: bool,
+    self_handle: Option<Weak<RefCell<World>>>,
     runtime_registry: Option<Arc<RuntimeRegistry>>,
     atmosphere: WorldAtmosphere,
 }
 
-impl World {
-    /// Play a sound through the audio engine
-    pub fn play_sound(&mut self, audio_source: &AudioSource) -> Option<SoundId> {
-        self.audio_engine.play(audio_source)
-    }
+pub trait WorldSpawnArg {
+    type Output;
 
+    fn spawn_into(self, world: &mut World) -> Self::Output;
+}
+
+impl WorldSpawnArg for Object {
+    type Output = ObjectId;
+
+    fn spawn_into(self, world: &mut World) -> Self::Output {
+        world.spawn_object(self)
+    }
+}
+
+impl WorldSpawnArg for &str {
+    type Output = Option<ObjectId>;
+
+    fn spawn_into(self, world: &mut World) -> Self::Output {
+        world.spawn_def_by_name(self)
+    }
+}
+
+impl WorldSpawnArg for String {
+    type Output = Option<ObjectId>;
+
+    fn spawn_into(self, world: &mut World) -> Self::Output {
+        world.spawn_def_by_name(&self)
+    }
+}
+
+impl World {
     pub fn new() -> Self {
         Self {
             objects: Vec::new(),
             debug_renderer: DebugRenderer::new(),
             audio_engine: AudioEngine::default(),
+            events: RefCell::new(EventBus::new()),
             next_object_id: 1,
             command_queue: Vec::new(),
             processing_lifecycle: false,
             started: false,
+            self_handle: None,
             runtime_registry: None,
             atmosphere: WorldAtmosphere::default(),
         }
+    }
+
+    /// Play a sound through the audio engine
+    pub fn play_sound(&mut self, audio_source: &AudioSource) -> Option<SoundId> {
+        self.audio_engine.play(audio_source)
     }
 
     pub fn atmosphere(&self) -> &WorldAtmosphere {
@@ -61,7 +98,11 @@ impl World {
         self.atmosphere = atmosphere;
     }
 
-    pub fn spawn(&mut self, object: Object) -> ObjectId {
+    pub fn spawn<S: WorldSpawnArg>(&mut self, spawn: S) -> S::Output {
+        spawn.spawn_into(self)
+    }
+
+    pub fn spawn_object(&mut self, object: Object) -> ObjectId {
         self.insert_object(object)
     }
 
@@ -73,10 +114,19 @@ impl World {
         self.runtime_registry = Some(runtime_registry);
     }
 
+    fn set_self_handle(&mut self, world_rc: Rc<RefCell<World>>) {
+        self.self_handle = Some(Rc::downgrade(&world_rc));
+    }
+
+    fn self_world_rc(&self) -> Option<Rc<RefCell<World>>> {
+        self.self_handle.as_ref()?.upgrade()
+    }
+
     pub fn refresh_object_world_ptrs(&mut self) {
-        let world_ptr = self as *mut World;
-        for object in &mut self.objects {
-            object.set_world(unsafe { &mut *world_ptr });
+        if let Some(world_rc) = self.self_world_rc() {
+            for object in &mut self.objects {
+                object.set_world(world_rc.clone());
+            }
         }
     }
 
@@ -84,8 +134,16 @@ impl World {
         self.runtime_registry.as_deref()
     }
 
+    pub fn runtime_registry_arc(&self) -> Option<Arc<RuntimeRegistry>> {
+        self.runtime_registry.clone()
+    }
+
     pub fn spawn_archetype<T: RunaArchetype>(&mut self) -> ObjectId {
         T::create(self)
+    }
+
+    pub fn spawn_def<T: ObjectDef>(&mut self) -> ObjectId {
+        self.spawn_object(T::create_object())
     }
 
     pub fn spawn_archetype_by_key(&mut self, key: &ArchetypeKey) -> Option<ObjectId> {
@@ -98,18 +156,34 @@ impl World {
         registry.spawn_archetype_by_name(self, name)
     }
 
+    pub fn spawn_def_by_key(&mut self, key: &ArchetypeKey) -> Option<ObjectId> {
+        let registry = self.runtime_registry.clone()?;
+        registry.spawn_object_def_by_key(self, key)
+    }
+
+    pub fn spawn_def_by_name(&mut self, name: &str) -> Option<ObjectId> {
+        let registry = self.runtime_registry.clone()?;
+        registry.spawn_object_def_by_name(self, name)
+    }
+
     fn insert_object(&mut self, mut object: Object) -> ObjectId {
+        let world_ptr: *mut World = self;
+        let maybe_world_rc = self.self_world_rc();
+
         let id = self.next_object_id;
         self.next_object_id += 1;
         object.set_id(id);
 
         self.objects.push(object);
-
-        let world_ptr = self as *mut World;
         let object = self.objects.last_mut().unwrap();
-        object.set_world(unsafe { &mut *world_ptr });
+
+        if let Some(world_rc) = maybe_world_rc {
+            object.set_world(world_rc.clone());
+        }
+
+        // если мир уже стартовал и lifecycle не обрабатывается
         if self.started && !self.processing_lifecycle {
-            Self::start_object_lifecycle(object);
+            Self::start_object_lifecycle(object, world_ptr);
         }
         id
     }
@@ -119,18 +193,20 @@ impl World {
             .initialize()
             .expect("Failed to initialize audio engine");
 
-        let world_ptr = self as *mut World;
-        for object in &mut self.objects {
-            object.set_world(unsafe { &mut *world_ptr });
+        if let Some(world_rc) = self.self_world_rc() {
+            for object in &mut self.objects {
+                object.set_world(world_rc.clone());
+            }
         }
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self, world_rc: Rc<RefCell<World>>) {
+        self.set_self_handle(world_rc.clone());
         self.processing_lifecycle = true;
-        let world_ptr = self as *mut World;
+        let world_ptr: *mut World = self;
         for object in &mut self.objects {
-            object.set_world(unsafe { &mut *world_ptr });
-            Self::start_object_lifecycle(object);
+            object.set_world(world_rc.clone());
+            Self::start_object_lifecycle(object, world_ptr);
         }
         self.processing_lifecycle = false;
         self.started = true;
@@ -138,6 +214,9 @@ impl World {
     }
 
     pub fn update(&mut self, dt: f32) {
+        // println!("Listeners: {}", self.events.borrow().listeners.len());
+        // println!("Queue: {}", self.events.borrow().queue.len());
+
         for object in &mut self.objects {
             if let Some(transform) = object.get_component_mut::<Transform>() {
                 transform.prepare_for_update();
@@ -145,12 +224,13 @@ impl World {
         }
 
         // Update scripts
+        let world_ptr: *mut World = self;
         self.processing_lifecycle = true;
         for object in &mut self.objects {
-            object.run_update(dt);
+            object.run_update(world_ptr, dt);
         }
         for object in &mut self.objects {
-            object.run_late_update(dt);
+            object.run_late_update(world_ptr, dt);
         }
         self.processing_lifecycle = false;
         self.apply_commands();
@@ -185,6 +265,9 @@ impl World {
 
         // Update spatial sound volumes based on listener position
         self.audio_engine.update_spatial_volumes();
+
+        // Update event system
+        self.events.borrow_mut().process();
 
         // Process audio requests (play/stop) from AudioSource components
         for object in &mut self.objects {
@@ -238,7 +321,7 @@ impl World {
             };
 
             if let (Some(canvas), Some(viewport_size)) =
-                (object.get_component_mut::<Canvas>(), viewport_size)
+                (object.get_component_mut::<CanvasRenderer>(), viewport_size)
             {
                 if canvas.dirty_layout {
                     canvas.layout(viewport_size);
@@ -284,6 +367,9 @@ impl World {
                 object.get_component::<Transform>(),
                 object.get_component::<MeshRenderer>(),
             ) {
+                if !mesh_renderer.visible {
+                    continue;
+                }
                 let model_matrix = self
                     .world_transform_matrix_for_object(object, interpolation_factor)
                     .unwrap_or_else(|| {
@@ -294,10 +380,10 @@ impl World {
                         )
                     });
                 let interpolated_position = model_matrix.transform_point3(Vec3::ZERO);
+                let mesh = mesh_renderer.get_mesh_handle();
                 // Convert Mesh vertices to render_api Vertex3D
-                let vertices: Vec<runa_render_api::command::Vertex3D> = mesh_renderer
-                    .mesh
-                    .vertices
+                let vertices: Vec<runa_render_api::command::Vertex3D> = mesh
+                    .inner.vertices
                     .iter()
                     .map(|v| runa_render_api::command::Vertex3D {
                         position: v.position,
@@ -310,7 +396,7 @@ impl World {
 
                 render_queue.draw_mesh_3d(
                     vertices,
-                    mesh_renderer.mesh.indices.clone(),
+                    mesh.inner.indices.clone(),
                     model_matrix,
                     material.base_color,
                     material.emission,
@@ -409,10 +495,7 @@ impl World {
                                     tile.flip_x,
                                     tile.flip_y,
                                     [1.0, 1.0, 1.0, layer.opacity.clamp(0.0, 1.0)],
-                                    object
-                                        .get_component::<Sorting>()
-                                        .map(|sorting| sorting.order)
-                                        .unwrap_or(0),
+                                    layer.self_order
                                 );
                             }
                         }
@@ -421,7 +504,7 @@ impl World {
             }
 
             if let (Some(canvas), Some(_camera), Some(_ac)) = (
-                &mut object.get_component::<Canvas>(),
+                &mut object.get_component::<CanvasRenderer>(),
                 object.get_component::<Camera>(),
                 object.get_component::<ActiveCamera>(),
             ) {
@@ -468,14 +551,22 @@ impl World {
         self.despawn_immediate(id).is_some()
     }
 
-    pub fn get(&self, id: ObjectId) -> Option<&Object> {
+    pub fn object(&self, id: ObjectId) -> Option<&Object> {
         self.objects.iter().find(|object| object.id() == Some(id))
     }
 
-    pub fn get_mut(&mut self, id: ObjectId) -> Option<&mut Object> {
+    pub fn object_mut(&mut self, id: ObjectId) -> Option<&mut Object> {
         self.objects
             .iter_mut()
             .find(|object| object.id() == Some(id))
+    }
+
+    pub fn get<T: 'static>(&self, id: ObjectId) -> Option<&T> {
+        self.object(id)?.get_component::<T>()
+    }
+
+    pub fn get_mut<T: 'static>(&mut self, id: ObjectId) -> Option<&mut T> {
+        self.object_mut(id)?.get_component_mut::<T>()
     }
 
     pub fn root_object_ids(&self) -> Vec<ObjectId> {
@@ -490,31 +581,31 @@ impl World {
         if Some(child_id) == parent_id {
             return false;
         }
-        if self.get(child_id).is_none() {
+        if self.object(child_id).is_none() {
             return false;
         }
-        if parent_id.is_some_and(|id| self.get(id).is_none()) {
+        if parent_id.is_some_and(|id| self.object(id).is_none()) {
             return false;
         }
         if parent_id.is_some_and(|id| self.is_descendant_of(id, child_id)) {
             return false;
         }
 
-        let old_parent = self.get(child_id).and_then(Object::parent);
+        let old_parent = self.object(child_id).and_then(Object::parent);
         if old_parent == parent_id {
             return true;
         }
 
         if let Some(old_parent) = old_parent {
-            if let Some(parent) = self.get_mut(old_parent) {
+            if let Some(parent) = self.object_mut(old_parent) {
                 parent.remove_child_id(child_id);
             }
         }
-        if let Some(child) = self.get_mut(child_id) {
+        if let Some(child) = self.object_mut(child_id) {
             child.set_parent_id(parent_id);
         }
         if let Some(parent_id) = parent_id {
-            if let Some(parent) = self.get_mut(parent_id) {
+            if let Some(parent) = self.object_mut(parent_id) {
                 parent.add_child_id(child_id);
             }
         }
@@ -558,14 +649,14 @@ impl World {
         }
 
         for (child_id, parent_id) in parent_map {
-            if let Some(parent) = self.get_mut(parent_id) {
+            if let Some(parent) = self.object_mut(parent_id) {
                 parent.add_child_id(child_id);
             }
         }
     }
 
     pub fn is_descendant_of(&self, child_id: ObjectId, ancestor_id: ObjectId) -> bool {
-        let mut current = self.get(child_id).and_then(Object::parent);
+        let mut current = self.object(child_id).and_then(Object::parent);
         let mut visited = HashSet::new();
         while let Some(parent_id) = current {
             if !visited.insert(parent_id) {
@@ -574,7 +665,7 @@ impl World {
             if parent_id == ancestor_id {
                 return true;
             }
-            current = self.get(parent_id).and_then(Object::parent);
+            current = self.object(parent_id).and_then(Object::parent);
         }
         false
     }
@@ -681,12 +772,12 @@ impl World {
             .position(|object| object.id() == Some(id))?;
         let mut object = self.objects.remove(index);
         if let Some(parent_id) = object.parent() {
-            if let Some(parent) = self.get_mut(parent_id) {
+            if let Some(parent) = self.object_mut(parent_id) {
                 parent.remove_child_id(id);
             }
         }
         for child_id in object.children().to_vec() {
-            if let Some(child) = self.get_mut(child_id) {
+            if let Some(child) = self.object_mut(child_id) {
                 child.set_parent_id(None);
             }
         }
@@ -695,8 +786,8 @@ impl World {
         Some(object)
     }
 
-    fn start_object_lifecycle(object: &mut Object) {
-        object.run_start();
+    fn start_object_lifecycle(object: &mut Object, world: *mut World) {
+        object.run_start(world);
 
         if let Some(audio) = object.get_component_mut::<AudioSource>() {
             if audio.play_on_awake && audio.audio_asset.is_some() {
@@ -729,7 +820,7 @@ impl World {
         if !visited.insert(object_id) {
             return None;
         }
-        let object = self.get(object_id)?;
+        let object = self.object(object_id)?;
         self.world_transform_matrix_for_object_checked(
             object_id,
             object,
@@ -770,7 +861,7 @@ impl World {
         if !visited.insert(object_id) {
             return result;
         }
-        let Some(object) = self.get(object_id) else {
+        let Some(object) = self.object(object_id) else {
             return result;
         };
 
@@ -831,6 +922,9 @@ fn to_render_atmosphere(atmosphere: WorldAtmosphere) -> runa_render_api::command
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use super::World;
     use crate::{
         components::{SerializedFieldAccess, Transform},
@@ -850,12 +944,12 @@ mod tests {
 
     #[test]
     fn deferred_despawn_applies_after_update_phase() {
-        let mut world = World::default();
-        world.spawn(Object::new("Transient").with(DespawnSelf));
-        world.start();
+        let world_rc = Rc::new(RefCell::new(World::default()));
+        world_rc.borrow_mut().spawn(Object::new("Transient").with(DespawnSelf));
+        world_rc.borrow_mut().start(world_rc.clone());
 
-        assert_eq!(world.query::<Transform>().len(), 1);
-        world.update(1.0 / 60.0);
-        assert!(world.query::<Transform>().is_empty());
+        assert_eq!(world_rc.borrow().query::<Transform>().len(), 1);
+        world_rc.borrow_mut().update(1.0 / 60.0);
+        assert!(world_rc.borrow().query::<Transform>().is_empty());
     }
 }

@@ -31,7 +31,7 @@ impl DebugRenderer {
         }
 
         for object_id in world.query::<PhysicsCollision>() {
-            let Some(object) = world.get(object_id) else {
+            let Some(object) = world.object(object_id) else {
                 continue;
             };
             if let (Some(_transform), Some(_collision)) = (
@@ -45,3 +45,4 @@ impl DebugRenderer {
         }
     }
 }
+

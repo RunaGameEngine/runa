@@ -16,11 +16,14 @@ fn main() {
     engine.register_archetype::<camera_controller::CameraControllerArchetype>();
     engine.register_archetype::<rotating_cube::RotatingCubeArchetype>();
     engine.register_archetype::<rotating_cube2::RotatingCube2Archetype>();
-    let mut world = engine.create_world();
+    let world_rc = engine.create_world();
 
-    let _ = world.spawn_archetype::<camera_controller::CameraControllerArchetype>();
-    let _ = world.spawn_archetype::<rotating_cube::RotatingCubeArchetype>();
-    let _ = world.spawn_archetype::<rotating_cube2::RotatingCube2Archetype>();
+    {
+        let mut world = world_rc.borrow_mut();
+        let _ = world.spawn_archetype::<camera_controller::CameraControllerArchetype>();
+        let _ = world.spawn_archetype::<rotating_cube::RotatingCubeArchetype>();
+        let _ = world.spawn_archetype::<rotating_cube2::RotatingCube2Archetype>();
+    }
 
     let config = RunaWindowConfig {
         title: "Runa 3D Sandbox - WASD to move, Space/Ctrl for up/down, Right-Click to look"
@@ -33,7 +36,7 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world, config);
+    let _ = RunaApp::run_with_config(world_rc, config);
 
     input_system::show_cursor(true);
     input_system::lock_cursor(false);

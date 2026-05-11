@@ -18,6 +18,7 @@ enum AssetKind {
     ImageFile,
     AudioFile,
     ShaderFile,
+    Runa3DModelFile,
 }
 
 #[derive(Clone)]
@@ -44,6 +45,7 @@ struct ContentBrowserIcons {
     image_file: TextureHandle,
     audio_file: TextureHandle,
     shader_file: TextureHandle,
+    r3m_file: TextureHandle,
 }
 
 struct RenameState {
@@ -872,7 +874,7 @@ impl ContentBrowserState {
         let base_name = match kind {
             RustFileKind::Empty => "NewFile",
             RustFileKind::Script => "NewObject",
-            RustFileKind::Archetype => "NewArchetype",
+            RustFileKind::Archetype => "NewObjectDef",
         };
         let path = unique_file_path(target_dir, base_name, "rs");
         let content = match kind {
@@ -885,7 +887,7 @@ impl ContentBrowserState {
             RustFileKind::Archetype => object_archetype_template(
                 path.file_stem()
                     .and_then(|stem| stem.to_str())
-                    .unwrap_or("NewArchetype"),
+                    .unwrap_or("NewObjectDef"),
             ),
         };
 
@@ -957,6 +959,7 @@ impl ContentBrowserState {
             .add_filter("Audio", &["ogg", "wav"])
             .add_filter("Code", &["rs", "wgsl"])
             .add_filter("Worlds", &["ron"])
+            .add_filter("3D Models", &["r3m", "glb"])
             .pick_files()
         else {
             return;
@@ -1064,6 +1067,7 @@ impl ContentBrowserState {
             image_file: load_editor_icon(ctx, "content_browser_image_file_icon", "image"),
             audio_file: load_editor_icon(ctx, "content_browser_audio_file_icon", "audio"),
             shader_file: load_editor_icon(ctx, "content_browser_shader_file_icon", "wgsl"),
+            r3m_file: load_editor_icon(ctx, "content_browser_r3m_file_icon", "r3m"),
         });
     }
 
@@ -1083,6 +1087,7 @@ impl ContentBrowserState {
             AssetKind::AudioFile => &icons.audio_file,
             AssetKind::ShaderFile => &icons.shader_file,
             AssetKind::GenericFile => &icons.file,
+            AssetKind::Runa3DModelFile => &icons.r3m_file,
         }
     }
 
@@ -1106,7 +1111,7 @@ impl ContentBrowserState {
                 self.create_new_rust_file(target_dir, RustFileKind::Script, settings);
                 ui.close();
             }
-            if ui.button("New Rust Archetype").clicked() {
+            if ui.button("New Rust Object Definition").clicked() {
                 self.create_new_rust_file(target_dir, RustFileKind::Archetype, settings);
                 ui.close();
             }
@@ -1387,7 +1392,7 @@ fn object_archetype_template(type_name: &str) -> String {
         .collect::<String>();
 
     format!(
-        "use runa_engine::{{\n    runa_core::ocs::{{Object, World}},\n    RunaArchetype,\n}};\n\n#[derive(RunaArchetype)]\n#[runa(name = \"{type_name_snake}\")]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn create(world: &mut World) -> u64 {{\n        world.spawn(Object::new(\"{type_name}\"))\n    }}\n}}\n",
+        "use runa_engine::{{\n    runa_core::ocs::ObjectBuilder,\n    ObjectDef, RunaObjectDef,\n}};\n\n#[derive(RunaObjectDef)]\n#[runa(name = \"{type_name_snake}\")]\npub struct {type_name};\n\nimpl ObjectDef for {type_name} {{\n    fn build(object: &mut ObjectBuilder) {{\n        object.name(\"{type_name}\");\n    }}\n}}\n",
         type_name_snake = type_name_snake,
     )
 }

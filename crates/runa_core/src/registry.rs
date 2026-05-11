@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
-    components::Component,
-    ocs::{Object, ObjectId, Script, World},
+    components::{Component, ObjectDefinitionInstance},
+    ocs::{Object, ObjectBuilder, ObjectId, Script, World},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -354,6 +354,33 @@ impl From<Arc<str>> for ArchetypeKey {
     }
 }
 
+pub type ObjectDefKey = ArchetypeKey;
+pub type ObjectDefMetadata = ArchetypeMetadata;
+pub type ObjectDefRegistry = ArchetypeRegistry;
+
+pub trait ObjectDefName: Sized + 'static {
+    fn key() -> ArchetypeKey;
+}
+
+pub trait ObjectDef: ObjectDefName {
+    fn build(object: &mut ObjectBuilder);
+
+    fn create_object() -> Object {
+        let mut builder = ObjectBuilder::new();
+        Self::build(&mut builder);
+        let mut object = builder.build();
+        if object
+            .get_component::<ObjectDefinitionInstance>()
+            .is_none()
+        {
+            object.add_component(ObjectDefinitionInstance::new(
+                <Self as ObjectDefName>::key().as_str(),
+            ));
+        }
+        object
+    }
+}
+
 pub trait RunaArchetype: Sized + 'static {
     fn key() -> ArchetypeKey;
     fn create(world: &mut World) -> ObjectId;
@@ -408,14 +435,30 @@ impl ArchetypeRegistry {
         self.register_factory(key, name, RegistrationSource::User, T::create)
     }
 
+    pub fn register_def<T>(&mut self) -> ArchetypeMetadata
+    where
+        T: ObjectDef,
+    {
+        let key = <T as ObjectDefName>::key();
+        let name = Arc::<str>::from(key.as_str());
+        self.register_factory(key, name, RegistrationSource::User, |world| {
+            world.spawn_object(T::create_object())
+        })
+    }
+
     pub fn register_named<F>(&mut self, name: impl Into<Arc<str>>, factory: F) -> ArchetypeMetadata
     where
         F: Fn() -> Object + Send + Sync + 'static,
     {
         let name = name.into();
         let key = ArchetypeKey::from(name.clone());
+        let instance_name = name.clone();
         self.register_factory(key, name, RegistrationSource::User, move |world| {
-            world.spawn(factory())
+            let mut object = factory();
+            if object.get_component::<ObjectDefinitionInstance>().is_none() {
+                object.add_component(ObjectDefinitionInstance::new(instance_name.as_ref()));
+            }
+            world.spawn_object(object)
         })
     }
 
@@ -663,11 +706,29 @@ impl RuntimeRegistry {
         self.archetypes.register::<T>()
     }
 
+    pub fn register_object_def<T>(&mut self) -> ObjectDefMetadata
+    where
+        T: ObjectDef,
+    {
+        self.archetypes.register_def::<T>()
+    }
+
     pub fn register_archetype_named<F>(
         &mut self,
         name: impl Into<Arc<str>>,
         factory: F,
     ) -> ArchetypeMetadata
+    where
+        F: Fn() -> Object + Send + Sync + 'static,
+    {
+        self.archetypes.register_named(name, factory)
+    }
+
+    pub fn register_object_def_named<F>(
+        &mut self,
+        name: impl Into<Arc<str>>,
+        factory: F,
+    ) -> ObjectDefMetadata
     where
         F: Fn() -> Object + Send + Sync + 'static,
     {
@@ -683,6 +744,18 @@ impl RuntimeRegistry {
     }
 
     pub fn spawn_archetype_by_name(&self, world: &mut World, name: &str) -> Option<ObjectId> {
+        self.archetypes.spawn_by_name(world, name)
+    }
+
+    pub fn spawn_object_def_by_key(
+        &self,
+        world: &mut World,
+        key: &ObjectDefKey,
+    ) -> Option<ObjectId> {
+        self.archetypes.spawn_by_key(world, key)
+    }
+
+    pub fn spawn_object_def_by_name(&self, world: &mut World, name: &str) -> Option<ObjectId> {
         self.archetypes.spawn_by_name(world, name)
     }
 

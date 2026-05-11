@@ -20,13 +20,17 @@ fn register_game_types(engine: &mut Engine) {
 fn main() {
     let mut engine = Engine::new();
     register_game_types(&mut engine);
-    let mut world = engine.create_world();
+    let world_rc = engine.create_world();
 
-    let _ = world.spawn_archetype::<tilemap_tester::TilemapTesterArchetype>();
-    let _ = world.spawn_archetype::<tester1::RotatingSpriteArchetype>();
-    let _ = world.spawn_archetype::<collider_demo::ColliderDemoBoxArchetype>();
-    let _ = world.spawn_archetype::<player::PlayerArchetype>();
-    let _ = world.spawn_archetype::<player::PlayerCameraArchetype>();
+    {
+        let mut world = world_rc.borrow_mut();
+
+        let _ = world.spawn_archetype::<tilemap_tester::TilemapTesterArchetype>();
+        let _ = world.spawn_archetype::<tester1::RotatingSpriteArchetype>();
+        let _ = world.spawn_archetype::<collider_demo::ColliderDemoBoxArchetype>();
+        let _ = world.spawn_archetype::<player::PlayerArchetype>();
+        let _ = world.spawn_archetype::<player::PlayerCameraArchetype>();
+    }
 
     let config = RunaWindowConfig {
         title: "Runa Sandbox".to_string(),
@@ -38,5 +42,5 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world, config);
+    let _ = RunaApp::run_with_config(world_rc, config);
 }

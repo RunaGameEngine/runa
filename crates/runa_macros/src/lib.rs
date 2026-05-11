@@ -3,7 +3,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Ident, Type};
 
-#[proc_macro_derive(RunaComponent, attributes(runa, serialize_field))]
+#[proc_macro_derive(RunaComponent, attributes(runa, serialize_field, runa_editable, runa_runtime))]
 pub fn derive_runa_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident.clone();
@@ -65,7 +65,7 @@ pub fn derive_runa_component(input: TokenStream) -> TokenStream {
     })
 }
 
-#[proc_macro_derive(RunaScript, attributes(runa, serialize_field))]
+#[proc_macro_derive(RunaScript, attributes(runa, serialize_field, runa_editable, runa_runtime))]
 pub fn derive_runa_script(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident.clone();
@@ -155,6 +155,38 @@ pub fn derive_runa_archetype(input: TokenStream) -> TokenStream {
     })
 }
 
+#[proc_macro_derive(RunaObjectDef, attributes(runa))]
+pub fn derive_runa_object_def(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let ident = input.ident.clone();
+    let object_def_name =
+        archetype_name_override(&input).unwrap_or_else(|| to_snake_case(&ident.to_string()));
+
+    TokenStream::from(quote! {
+        impl ::runa_engine::ObjectDefName for #ident {
+            fn key() -> ::runa_engine::ObjectDefKey {
+                ::runa_engine::ObjectDefKey::new(#object_def_name)
+            }
+        }
+
+        impl #ident {
+            pub fn object_def_key() -> ::runa_engine::ObjectDefKey {
+                <Self as ::runa_engine::ObjectDefName>::key()
+            }
+
+            pub fn object_def_name() -> &'static str {
+                #object_def_name
+            }
+
+            pub fn register(
+                engine: &mut ::runa_engine::Engine
+            ) -> ::runa_engine::ObjectDefMetadata {
+                engine.register_object_def::<Self>()
+            }
+        }
+    })
+}
+
 fn serialized_fields_tokens(data: &Data) -> TokenStream2 {
     let fields = serializable_fields(data);
     if fields.is_empty() {
@@ -212,10 +244,14 @@ fn serializable_fields(data: &Data) -> Vec<Field> {
 fn has_serialize_field_attr(field: &Field) -> bool {
     field.attrs.iter().any(|attribute| {
         attribute.path().is_ident("serialize_field")
+            || attribute.path().is_ident("runa_editable")
             || (attribute.path().is_ident("runa")
                 && attribute
                     .parse_nested_meta(|meta| {
-                        if meta.path.is_ident("serialize") || meta.path.is_ident("field") {
+                        if meta.path.is_ident("serialize")
+                            || meta.path.is_ident("field")
+                            || meta.path.is_ident("editable")
+                        {
                             Ok(())
                         } else {
                             Err(meta.error("unsupported runa field attribute"))

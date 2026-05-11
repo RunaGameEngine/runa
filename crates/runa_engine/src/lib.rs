@@ -9,7 +9,8 @@ pub use engine::Engine;
 pub use engine::RunaTypeRegistration;
 pub use runa_core::registry::{
     ArchetypeKey, ArchetypeMetadata, ArchetypeRegistry, RegisteredTypeKind, RegistrationSource,
-    RunaArchetype, RunaComponentType, RunaScriptType, RuntimeRegistry, TypeMetadata, TypeRegistry,
+    ObjectDef, ObjectDefKey, ObjectDefMetadata, ObjectDefName, ObjectDefRegistry, RunaArchetype,
+    RunaComponentType, RunaScriptType, RuntimeRegistry, TypeMetadata, TypeRegistry,
 };
 pub use runa_core::{SerializedField, SerializedFieldAccess, SerializedFieldValue};
-pub use runa_macros::{RunaArchetype, RunaComponent, RunaScript};
+pub use runa_macros::{RunaArchetype, RunaComponent, RunaObjectDef, RunaScript};

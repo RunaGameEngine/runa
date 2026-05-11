@@ -9,7 +9,7 @@ impl<'window> EditorApp<'window> {
 
         let object_ids = self.world_object_ids();
         for object_id in object_ids {
-            let Some(object) = self.world.get_mut(object_id) else {
+            let Some(object) = self.world.object_mut(object_id) else {
                 continue;
             };
             let Some(storage) = object.get_component_mut::<SerializedTypeStorage>() else {
@@ -55,7 +55,7 @@ impl<'window> EditorApp<'window> {
         type_id: TypeId,
     ) -> bool {
         let registry = self.runtime_registry().clone();
-        let Some(object) = self.world.get_mut(object_id) else {
+        let Some(object) = self.world.object_mut(object_id) else {
             return false;
         };
         registry.add_type_to_object(object, type_id)
@@ -66,7 +66,7 @@ impl<'window> EditorApp<'window> {
         object_id: ObjectId,
         metadata: &ProjectRegisteredTypeRecord,
     ) -> bool {
-        let Some(object) = self.world.get_mut(object_id) else {
+        let Some(object) = self.world.object_mut(object_id) else {
             return false;
         };
 
@@ -106,7 +106,7 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn create_from_archetype_menu_ui(&mut self, ui: &mut egui::Ui) {
-        ui.menu_button("Create From Archetype", |ui| {
+        ui.menu_button("Create From Object Definition", |ui| {
             self.refresh_project_metadata(false);
             self.poll_place_object_refresh();
 
@@ -116,13 +116,13 @@ impl<'window> EditorApp<'window> {
                 .place_object
                 .objects
                 .iter()
-                .filter(|object| object.category == "Archetypes")
+                .filter(|object| object.category == "Object Definitions")
                 .cloned()
                 .collect();
             project_archetypes.sort_by(|left, right| left.name.cmp(&right.name));
 
             if archetypes.is_empty() && project_archetypes.is_empty() {
-                ui.label("No registered archetypes.");
+                ui.label("No registered object definitions.");
                 return;
             }
 
@@ -131,12 +131,13 @@ impl<'window> EditorApp<'window> {
                 let name = archetype.name().to_string();
                 let key = archetype.key().clone();
                 if ui.button(&name).clicked() {
-                    if let Some(object_id) = self.world.spawn_archetype_by_key(&key) {
+                    if let Some(object_id) = self.world.spawn_def_by_key(&key) {
                         self.set_primary_selection(Some(object_id));
-                        self.status_line = format!("Created object from archetype {name}.");
+                        self.status_line =
+                            format!("Created object from object definition {name}.");
                     } else {
                         self.status_line =
-                            format!("Failed to create object from archetype {name}.");
+                            format!("Failed to create object from object definition {name}.");
                     }
                     ui.close();
                 }
@@ -150,7 +151,8 @@ impl<'window> EditorApp<'window> {
                     let name = archetype.name.clone();
                     if ui.button(&name).clicked() {
                         self.place_object(&archetype);
-                        self.status_line = format!("Created object from project archetype {name}.");
+                        self.status_line =
+                            format!("Created object from project object definition {name}.");
                         ui.close();
                     }
                 }
@@ -173,7 +175,7 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn copy_object(&mut self, object_id: ObjectId, cut: bool) {
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         self.hierarchy_clipboard = Some(ObjectClipboard {
@@ -377,3 +379,4 @@ impl<'window> EditorApp<'window> {
 fn short_type_name(type_name: &str) -> &str {
     type_name.rsplit("::").next().unwrap_or(type_name)
 }
+

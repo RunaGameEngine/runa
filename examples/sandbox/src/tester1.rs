@@ -15,6 +15,10 @@ impl RotatingSprite1 {
 
 impl Script for RotatingSprite1 {
     fn start(&mut self, ctx: &mut ScriptContext) {
+        ctx.subscribe_to_event::<crate::player::EventChangedDirectionX>(|_| {
+            println!("Direction Changed");
+        });
+
         if let Some(transform) = ctx.get_component_mut::<Transform>() {
             transform.position = Vec3::new(0.0, 4.0, 0.0);
         }

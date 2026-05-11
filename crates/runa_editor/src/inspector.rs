@@ -9,7 +9,7 @@ use rfd::FileDialog;
 use runa_asset::loader::load_image;
 use runa_asset::AudioAsset;
 use runa_core::components::{
-    ActiveCamera, AudioListener, AudioSource, BuiltinMeshPrimitive, Camera, Canvas, Collider2D,
+    ActiveCamera, AudioListener, AudioSource, BuiltinMeshPrimitive, Camera, CanvasRenderer, Collider2D,
     ComponentRuntimeKind, CursorInteractable, DirectionalLight, MeshRenderer, PhysicsCollision,
     PointLight, ProjectionType, SerializedField, SerializedFieldValue, SerializedTypeKind,
     SerializedTypeStorage, Sorting, SpriteAnimationClip, SpriteAnimator, SpriteRenderer, Tilemap,
@@ -17,6 +17,7 @@ use runa_core::components::{
 };
 use runa_core::glam::{EulerRot, Quat, USizeVec2, Vec3};
 use runa_core::ocs::Object;
+use runa_project::runa3d::RunaModel;
 
 use crate::editor_textures::{load_component_icon, load_editor_icon};
 use crate::style;
@@ -207,7 +208,7 @@ fn components_section(
                     ui.selectable_value(
                         &mut camera.projection,
                         ProjectionType::Orthographic,
-                        "Ortho",
+                        "Orthographic",
                     );
                     ui.selectable_value(
                         &mut camera.projection,
@@ -217,19 +218,19 @@ fn components_section(
                 });
                 if previous_projection != camera.projection
                     && camera.projection == ProjectionType::Orthographic
-                    && camera.ortho_size.length_squared() <= f32::EPSILON
+                    && camera.orthographic_size.length_squared() <= f32::EPSILON
                 {
-                    camera.ortho_size = runa_core::glam::Vec2::new(320.0, 180.0);
+                    camera.orthographic_size = runa_core::glam::Vec2::new(320.0, 180.0);
                 }
                 if camera.projection == ProjectionType::Orthographic {
-                    property_row(ui, "Ortho Size", |ui| {
+                    property_row(ui, "Orthographic Size", |ui| {
                         ui.add_sized(
                             [78.0, 22.0],
-                            egui::DragValue::new(&mut camera.ortho_size.x).speed(1.0),
+                            egui::DragValue::new(&mut camera.orthographic_size.x).speed(1.0),
                         );
                         ui.add_sized(
                             [78.0, 22.0],
-                            egui::DragValue::new(&mut camera.ortho_size.y).speed(1.0),
+                            egui::DragValue::new(&mut camera.orthographic_size.y).speed(1.0),
                         );
                     });
                 }
@@ -262,7 +263,7 @@ fn components_section(
     if object.get_component::<ActiveCamera>().is_some() {
         component_block(
             ui,
-            "ActiveCamera",
+            "Active Camera",
             true,
             actions,
             TypeId::of::<ActiveCamera>(),
@@ -281,7 +282,7 @@ fn components_section(
     if let Some(mesh_renderer) = object.get_component_mut::<MeshRenderer>() {
         component_block(
             ui,
-            "MeshRenderer",
+            "Mesh Renderer",
             true,
             actions,
             TypeId::of::<MeshRenderer>(),
@@ -290,38 +291,28 @@ fn components_section(
             None,
             editor_settings,
             |ui| {
-                property_row(ui, "Builtin Mesh", |ui| {
-                    let mut primitive = mesh_renderer
-                        .mesh
-                        .primitive_hint
-                        .unwrap_or(BuiltinMeshPrimitive::Cube);
-                    egui::ComboBox::from_id_salt("mesh_renderer_builtin_mesh")
-                        .selected_text(mesh_primitive_label(primitive))
-                        .show_ui(ui, |ui| {
-                            for candidate in [
-                                BuiltinMeshPrimitive::Cube,
-                                BuiltinMeshPrimitive::Quad,
-                                BuiltinMeshPrimitive::Plane,
-                                BuiltinMeshPrimitive::Pyramid,
-                            ] {
-                                ui.selectable_value(
-                                    &mut primitive,
-                                    candidate,
-                                    mesh_primitive_label(candidate),
-                                );
-                            }
-                        });
-
-                    if primitive != mesh_renderer.mesh.primitive_hint.unwrap_or(primitive) {
-                        let extents = mesh_extents(&mesh_renderer.mesh);
-                        mesh_renderer.mesh = build_builtin_mesh_from_extents(primitive, extents);
+                // let mut error_message = None;
+                editable_asset_path(ui, "Mesh", &mut mesh_renderer.mesh_path);
+                property_row(ui, "Actions", |ui| {
+                    if ui.button("Choose PNG").clicked() {
+                        if let Some(path) =
+                            pick_asset_file(project_root, &["png", "jpg", "jpeg", "webp"])
+                        {
+                            // match load_r3m_from_path(project_root, &path) {
+                            //     Ok(r3m) => mesh_renderer.set_mesh(Some(r3m.inner)),
+                            //     Err(error) => error_message = Some(error),
+                            // }
+                        }
+                    }
+                    if ui.button("Clear").clicked() {
+                        mesh_renderer.set_mesh(None, None);
                     }
                 });
                 property_row(ui, "Vertices", |ui| {
-                    ui.label(mesh_renderer.mesh.vertices.len().to_string());
+                    ui.label(mesh_renderer.get_mesh_handle().inner.vertices.len().to_string());
                 });
                 property_row(ui, "Indices", |ui| {
-                    ui.label(mesh_renderer.mesh.indices.len().to_string());
+                    ui.label(mesh_renderer.get_mesh_handle().inner.indices.len().to_string());
                 });
                 color_editor(ui, "Tint", &mut mesh_renderer.color);
             },
@@ -331,7 +322,7 @@ fn components_section(
     if let Some(sprite) = object.get_component_mut::<SpriteRenderer>() {
         component_block(
             ui,
-            "SpriteRenderer",
+            "Sprite Renderer",
             true,
             actions,
             TypeId::of::<SpriteRenderer>(),
@@ -411,7 +402,7 @@ fn components_section(
     if let Some(animator) = object.get_component_mut::<SpriteAnimator>() {
         component_block(
             ui,
-            "SpriteAnimator",
+            "Sprite Animator",
             true,
             actions,
             TypeId::of::<SpriteAnimator>(),
@@ -622,7 +613,7 @@ fn components_section(
         if let Some(tilemap) = object.get_component_mut::<Tilemap>() {
             component_block(
                 ui,
-                "TilemapRenderer",
+                "Tilemap Renderer",
                 true,
                 actions,
                 TypeId::of::<TilemapRenderer>(),
@@ -792,6 +783,13 @@ fn components_section(
                                             .speed(0.01),
                                     );
                                 });
+                                property_row(ui, "Render Order", |ui| {
+                                    ui.add_sized(
+                                        [96.0, 22.0],
+                                        egui::DragValue::new(&mut layer.self_order)
+                                            .speed(1),
+                                    );
+                                });
                                 property_row(ui, "Actions", |ui| {
                                     if ui.add_enabled(index > 0, egui::Button::new("Up")).clicked()
                                     {
@@ -823,7 +821,7 @@ fn components_section(
     if let Some(audio) = object.get_component_mut::<AudioSource>() {
         component_block(
             ui,
-            "AudioSource",
+            "Audio Source",
             true,
             actions,
             TypeId::of::<AudioSource>(),
@@ -881,7 +879,7 @@ fn components_section(
     if let Some(listener) = object.get_component::<AudioListener>() {
         component_block(
             ui,
-            "AudioListener",
+            "Audio Listener",
             true,
             actions,
             TypeId::of::<AudioListener>(),
@@ -906,7 +904,7 @@ fn components_section(
     if let Some(interactable) = object.get_component::<CursorInteractable>() {
         component_block(
             ui,
-            "CursorInteractable",
+            "Cursor Interactable",
             true,
             actions,
             TypeId::of::<CursorInteractable>(),
@@ -936,7 +934,7 @@ fn components_section(
     if let Some(collider) = object.get_component_mut::<Collider2D>() {
         component_block(
             ui,
-            "Collider2D",
+            "Collider 2D",
             true,
             actions,
             TypeId::of::<Collider2D>(),
@@ -994,7 +992,7 @@ fn components_section(
     if let Some(collision) = object.get_component_mut::<PhysicsCollision>() {
         component_block(
             ui,
-            "PhysicsCollision",
+            "Physics Collision",
             true,
             actions,
             TypeId::of::<PhysicsCollision>(),
@@ -1965,7 +1963,7 @@ fn component_icon_name(type_id: TypeId, kind: ComponentRuntimeKind) -> &'static 
         "c-PhysicsCollision"
     } else if type_id == TypeId::of::<CursorInteractable>() {
         "c-CursorInteractable"
-    } else if type_id == TypeId::of::<Canvas>() {
+    } else if type_id == TypeId::of::<CanvasRenderer>() {
         "c-Canvas"
     } else if type_id == TypeId::of::<MeshRenderer>() {
         "c-MeshRenderer"
@@ -2004,15 +2002,6 @@ fn is_supported_component_type(type_id: TypeId) -> bool {
         TypeId::of::<PhysicsCollision>(),
     ]
     .contains(&type_id)
-}
-
-fn mesh_primitive_label(primitive: BuiltinMeshPrimitive) -> &'static str {
-    match primitive {
-        BuiltinMeshPrimitive::Cube => "Cube",
-        BuiltinMeshPrimitive::Quad => "Quad",
-        BuiltinMeshPrimitive::Plane => "Plane",
-        BuiltinMeshPrimitive::Pyramid => "Pyramid",
-    }
 }
 
 fn mesh_extents(mesh: &runa_core::components::Mesh) -> Vec3 {
@@ -2143,6 +2132,19 @@ fn load_texture_from_path(
         project_root.to_string_lossy().as_ref(),
         relative_path,
     ))
+}
+
+fn load_r3m_from_path(
+    project_root: Option<&Path>,
+    relative_path: &str,
+) -> Result<runa_asset::Handle<RunaModel>, String> {
+    let Some(project_root) = project_root else {
+        return Err("Open a project before assigning model assets.".to_string());
+    };
+    // RunaModel::from_file(project_root.to_string_lossy().as_ref(), relative_path)
+    //     .map(runa_asset::Handle::new)
+    //     .map_err(|error| error.to_string())
+    todo!("Not yet implemented")
 }
 
 fn load_audio_from_path(

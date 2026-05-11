@@ -322,6 +322,7 @@ fn tilemap_object_asset() -> WorldObjectAsset {
                 visible: true,
                 opacity: 1.0,
                 tiles: Vec::new(),
+                self_order: 0,
             }],
         }),
         camera: None,

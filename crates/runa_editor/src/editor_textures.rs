@@ -179,6 +179,10 @@ fn embedded_editor_icon(icon_name: &str) -> Option<EmbeddedIcon> {
             bytes: include_bytes!("../assets/icons/world.svg"),
             extension: "svg",
         },
+        "r3m" => EmbeddedIcon {
+            bytes: include_bytes!("../assets/icons/runa3dm.svg"),
+            extension: "svg",
+        },
         _ => return None,
     };
     Some(icon)

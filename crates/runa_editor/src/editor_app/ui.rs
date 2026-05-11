@@ -348,9 +348,9 @@ impl<'window> EditorApp<'window> {
                             for object_id in self.world_object_ids() {
                                 let has_valid_parent = self
                                     .world
-                                    .get(object_id)
+                                    .object(object_id)
                                     .and_then(|object| object.parent())
-                                    .is_some_and(|parent_id| self.world.get(parent_id).is_some());
+                                    .is_some_and(|parent_id| self.world.object(parent_id).is_some());
                                 if !visited.contains(&object_id) && !has_valid_parent {
                                     self.hierarchy_object_row(ui, object_id, 0, &mut visited);
                                 }
@@ -396,7 +396,7 @@ impl<'window> EditorApp<'window> {
                         .id_salt("inspector_scroll")
                         .show(ui, |ui| {
                             if let Some(object_id) = self.selection {
-                                if let Some(object) = self.world.get_mut(object_id) {
+                                if let Some(object) = self.world.object_mut(object_id) {
                                     let project_root = self
                                         .project_session
                                         .as_ref()
@@ -1090,7 +1090,7 @@ impl<'window> EditorApp<'window> {
         if !visited.insert(object_id) {
             return;
         }
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         let title = helpers::object_title(object);
@@ -1216,7 +1216,7 @@ impl<'window> EditorApp<'window> {
     }
 
     fn begin_hierarchy_rename(&mut self, object_id: ObjectId) {
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         self.hierarchy_renaming = Some(object_id);
@@ -1225,7 +1225,7 @@ impl<'window> EditorApp<'window> {
 
     fn commit_hierarchy_rename(&mut self, object_id: ObjectId) {
         let name = self.hierarchy_rename_buffer.trim();
-        if let Some(object) = self.world.get_mut(object_id) {
+        if let Some(object) = self.world.object_mut(object_id) {
             object.name = if name.is_empty() {
                 "Object".to_string()
             } else {
@@ -1255,7 +1255,7 @@ impl<'window> EditorApp<'window> {
         };
 
         ui.menu_button(label, |ui| {
-            let Some(object) = self.world.get(object_id) else {
+            let Some(object) = self.world.object(object_id) else {
                 ui.label("Object not found.");
                 return;
             };
@@ -2074,7 +2074,7 @@ impl<'window> EditorApp<'window> {
                     ui.label("Select a Tilemap object to choose tiles.");
                     return;
                 };
-                let Some(object) = self.world.get_mut(object_id) else {
+                let Some(object) = self.world.object_mut(object_id) else {
                     ui.label("Selected object is no longer available.");
                     return;
                 };
@@ -2236,3 +2236,4 @@ fn version_warning_badge(ui: &mut egui::Ui) {
         egui::Color32::BLACK,
     );
 }
+

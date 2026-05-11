@@ -5,14 +5,14 @@ use runa_render_api::{command::UiRect, RenderQueue};
 
 use crate::components::ui::{ContainerKind, ImageProps, TextProps, UiNode, UiNodeId, UiNodeKind};
 
-pub struct Canvas {
+pub struct CanvasRenderer {
     pub space: CanvasSpace,
     pub nodes: Vec<UiNode>,
     pub root: UiNodeId,
     pub dirty_layout: bool,
 }
 
-impl Canvas {
+impl CanvasRenderer {
     pub fn new(space: CanvasSpace) -> Self {
         let root = UiNodeId(0);
         let root_node = UiNode::new(root, None, UiNodeKind::Container(ContainerKind::Free));

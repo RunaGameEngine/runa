@@ -26,7 +26,7 @@ pub struct Camera {
 
     // Orthographic projection parameters (2D)
     /// Orthographic camera size as width and height.
-    pub ortho_size: Vec2,
+    pub orthographic_size: Vec2,
     /// Near clipping plane.
     pub near: f32,
     /// Far clipping plane.
@@ -46,13 +46,13 @@ impl Camera {
     /// # Arguments
     /// * `width` - Visible width
     /// * `height` - Visible height
-    pub fn new_ortho(width: f32, height: f32) -> Self {
+    pub fn new_orthographic(width: f32, height: f32) -> Self {
         Self {
             position: Vec3::ZERO,
             target: Vec3::NEG_Z,
             up: Vec3::Y,
             projection: ProjectionType::Orthographic,
-            ortho_size: Vec2::new(width.max(f32::EPSILON), height.max(f32::EPSILON)),
+            orthographic_size: Vec2::new(width.max(f32::EPSILON), height.max(f32::EPSILON)),
             near: -1000.0,
             far: 1000.0,
             fov: 0.0, // Unused for orthographic projection
@@ -82,7 +82,7 @@ impl Camera {
             target,
             up,
             projection: ProjectionType::Perspective,
-            ortho_size: Vec2::new(320.0, 180.0), // Useful fallback when switching to ortho in tools
+            orthographic_size: Vec2::new(320.0, 180.0), // Useful fallback when switching to ortho in tools
             near,
             far,
             fov,
@@ -126,8 +126,8 @@ impl Camera {
     pub fn ortho_visible_size(&self) -> Vec2 {
         let viewport_width = self.viewport_size.0.max(1) as f32;
         let viewport_height = self.viewport_size.1.max(1) as f32;
-        let base_width = self.ortho_size.x.max(f32::EPSILON);
-        let base_height = self.ortho_size.y.max(f32::EPSILON);
+        let base_width = self.orthographic_size.x.max(f32::EPSILON);
+        let base_height = self.orthographic_size.y.max(f32::EPSILON);
         let base_aspect = base_width / base_height;
         let viewport_aspect = viewport_width / viewport_height;
 
@@ -181,7 +181,7 @@ impl Camera {
 
     /// Sets the orthographic camera size.
     pub fn set_ortho_size(&mut self, size: Vec2) {
-        self.ortho_size = size;
+        self.orthographic_size = size;
     }
 
     /// Sets the field of view for a perspective camera.

@@ -4,6 +4,9 @@ use crate::registry::RuntimeRegistry;
 use glam::Vec2;
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+use std::sync::Arc;
 
 pub type ObjectId = u64;
 
@@ -28,7 +31,11 @@ pub struct Object {
     parent: Option<ObjectId>,
     children: Vec<ObjectId>,
     components: HashMap<TypeId, Box<dyn Component>>,
-    world_ptr: *mut World,
+    world: Option<Weak<RefCell<World>>>,
+}
+
+pub struct ObjectBuilder {
+    object: Object,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,6 +59,34 @@ impl ObjectComponentInfo {
     }
 }
 
+impl ObjectBuilder {
+    pub fn new() -> Self {
+        Self {
+            object: Object::new(""),
+        }
+    }
+
+    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
+        self.object.name = name.into();
+        self
+    }
+
+    pub fn with<T: Component>(&mut self, component: T) -> &mut Self {
+        self.object.add_component(component);
+        self
+    }
+
+    pub fn build(self) -> Object {
+        self.object
+    }
+}
+
+impl Default for ObjectBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Object {
     pub fn new(name: impl Into<String>) -> Self {
         let mut components: HashMap<TypeId, Box<dyn Component>> = HashMap::new();
@@ -63,7 +98,7 @@ impl Object {
             parent: None,
             children: Vec::new(),
             components,
-            world_ptr: std::ptr::null_mut(),
+            world: None,
         }
     }
 
@@ -105,12 +140,12 @@ impl Object {
         self.children.clear();
     }
 
-    pub(crate) fn set_world(&mut self, world: &mut World) {
-        self.world_ptr = world as *mut World;
+    pub fn set_world(&mut self, world: Rc<RefCell<World>>) {
+        self.world = Some(Rc::downgrade(&world));
     }
 
-    pub(crate) fn get_world_ptr(&mut self) -> *mut World {
-        self.world_ptr
+    pub fn get_world(&self) -> Option<Rc<RefCell<World>>> {
+        self.world.as_ref()?.upgrade() // None, if World killed
     }
 
     pub(crate) fn set_id(&mut self, id: ObjectId) {
@@ -122,16 +157,9 @@ impl Object {
         self
     }
 
-    pub(crate) fn get_world(&self) -> Option<&World> {
-        if self.world_ptr.is_null() {
-            None
-        } else {
-            Some(unsafe { &*self.world_ptr })
-        }
-    }
-
-    pub fn runtime_registry(&self) -> Option<&RuntimeRegistry> {
-        self.get_world().and_then(|world| world.runtime_registry())
+    pub fn runtime_registry(&self) -> Option<Arc<RuntimeRegistry>> {
+        self.get_world()
+            .and_then(|world_rc| world_rc.borrow().runtime_registry_arc())
     }
 
     /// Add a component to the object. Only one component of a given type is allowed.
@@ -207,58 +235,59 @@ impl Object {
             .collect()
     }
 
-    pub(crate) fn run_start(&mut self) {
+    pub(crate) fn run_start(&mut self, world: *mut World) {
+        let world = unsafe { &mut *world };
         let component_ids: Vec<TypeId> = self.components.keys().copied().collect();
         for type_id in component_ids {
             let Some(mut component) = self.components.remove(&type_id) else {
                 continue;
             };
-            let mut ctx = ScriptContext::new(self);
+            let mut ctx = ScriptContext::new(self, world);
             component.on_start(&mut ctx);
             self.components.insert(type_id, component);
         }
     }
 
-    pub(crate) fn run_update(&mut self, dt: f32) {
+    pub(crate) fn run_update(&mut self, world: *mut World, dt: f32) {
+        let world = unsafe { &mut *world };
         let component_ids: Vec<TypeId> = self.components.keys().copied().collect();
         for type_id in component_ids {
             let Some(mut component) = self.components.remove(&type_id) else {
                 continue;
             };
-            let mut ctx = ScriptContext::new(self);
+            let mut ctx = ScriptContext::new(self, world);
             component.on_update(&mut ctx, dt);
             self.components.insert(type_id, component);
         }
     }
 
-    pub(crate) fn run_late_update(&mut self, dt: f32) {
+    pub(crate) fn run_late_update(&mut self, world: *mut World, dt: f32) {
+        let world = unsafe { &mut *world };
         let component_ids: Vec<TypeId> = self.components.keys().copied().collect();
         for type_id in component_ids {
             let Some(mut component) = self.components.remove(&type_id) else {
                 continue;
             };
-            let mut ctx = ScriptContext::new(self);
+            let mut ctx = ScriptContext::new(self, world);
             component.on_late_update(&mut ctx, dt);
             self.components.insert(type_id, component);
         }
     }
 
-    pub fn is_colliding_2d(&mut self) -> bool {
+    pub fn colliding_2d(&mut self, world: &World) -> bool {
         let center = self
             .get_component::<Transform>()
             .map(|transform| transform.position.truncate())
             .unwrap_or(Vec2::ZERO);
-        self.would_collide_2d_at(center)
+        self.would_collide_2d_at(world, center)
     }
 
-    pub fn would_collide_2d_at(&mut self, center: Vec2) -> bool {
+    pub fn would_collide_2d_at(&self, world: &World, center: Vec2) -> bool {
         let Some(collider) = self.get_component::<Collider2D>().copied() else {
             return false;
         };
 
         let self_ptr = self as *const Object;
-        self.get_world()
-            .map(|world| world.overlaps_collider_2d(center, &collider, Some(self_ptr)))
-            .unwrap_or(false)
+        world.overlaps_collider_2d(center, &collider, Some(self_ptr))
     }
 }

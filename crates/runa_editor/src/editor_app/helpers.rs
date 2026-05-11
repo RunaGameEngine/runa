@@ -225,7 +225,7 @@ pub(super) fn component_icon_name(type_id: TypeId, kind: ComponentRuntimeKind) -
         "c-PointLight"
     } else if type_id == TypeId::of::<Tilemap>() || type_id == TypeId::of::<TilemapRenderer>() {
         "c-TilemapRenderer"
-    } else if type_id == TypeId::of::<Canvas>() {
+    } else if type_id == TypeId::of::<CanvasRenderer>() {
         "c-Canvas"
     } else if type_id == TypeId::of::<CursorInteractable>() {
         "c-CursorInteractable"

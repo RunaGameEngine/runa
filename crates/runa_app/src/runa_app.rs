@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Instant;
 
 use runa_core::{components::Camera, systems::InteractionSystem, Console, World};
@@ -16,10 +18,10 @@ pub trait GameState {}
 impl RunaApp {
     /// Run Runa application with config (fullscreen ?, vsync ?, screensize ? etc.)
     pub fn run_with_config(
-        mut world: World,
+        world_rc: Rc<RefCell<World>>,
         config: RunaWindowConfig,
     ) -> Result<(), EventLoopError> {
-        let event_loop = EventLoop::new().unwrap();
+        let event_loop = EventLoop::new()?;
         event_loop.set_control_flow(ControlFlow::Poll);
 
         // Initialize input
@@ -29,8 +31,11 @@ impl RunaApp {
         // Default camera (will be overridden by world cameras if present)
         let camera = Camera::default();
 
-        world.construct();
-        world.start();
+        {
+            let mut world = world_rc.borrow_mut();
+            world.construct();
+            world.start(world_rc.clone());
+        }
 
         let console = Console::new();
 
@@ -41,7 +46,7 @@ impl RunaApp {
             camera,
             camera_matrix_override: None,
             active_camera_set: false,
-            world,
+            world_rc: world_rc.clone(),
             last_time: Instant::now(),
             accumulator: 0.0,
             frame_count: 0,
@@ -61,7 +66,7 @@ impl RunaApp {
     /// height: 720,
     /// fullscreen: false,
     /// vsync: true
-    pub fn run_default(mut world: World) -> Result<(), EventLoopError> {
+    pub fn run_default(world_rc: Rc<RefCell<World>>,) -> Result<(), EventLoopError> {
         let event_loop = EventLoop::new().unwrap();
         event_loop.set_control_flow(ControlFlow::Poll);
 
@@ -71,8 +76,11 @@ impl RunaApp {
         // Default camera (will be overridden by world cameras if present)
         let camera = Camera::default();
 
-        world.construct();
-        world.start();
+        {
+            let mut world = world_rc.borrow_mut();
+            world.construct();
+            world.start(world_rc.clone());
+        }
 
         let console = Console::new();
 
@@ -83,7 +91,7 @@ impl RunaApp {
             camera,
             camera_matrix_override: None,
             active_camera_set: false,
-            world,
+            world_rc: world_rc.clone(),
             last_time: Instant::now(),
             accumulator: 0.0,
             frame_count: 0,

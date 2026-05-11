@@ -203,7 +203,7 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return false;
         };
-        let Some(object) = self.world.get_mut(object_id) else {
+        let Some(object) = self.world.object_mut(object_id) else {
             return false;
         };
         let Some(transform) = object.get_component::<Transform>().cloned() else {
@@ -299,7 +299,7 @@ impl<'window> EditorApp<'window> {
         editor_camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         let Some(camera) = object.get_component::<Camera>() else {
@@ -396,7 +396,7 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
     ) {
         for object_id in self.world_object_ids() {
-            let Some(object) = self.world.get(object_id) else {
+            let Some(object) = self.world.object(object_id) else {
                 continue;
             };
             let Some(light) = object.get_component::<DirectionalLight>() else {
@@ -581,7 +581,7 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return false;
         };
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return false;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -614,7 +614,7 @@ impl<'window> EditorApp<'window> {
         let Some(drag) = self.gizmo_drag.as_ref() else {
             return;
         };
-        let Some(object) = self.world.get_mut(drag.object_id) else {
+        let Some(object) = self.world.object_mut(drag.object_id) else {
             return;
         };
         let Some(transform) = object.get_component_mut::<Transform>() else {
@@ -676,7 +676,7 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return false;
         };
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return false;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -708,7 +708,7 @@ impl<'window> EditorApp<'window> {
         let Some(drag) = self.gizmo_drag.as_ref() else {
             return;
         };
-        let Some(object) = self.world.get_mut(drag.object_id) else {
+        let Some(object) = self.world.object_mut(drag.object_id) else {
             return;
         };
         let Some(transform) = object.get_component_mut::<Transform>() else {
@@ -755,7 +755,7 @@ impl<'window> EditorApp<'window> {
         let mut best: Option<(ObjectId, f32, f32)> = None;
 
         for object_id in self.world_object_ids() {
-            let Some(object) = self.world.get(object_id) else {
+            let Some(object) = self.world.object(object_id) else {
                 continue;
             };
             let Some((min, max)) = self.object_bounds_2d(object_id, object) else {
@@ -821,7 +821,7 @@ impl<'window> EditorApp<'window> {
             return self.object_screen_rect(rect, camera, object_id);
         }
 
-        let object = self.world.get(object_id)?;
+        let object = self.world.object(object_id)?;
         let (min, max) = helpers::object_world_bounds_3d(object)?;
         let matrix = self.world.world_transform_matrix(object_id, 1.0)?;
         let local_position = object.get_component::<Transform>()?.position;
@@ -851,7 +851,7 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) -> Option<egui::Rect> {
-        let object = self.world.get(object_id)?;
+        let object = self.world.object(object_id)?;
         let (min, max) = self.object_bounds_2d(object_id, object)?;
         let top_left = helpers::world_to_screen(rect, camera, Vec2::new(min.x, max.y));
         let bottom_right = helpers::world_to_screen(rect, camera, Vec2::new(max.x, min.y));
@@ -893,7 +893,7 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -964,7 +964,7 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -1029,7 +1029,7 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         let Some((min, max)) = helpers::object_world_bounds_3d(object) else {
@@ -1065,7 +1065,7 @@ impl<'window> EditorApp<'window> {
 
     fn draw_component_icons(&self, painter: &egui::Painter, rect: egui::Rect, camera: Camera) {
         for object_id in self.world_object_ids() {
-            let Some(object) = self.world.get(object_id) else {
+            let Some(object) = self.world.object(object_id) else {
                 continue;
             };
 
@@ -1117,7 +1117,7 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return;
         };
-        let Some(object) = self.world.get(object_id) else {
+        let Some(object) = self.world.object(object_id) else {
             return;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -1162,3 +1162,4 @@ fn draw_screen_arrow(
     painter.line_segment([end, left], egui::Stroke::new(2.0, color));
     painter.line_segment([end, right], egui::Stroke::new(2.0, color));
 }
+

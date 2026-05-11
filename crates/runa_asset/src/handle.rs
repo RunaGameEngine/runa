@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct Handle<T> {
     pub inner: Arc<T>,
 }

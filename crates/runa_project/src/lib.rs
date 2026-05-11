@@ -18,3 +18,4 @@ pub use world_asset::{
     SpriteRendererAsset, TilemapAsset, TilemapLayerAsset, TransformAsset, WorldAsset,
     WorldObjectAsset,
 };
+pub mod runa3d;

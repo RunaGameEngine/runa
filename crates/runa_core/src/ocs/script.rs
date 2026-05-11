@@ -4,11 +4,12 @@ use glam::Vec2;
 
 pub struct ScriptContext<'a> {
     object: &'a mut Object,
+    world: &'a mut World,
 }
 
 impl<'a> ScriptContext<'a> {
-    pub(crate) fn new(object: &'a mut Object) -> Self {
-        Self { object }
+    pub(crate) fn new(object: &'a mut Object, world: &'a mut World) -> Self {
+        Self { object, world }
     }
 
     pub fn id(&self) -> Option<ObjectId> {
@@ -49,39 +50,52 @@ impl<'a> ScriptContext<'a> {
     }
 
     pub fn world(&self) -> &World {
-        self.object
-            .get_world()
-            .expect("ScriptContext world access is only valid for world-owned objects")
+        self.world
     }
 
-    pub fn commands(&mut self) -> ScriptCommands {
-        ScriptCommands::new(self.object.get_world_ptr())
+    pub fn world_mut(&mut self) -> &mut World {
+        self.world
+    }
+
+    pub fn commands(&mut self) -> ScriptCommands<'_> {
+        ScriptCommands::new(self.world)
     }
 
     pub fn get_object(&self, id: ObjectId) -> Option<&Object> {
-        self.world().get(id)
+        if self.object.id() == Some(id) {
+            Some(&*self.object)
+        } else {
+            self.world.object(id)
+        }
     }
 
     pub fn find_first_with<T: 'static>(&self) -> Option<ObjectId> {
-        self.world().find_first_with::<T>()
+        self.world.find_first_with::<T>()
     }
 
     pub fn find_all_with<T: 'static>(&self) -> Vec<ObjectId> {
-        self.world().find_all_with::<T>()
+        self.world.find_all_with::<T>()
     }
 
-    pub fn is_colliding_2d(&mut self) -> bool {
-        self.object.is_colliding_2d()
+    pub fn colliding_2d(&mut self, world: &World) -> bool {
+        self.object.colliding_2d(world)
     }
 
-    pub fn would_collide_2d_at(&mut self, center: Vec2) -> bool {
-        self.object.would_collide_2d_at(center)
+    pub fn would_collide_2d_at(&mut self, world: &World, center: Vec2) -> bool {
+        self.object.would_collide_2d_at(world, center)
     }
 
     pub fn overlaps_collider_2d(&self, center: Vec2, collider: &Collider2D) -> bool {
         let self_ptr = self.object as *const Object;
-        self.world()
-            .overlaps_collider_2d(center, collider, Some(self_ptr))
+        self.world.overlaps_collider_2d(center, collider, Some(self_ptr))
+    }
+
+    pub fn emit_event<E: 'static>(&self, event: E) {
+        self.world.events.borrow_mut().emit(event);
+    }
+
+    pub fn subscribe_to_event<E: 'static>(&self, callback: impl Fn(&E) + 'static) {
+        self.world.events.borrow_mut().subscribe(callback);
     }
 }
 
@@ -143,7 +157,7 @@ pub trait Script: SerializedFieldAccess + 'static {
     /// Use this method for:
     /// - Input handling (`Input::is_key_pressed()`)
     /// - Movement and animation
-    /// - AI behavior and decision making
+    /// - AI behavior and decision-making
     /// - Physics updates (use fixed timestep for determinism)
     /// - Audio playback via `AudioSource::play()`
     ///
@@ -154,7 +168,7 @@ pub trait Script: SerializedFieldAccess + 'static {
     /// Called after all regular `update()` calls for the current tick.
     ///
     /// Use this for dependent logic that must observe the final results of gameplay updates,
-    /// such as follow cameras and post-movement alignment.
+    /// such as follows cameras and post-movement alignment.
     fn late_update(&mut self, _ctx: &mut ScriptContext, _dt: f32) {}
 }
 

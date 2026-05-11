@@ -459,13 +459,13 @@ fn project_metadata() -> ProjectMetadataSnapshot {
         .into_iter()
         .filter_map(|archetype| {
             let mut world = engine.create_world();
-            let object_id = engine.spawn_archetype_by_key(&mut world, archetype.key())?;
-            let object = world.get(object_id)?;
+            let object_id = engine.spawn_def_by_name(&mut world, archetype.name())?;
+            let object = world.object(object_id)?;
             Some(PlaceableObjectRecord {
                 descriptor: PlaceableObjectDescriptor {
                     id: archetype.key().as_str().to_string(),
                     name: archetype.name().to_string(),
-                    category: "Archetypes".to_string(),
+                    category: "Object Definitions".to_string(),
                 },
                 object: WorldObjectAsset::from_object(object),
             })
@@ -843,3 +843,4 @@ fn main() {
         let _ = fs::remove_dir_all(root);
     }
 }
+

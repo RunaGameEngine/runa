@@ -28,7 +28,7 @@ impl InteractionSystem {
 
         // Reset states
         for object_id in &interactable_ids {
-            let Some(object) = world.get_mut(*object_id) else {
+            let Some(object) = world.object_mut(*object_id) else {
                 continue;
             };
             if let Some(interactable) = object.get_component_mut::<CursorInteractable>() {
@@ -43,7 +43,7 @@ impl InteractionSystem {
 
         // First pass: find which object is closest to the cursor
         for object_id in &interactable_ids {
-            let Some(object) = world.get(*object_id) else {
+            let Some(object) = world.object(*object_id) else {
                 continue;
             };
             if let (Some(transform), Some(interactable)) = (
@@ -62,7 +62,7 @@ impl InteractionSystem {
 
         // Second pass: update hover states
         for object_id in &interactable_ids {
-            let Some(object) = world.get_mut(*object_id) else {
+            let Some(object) = world.object_mut(*object_id) else {
                 continue;
             };
             if let Some(interactable) = object.get_component_mut::<CursorInteractable>() {
@@ -87,7 +87,7 @@ impl InteractionSystem {
                 (self.pressed_object_id, closest_object_id)
             {
                 if pressed_id == closest_id {
-                    if let Some(object) = world.get_mut(closest_id) {
+                    if let Some(object) = world.object_mut(closest_id) {
                         if let Some(interactable) = object.get_component_mut::<CursorInteractable>()
                         {
                             if let Some(ref mut callback) = interactable.on_click {
@@ -104,7 +104,7 @@ impl InteractionSystem {
 
         // Update callbacks
         for object_id in interactable_ids {
-            let Some(object) = world.get_mut(object_id) else {
+            let Some(object) = world.object_mut(object_id) else {
                 continue;
             };
             if let Some(interactable) = object.get_component_mut::<CursorInteractable>() {
@@ -113,3 +113,4 @@ impl InteractionSystem {
         }
     }
 }
+

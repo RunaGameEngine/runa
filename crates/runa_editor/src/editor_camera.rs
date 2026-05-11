@@ -151,7 +151,7 @@ impl EditorCameraController {
                     target: Vec3::new(self.ortho_center.x, self.ortho_center.y, -1.0),
                     up: Vec3::Y,
                     projection: ProjectionType::Orthographic,
-                    ortho_size: Vec2::new(view_width, view_height),
+                    orthographic_size: Vec2::new(view_width, view_height),
                     near: -1000.0,
                     far: 1000.0,
                     fov: 0.0,

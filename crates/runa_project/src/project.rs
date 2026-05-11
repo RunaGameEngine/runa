@@ -10,6 +10,9 @@ pub enum ProjectError {
     Io(std::io::Error),
     Ron(ron::Error),
     RonSpanned(ron::error::SpannedError),
+    Json(serde_json::Error),
+    Zip(zip::result::ZipError),
+    Gltf(gltf::Error),
     Message(String),
 }
 
@@ -19,6 +22,9 @@ impl Display for ProjectError {
             Self::Io(error) => write!(f, "{error}"),
             Self::Ron(error) => write!(f, "{error}"),
             Self::RonSpanned(error) => write!(f, "{error}"),
+            Self::Json(error) => write!(f, "{error}"),
+            Self::Zip(error) => write!(f, "{error}"),
+            Self::Gltf(error) => write!(f, "{error}"),
             Self::Message(message) => write!(f, "{message}"),
         }
     }
@@ -41,6 +47,24 @@ impl From<ron::Error> for ProjectError {
 impl From<ron::error::SpannedError> for ProjectError {
     fn from(value: ron::error::SpannedError) -> Self {
         Self::RonSpanned(value)
+    }
+}
+
+impl From<serde_json::Error> for ProjectError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Json(value)
+    }
+}
+
+impl From<zip::result::ZipError> for ProjectError {
+    fn from(value: zip::result::ZipError) -> Self {
+        Self::Zip(value)
+    }
+}
+
+impl From<gltf::Error> for ProjectError {
+    fn from(value: gltf::Error) -> Self {
+        Self::Gltf(value)
     }
 }
 

@@ -1,8 +1,10 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use runa_core::{
     components::{
-        ui::CanvasSpace, ActiveCamera, AudioListener, AudioSource, Camera, Canvas, Collider2D,
+        ui::CanvasSpace, ActiveCamera, AudioListener, AudioSource, Camera, CanvasRenderer, Collider2D,
         Component, CursorInteractable, DirectionalLight, MeshRenderer, ObjectDefinitionInstance,
         PhysicsCollision, PointLight, SerializedTypeStorage, Sorting, SpriteAnimator,
         SpriteRenderer, Tilemap, TilemapLayer, TilemapRenderer, Transform,
@@ -10,8 +12,8 @@ use runa_core::{
     glam::USizeVec2,
     ocs::{Object, Script, World},
     registry::{
-        ArchetypeKey, ArchetypeMetadata, RunaArchetype, RunaComponentType, RunaScriptType,
-        RuntimeRegistry, TypeMetadata,
+        ArchetypeKey, ArchetypeMetadata, ObjectDef, ObjectDefMetadata, RunaArchetype,
+        RunaComponentType, RunaScriptType, RuntimeRegistry, TypeMetadata,
     },
 };
 
@@ -140,6 +142,13 @@ impl Engine {
         self.runtime_registry.register_archetype::<T>()
     }
 
+    pub fn register_object_def<T>(&mut self) -> ObjectDefMetadata
+    where
+        T: ObjectDef,
+    {
+        self.runtime_registry.register_object_def::<T>()
+    }
+
     pub fn register_archetype_named<F>(
         &mut self,
         name: impl Into<Arc<str>>,
@@ -152,14 +161,23 @@ impl Engine {
             .register_archetype_named(name, factory)
     }
 
-    pub fn create_world(&self) -> World {
+    pub fn create_world(&self) -> Rc<RefCell<World>> {
+        // Создаём новый мир
         let mut world = World::default();
+
+        // Настраиваем runtime_registry
         world.set_runtime_registry(Arc::new(self.runtime_registry.clone()));
-        world
+
+        // Оборачиваем World в Rc<RefCell>
+        Rc::new(RefCell::new(world))
     }
 
     pub fn spawn_archetype<T: RunaArchetype>(&self, world: &mut World) -> u64 {
         T::create(world)
+    }
+
+    pub fn spawn_def<T: ObjectDef>(&self, world: &mut World) -> u64 {
+        world.spawn_def::<T>()
     }
 
     pub fn spawn_archetype_by_key(&self, world: &mut World, key: &ArchetypeKey) -> Option<u64> {
@@ -168,6 +186,10 @@ impl Engine {
 
     pub fn spawn_archetype_by_name(&self, world: &mut World, name: &str) -> Option<u64> {
         self.runtime_registry.spawn_archetype_by_name(world, name)
+    }
+
+    pub fn spawn_def_by_name(&self, world: &mut World, name: &str) -> Option<u64> {
+        self.runtime_registry.spawn_object_def_by_name(world, name)
     }
 
     fn register_builtin_types(&mut self) {
@@ -186,7 +208,7 @@ impl Engine {
         self.runtime_registry
             .register_builtin_component_factory::<Collider2D, _>(Collider2D::default);
         self.runtime_registry
-            .register_builtin_component_factory::<Canvas, _>(|| Canvas::new(CanvasSpace::Screen));
+            .register_builtin_component_factory::<CanvasRenderer, _>(|| CanvasRenderer::new(CanvasSpace::Screen));
         self.runtime_registry
             .register_builtin_component_factory::<AudioListener, _>(AudioListener::default);
         self.runtime_registry

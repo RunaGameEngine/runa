@@ -1,9 +1,11 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
-use runa_core::components::{Camera, Transform};
+use runa_core::components::{ActiveCamera, Camera, Transform};
 use runa_core::input::InputState;
-use runa_core::ocs::World;
+use runa_core::ocs::{ObjectId, World};
 use runa_core::systems::InteractionSystem;
 use runa_core::{glam, Console};
 use runa_render::Renderer;
@@ -48,7 +50,7 @@ pub struct App<'window> {
     pub camera: Camera,
     pub camera_matrix_override: Option<glam::Mat4>, // For Camera3D
     pub active_camera_set: bool,                    // True if ActiveCamera was manually set
-    pub world: World,
+    pub world_rc: Rc<RefCell<World>>,
 
     pub last_time: Instant,
     pub accumulator: f32,
@@ -68,10 +70,11 @@ impl<'window> App<'window> {
         object_id: runa_core::ocs::ObjectId,
         interpolation_factor: f32,
     ) -> Option<Camera> {
-        let object = self.world.get(object_id)?;
-        let camera = object.get_component::<Camera>()?;
+        let world = &self.world_rc.borrow();
+        let object = world.object(object_id);
+        let camera = object.unwrap().get_component::<Camera>();
         if let Some(matrix) = self
-            .world
+            .world_rc.borrow()
             .world_transform_matrix(object_id, interpolation_factor)
         {
             // Camera-follow jitter is very noticeable, so the active camera
@@ -85,16 +88,21 @@ impl<'window> App<'window> {
                 previous_position: position,
                 previous_rotation: rotation,
             };
-            Some(camera.resolved_with_transform(Some(&interpolated_transform)))
+            Some(camera.unwrap().resolved_with_transform(Some(&interpolated_transform)))
         } else {
-            Some(*camera)
+            Some(*camera.unwrap())
         }
     }
 
-    fn resolved_camera_for_object(&self, object_id: runa_core::ocs::ObjectId) -> Option<Camera> {
-        let object = self.world.get(object_id)?;
+    pub fn resolved_camera_for_object(&self, object_id: ObjectId) -> Option<Camera> {
+        // один mutable borrow на весь блок
+        let world = self.world_rc.borrow_mut();
+
+        let object = world.object(object_id)?;
         let camera = object.get_component::<Camera>()?;
-        if let Some(matrix) = self.world.world_transform_matrix(object_id, 1.0) {
+
+        // world_transform_matrix может мутировать World, поэтому один borrow_mut нужен
+        if let Some(matrix) = world.world_transform_matrix(object_id, 1.0) {
             let (scale, rotation, position) = matrix.to_scale_rotation_translation();
             let transform = Transform {
                 position,
@@ -109,17 +117,20 @@ impl<'window> App<'window> {
         }
     }
 
-    fn active_camera_id(&self) -> Option<runa_core::ocs::ObjectId> {
-        self.world
-            .query::<runa_core::components::ActiveCamera>()
+    pub fn active_camera_id(&self) -> Option<ObjectId> {
+        // Берём один mutable borrow на весь блок, чтобы избежать nested borrow
+        let mut world = self.world_rc.borrow_mut();
+
+        // ищем объект с ActiveCamera и Camera компонентом
+        let id_opt = world.query::<ActiveCamera>()
             .into_iter()
             .find(|id| {
-                self.world
-                    .get(*id)
+                world.object(*id)
                     .and_then(|object| object.get_component::<Camera>())
                     .is_some()
-            })
-            .or_else(|| self.world.find_first_with::<Camera>())
+            });
+
+        id_opt.or_else(|| world.find_first_with::<Camera>())
     }
 
     fn toggle_fullscreen(&mut self) {
@@ -144,7 +155,7 @@ impl<'window> App<'window> {
             self.queue.clear();
 
             // Compile render commands from world
-            self.world.render(&mut self.queue, interpolation_factor);
+            self.world_rc.borrow().render(&mut self.queue, interpolation_factor);
 
             // Render console on top (after clearing queue and world render)
             self.console.render(&mut self.queue, &active_camera);
@@ -163,7 +174,7 @@ impl<'window> App<'window> {
                     renderer.surface_config.height.max(1) as f32,
                 )
             } else {
-                active_camera.ortho_size
+                active_camera.orthographic_size
             };
 
             // Get ortho_size from active camera if available, otherwise use default camera
@@ -204,8 +215,8 @@ impl<'window> App<'window> {
                 let w = renderer.surface_config.width.max(1);
                 let h = renderer.surface_config.height.max(1);
                 if let Some(camera) = self
-                    .world
-                    .get_mut(camera_id)
+                    .world_rc.borrow_mut()
+                    .object_mut(camera_id)
                     .and_then(|object| object.get_component_mut::<Camera>())
                 {
                     camera.viewport_size = (w, h);
@@ -216,8 +227,8 @@ impl<'window> App<'window> {
                 self.camera = camera;
                 self.camera_matrix_override = Some(camera.matrix());
                 self.active_camera_set = self
-                    .world
-                    .get(camera_id)
+                    .world_rc.borrow()
+                    .object(camera_id)
                     .and_then(|object| object.get_component::<ActiveCamera>())
                     .is_some();
 
@@ -299,6 +310,7 @@ impl<'window> ApplicationHandler for App<'window> {
         // Clear the "just" input states at the beginning of each event loop cycle
         // This ensures that "just pressed" events are only valid for one frame
 
+
         const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
 
         let current_time = Instant::now();
@@ -321,13 +333,16 @@ impl<'window> ApplicationHandler for App<'window> {
                 };
                 input_state.camera = Some(camera_to_use);
             } // Release the lock immediately after setting the camera
+            {
+                let mut world = self.world_rc.borrow_mut(); // one borrow_mut per frame
 
-            // Update interaction system BEFORE world update so scripts can use hover state
-            if !self.console.is_visible() {
-                self.interaction_system.update(&mut self.world);
+                // Update interaction system BEFORE world update so scripts can use hover state
+                if !self.console.is_visible() {
+                    self.interaction_system.update(&mut world);
+                }
+                world.update(FIXED_TIMESTEP);
             }
 
-            self.world.update(FIXED_TIMESTEP);
             InputState::update_frame();
 
             // Sync camera
@@ -447,3 +462,4 @@ impl<'window> ApplicationHandler for App<'window> {
         }
     }
 }
+

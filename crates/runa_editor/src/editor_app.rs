@@ -20,7 +20,7 @@ use egui_wgpu::{Renderer as EguiRenderer, RendererOptions, ScreenDescriptor};
 use egui_winit::State as EguiWinitState;
 use rfd::FileDialog;
 use runa_core::components::{
-    ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, Canvas, Collider2D,
+    ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, CanvasRenderer, Collider2D,
     ComponentRuntimeKind, CursorInteractable, DirectionalLight, Mesh, MeshRenderer,
     ObjectDefinitionInstance, PhysicsCollision, SerializedTypeEntry, SerializedTypeKind,
     SerializedTypeStorage, SpriteRenderer, Tilemap, TilemapRenderer, Transform,

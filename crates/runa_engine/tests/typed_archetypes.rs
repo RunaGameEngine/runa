@@ -1,10 +1,10 @@
 use runa_engine::{
     runa_core::{
-        components::Transform,
-        ocs::{Object, Script, ScriptContext, World},
+        components::{SerializedFieldAccess, Transform},
+        ocs::{Object, ObjectBuilder, Script, ScriptContext, World},
         RegisteredTypeKind, RegistrationSource,
     },
-    Engine, RunaArchetype, RunaComponent, RunaScript,
+    Engine, ObjectDef, RunaArchetype, RunaComponent, RunaObjectDef, RunaScript,
 };
 
 #[derive(RunaArchetype)]
@@ -28,6 +28,9 @@ impl BossEnemy {
 
 #[derive(Default, RunaComponent)]
 struct Health {
+    #[runa_editable]
+    max: i32,
+    #[runa_runtime]
     current: i32,
 }
 
@@ -74,20 +77,60 @@ fn typed_archetypes_register_and_spawn() {
     let mut engine = Engine::new();
     let player_metadata = engine.register_archetype::<PlayerArchetype>();
     let boss_metadata = engine.register_archetype::<BossEnemy>();
-    let mut world = engine.create_world();
+    let world_rc = engine.create_world();
 
-    let player_id = world.spawn_archetype::<PlayerArchetype>();
-    let boss_id = world.spawn_archetype::<BossEnemy>();
-    let player_by_name = world.spawn_archetype_by_name("player");
-    let boss_by_key = world.spawn_archetype_by_key(boss_metadata.key());
+    {
+        let mut world = world_rc.borrow_mut();
 
-    assert_eq!(PlayerArchetype::archetype_name(), "player");
-    assert_eq!(PlayerArchetype::archetype_key().as_str(), "player");
-    assert_eq!(BossEnemy::archetype_key().as_str(), "boss_enemy");
-    assert_eq!(player_metadata.key().as_str(), "player");
-    assert_eq!(boss_metadata.name(), "boss_enemy");
-    assert!(world.get(player_id).is_some());
-    assert!(world.get(boss_id).is_some());
-    assert!(player_by_name.is_some());
-    assert!(boss_by_key.is_some());
+        let player_id = world.spawn_archetype::<PlayerArchetype>();
+        let boss_id = world.spawn_archetype::<BossEnemy>();
+        let player_by_name = world.spawn_archetype_by_name("player");
+        let boss_by_key = world.spawn_archetype_by_key(boss_metadata.key());
+
+        assert_eq!(PlayerArchetype::archetype_name(), "player");
+        assert_eq!(PlayerArchetype::archetype_key().as_str(), "player");
+        assert_eq!(BossEnemy::archetype_key().as_str(), "boss_enemy");
+        assert_eq!(player_metadata.key().as_str(), "player");
+        assert_eq!(boss_metadata.name(), "boss_enemy");
+        assert!(world.object(player_id).is_some());
+        assert!(world.object(boss_id).is_some());
+        assert!(player_by_name.is_some());
+        assert!(boss_by_key.is_some());
+    }
 }
+
+#[derive(RunaObjectDef)]
+#[runa(name = "defined_player")]
+struct DefinedPlayer;
+
+impl ObjectDef for DefinedPlayer {
+    fn build(object: &mut ObjectBuilder) {
+        object.name("Defined Player").with(Health {
+            max: 100,
+            current: 100,
+        });
+    }
+}
+
+#[test]
+fn object_defs_spawn_by_type_and_name_with_component_access() {
+    let mut engine = Engine::new();
+    let metadata = engine.register_object_def::<DefinedPlayer>();
+    let world_rc = engine.create_world();
+
+    let by_type = world_rc.borrow_mut().spawn_def::<DefinedPlayer>();
+    let by_name = world_rc.borrow_mut()
+        .spawn("defined_player")
+        .expect("definition should spawn by name");
+
+    assert_eq!(metadata.key().as_str(), "defined_player");
+    assert_eq!(DefinedPlayer::object_def_name(), "defined_player");
+    assert_eq!(world_rc.borrow().get::<Health>(by_type).unwrap().max, 100);
+    world_rc.borrow_mut().get_mut::<Health>(by_name).unwrap().max = 150;
+    assert_eq!(world_rc.borrow().get::<Health>(by_name).unwrap().max, 150);
+
+    let fields = world_rc.borrow().get::<Health>(by_type).unwrap().serialized_fields();
+    assert_eq!(fields.len(), 1);
+    assert_eq!(fields[0].name, "max");
+}
+
