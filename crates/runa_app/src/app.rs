@@ -67,7 +67,7 @@ pub struct App<'window> {
 impl<'window> App<'window> {
     fn resolved_camera_for_object_with_interpolation(
         &self,
-        object_id: runa_core::ocs::ObjectId,
+        object_id: ObjectId,
         interpolation_factor: f32,
     ) -> Option<Camera> {
         let world = &self.world_rc.borrow();
@@ -119,7 +119,7 @@ impl<'window> App<'window> {
 
     pub fn active_camera_id(&self) -> Option<ObjectId> {
         // Берём один mutable borrow на весь блок, чтобы избежать nested borrow
-        let mut world = self.world_rc.borrow_mut();
+        let world = self.world_rc.borrow();
 
         // ищем объект с ActiveCamera и Camera компонентом
         let id_opt = world.query::<ActiveCamera>()

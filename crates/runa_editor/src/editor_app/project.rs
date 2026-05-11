@@ -9,7 +9,7 @@ impl<'window> EditorApp<'window> {
         }
 
         self.world = helpers::create_preview_world();
-        self.world
+        self.world.borrow_mut()
             .set_runtime_registry(Arc::new(self.runtime_engine.runtime_registry().clone()));
         self.set_primary_selection(self.first_object_id());
         self.project_session = None;
@@ -64,6 +64,7 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn begin_load_project(&mut self, path: PathBuf) {
+        println!("Begin load project");
         let output_tx = self.output_tx.clone();
         let (tx, rx) = mpsc::channel();
         self.project_load = Some(rx);
@@ -76,6 +77,7 @@ impl<'window> EditorApp<'window> {
                 let project = load_project(&path).map_err(|error| error.to_string())?;
                 ensure_editor_bridge_files(&project.root_dir).map_err(|error| error.to_string())?;
                 let metadata = placeables::query_project_metadata(&project, &output_tx)?;
+                println!("Project Metadata loaded!");
 
                 Ok(ProjectLoadResult { project, metadata })
             })();
@@ -112,6 +114,8 @@ impl<'window> EditorApp<'window> {
         };
         self.world = world;
         self.ensure_world_runtime_registry();
+        self.world.borrow_mut().start(self.world.clone());
+        self.log_file = std::fs::File::create(project.root_dir.join("editor.log")).ok();
         self.set_primary_selection(self.first_object_id());
         self.content_browser
             .set_project_root(project.root_dir.clone(), &self.settings);
@@ -253,7 +257,7 @@ impl<'window> EditorApp<'window> {
                 "save_world_data: refresh_object_world_ptrs started",
             );
         }
-        self.world.refresh_object_world_ptrs();
+        self.world.borrow_mut().refresh_object_world_ptrs();
         if let Some(project_root) = play_log_project_root {
             self.play_launch_trace(
                 project_root,
@@ -263,9 +267,9 @@ impl<'window> EditorApp<'window> {
         if let Some(project_root) = play_log_project_root {
             self.play_launch_trace(project_root, "save_world_data: repair_hierarchy started");
         }
-        self.world.repair_hierarchy();
+        self.world.borrow_mut().repair_hierarchy();
         if let Some(project_root) = play_log_project_root {
-            let object_count = self.world.query::<Transform>().len();
+            let object_count = self.world.borrow().query::<Transform>().len();
             self.play_launch_trace(
                 project_root,
                 format!("save_world_data: repair_hierarchy completed, objects={object_count}"),
@@ -278,7 +282,7 @@ impl<'window> EditorApp<'window> {
                 ),
             );
         }
-        save_world(&path, &self.world).map_err(|error| error.to_string())?;
+        save_world(&path, &self.world.borrow()).map_err(|error| error.to_string())?;
         if let Some(project_root) = play_log_project_root {
             self.play_launch_trace(project_root, "save_world_data: save_world completed");
         }
@@ -644,10 +648,15 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn push_output(&mut self, line: impl Into<String>) {
-        self.output_lines.push(line.into());
+        let line = line.into();
+        self.output_lines.push(line.clone());
         if self.output_lines.len() > 500 {
             let drain_len = self.output_lines.len() - 500;
             self.output_lines.drain(0..drain_len);
+        }
+        if let Some(file) = &mut self.log_file {
+            use std::io::Write;
+            writeln!(file, "{}", line).ok();
         }
     }
 

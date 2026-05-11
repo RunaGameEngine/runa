@@ -147,7 +147,7 @@ pub fn create_player() -> Object {
 
 pub fn create_player_camera() -> Object {
     Object::new("Player Camera")
-        // A wider ortho view keeps sandbox movement readable while still making
+        // A wider orthographic view keeps sandbox movement readable while still making
         // camera-follow interpolation problems obvious during debugging.
         .with(Camera::new_orthographic(32.0, 18.0))
         .with(ActiveCamera)

@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use super::*;
 
 impl<'window> EditorApp<'window> {
@@ -58,9 +59,9 @@ impl<'window> EditorApp<'window> {
         self.viewport_camera = Some(camera);
         let virtual_size = Vec2::new(target.size().0 as f32, target.size().1 as f32);
 
-        self.world.repair_hierarchy();
+        self.world.borrow_mut().repair_hierarchy();
         self.scene_queue.clear();
-        self.world.render(&mut self.scene_queue, 1.0);
+        self.world.borrow_mut().render(&mut self.scene_queue, 1.0);
         renderer.draw_to_target(target, &self.scene_queue, camera.matrix(), virtual_size);
     }
 
@@ -203,7 +204,8 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return false;
         };
-        let Some(object) = self.world.object_mut(object_id) else {
+        let mut world_rc = self.world.borrow_mut();
+        let Some(object) = world_rc.object_mut(object_id) else {
             return false;
         };
         let Some(transform) = object.get_component::<Transform>().cloned() else {
@@ -299,7 +301,8 @@ impl<'window> EditorApp<'window> {
         editor_camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         let Some(camera) = object.get_component::<Camera>() else {
@@ -396,13 +399,14 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
     ) {
         for object_id in self.world_object_ids() {
-            let Some(object) = self.world.object(object_id) else {
+            let mut world = self.world.borrow();
+            let Some(object) = world.object(object_id) else {
                 continue;
             };
             let Some(light) = object.get_component::<DirectionalLight>() else {
                 continue;
             };
-            let Some(matrix) = self.world.world_transform_matrix(object_id, 1.0) else {
+            let Some(matrix) = self.world.borrow().world_transform_matrix(object_id, 1.0) else {
                 continue;
             };
             let origin = matrix.transform_point3(Vec3::ZERO);
@@ -581,7 +585,8 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return false;
         };
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return false;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -614,7 +619,8 @@ impl<'window> EditorApp<'window> {
         let Some(drag) = self.gizmo_drag.as_ref() else {
             return;
         };
-        let Some(object) = self.world.object_mut(drag.object_id) else {
+        let mut world = self.world.borrow_mut();
+        let Some(object) = world.object_mut(drag.object_id) else {
             return;
         };
         let Some(transform) = object.get_component_mut::<Transform>() else {
@@ -676,7 +682,8 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return false;
         };
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return false;
         };
         let Some(transform) = object.get_component::<Transform>() else {
@@ -708,7 +715,8 @@ impl<'window> EditorApp<'window> {
         let Some(drag) = self.gizmo_drag.as_ref() else {
             return;
         };
-        let Some(object) = self.world.object_mut(drag.object_id) else {
+        let mut world = self.world.borrow_mut();
+        let Some(object) = world.object_mut(drag.object_id) else {
             return;
         };
         let Some(transform) = object.get_component_mut::<Transform>() else {
@@ -755,7 +763,8 @@ impl<'window> EditorApp<'window> {
         let mut best: Option<(ObjectId, f32, f32)> = None;
 
         for object_id in self.world_object_ids() {
-            let Some(object) = self.world.object(object_id) else {
+            let world = self.world.borrow();
+            let Some(object) = world.object(object_id) else {
                 continue;
             };
             let Some((min, max)) = self.object_bounds_2d(object_id, object) else {
@@ -821,9 +830,10 @@ impl<'window> EditorApp<'window> {
             return self.object_screen_rect(rect, camera, object_id);
         }
 
-        let object = self.world.object(object_id)?;
+        let world = self.world.borrow();
+        let object = world.object(object_id)?;
         let (min, max) = helpers::object_world_bounds_3d(object)?;
-        let matrix = self.world.world_transform_matrix(object_id, 1.0)?;
+        let matrix = world.world_transform_matrix(object_id, 1.0)?;
         let local_position = object.get_component::<Transform>()?.position;
         let local_matrix = Mat4::from_translation(-local_position);
         let to_world = matrix * local_matrix;
@@ -851,7 +861,8 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) -> Option<egui::Rect> {
-        let object = self.world.object(object_id)?;
+        let world = self.world.borrow();
+        let object = world.object(object_id)?;
         let (min, max) = self.object_bounds_2d(object_id, object)?;
         let top_left = helpers::world_to_screen(rect, camera, Vec2::new(min.x, max.y));
         let bottom_right = helpers::world_to_screen(rect, camera, Vec2::new(max.x, min.y));
@@ -860,7 +871,7 @@ impl<'window> EditorApp<'window> {
 
     fn object_bounds_2d(&self, object_id: ObjectId, object: &Object) -> Option<(Vec2, Vec2)> {
         let (min, max) = helpers::object_world_bounds_2d(object)?;
-        let matrix = self.world.world_transform_matrix(object_id, 1.0)?;
+        let matrix = self.world.borrow().world_transform_matrix(object_id, 1.0)?;
         let local_position = object.get_component::<Transform>()?.position;
         let local_matrix = Mat4::from_translation(-local_position);
         let to_world = matrix * local_matrix;
@@ -881,7 +892,7 @@ impl<'window> EditorApp<'window> {
     }
 
     fn object_world_position(&self, object_id: ObjectId) -> Option<Vec3> {
-        self.world
+        self.world.borrow()
             .world_transform_matrix(object_id, 1.0)
             .map(|matrix| matrix.transform_point3(Vec3::ZERO))
     }
@@ -893,15 +904,15 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         let Some(transform) = object.get_component::<Transform>() else {
             return;
         };
 
-        let matrix = self
-            .world
+        let matrix = world
             .world_transform_matrix(object_id, 1.0)
             .unwrap_or_else(|| {
                 Mat4::from_scale_rotation_translation(
@@ -964,14 +975,14 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         let Some(transform) = object.get_component::<Transform>() else {
             return;
         };
-        let origin = self
-            .world
+        let origin = world
             .world_transform_matrix(object_id, 1.0)
             .map(|matrix| matrix.transform_point3(Vec3::ZERO))
             .unwrap_or(transform.position);
@@ -1029,7 +1040,8 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
         object_id: ObjectId,
     ) {
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         let Some((min, max)) = helpers::object_world_bounds_3d(object) else {
@@ -1065,7 +1077,8 @@ impl<'window> EditorApp<'window> {
 
     fn draw_component_icons(&self, painter: &egui::Painter, rect: egui::Rect, camera: Camera) {
         for object_id in self.world_object_ids() {
-            let Some(object) = self.world.object(object_id) else {
+            let world = self.world.borrow();
+            let Some(object) = world.object(object_id) else {
                 continue;
             };
 
@@ -1117,7 +1130,8 @@ impl<'window> EditorApp<'window> {
         let Some(object_id) = self.selection else {
             return;
         };
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         let Some(transform) = object.get_component::<Transform>() else {

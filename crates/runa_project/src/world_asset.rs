@@ -1,7 +1,9 @@
 use std::any::TypeId;
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use runa_asset::{AudioAsset, Handle, TextureAsset};
@@ -354,7 +356,7 @@ pub struct TilemapLayerAsset {
     pub self_order: i32,
 }
 
-pub fn create_empty_world() -> World {
+pub fn create_empty_world() -> Rc<RefCell<World>> {
     let mut world = World::default();
 
     let mut camera = Object::new("Main Camera");
@@ -362,7 +364,7 @@ pub fn create_empty_world() -> World {
     camera.add_component(ActiveCamera);
     world.spawn(camera);
 
-    world
+    Rc::new(RefCell::new(world))
 }
 
 pub fn save_world(path: impl AsRef<Path>, world: &World) -> Result<(), ProjectError> {
@@ -386,7 +388,7 @@ pub fn load_world(path: impl AsRef<Path>) -> Result<World, ProjectError> {
 pub fn load_world_with_runtime_registry(
     path: impl AsRef<Path>,
     runtime_registry: &runa_core::registry::RuntimeRegistry,
-) -> Result<World, ProjectError> {
+) -> Result<Rc<RefCell<World>>, ProjectError> {
     let content = fs::read_to_string(path.as_ref())?;
     let asset: WorldAsset = ron::from_str(&content)?;
     let project_root = project_root_for_world_path(path.as_ref());
@@ -396,7 +398,7 @@ pub fn load_world_with_runtime_registry(
 pub fn load_world_with_object_loader<F>(
     path: impl AsRef<Path>,
     object_loader: F,
-) -> Result<World, ProjectError>
+) -> Result<Rc<RefCell<World>>, ProjectError>
 where
     F: Fn(&str) -> Option<WorldObjectAsset>,
 {
@@ -447,7 +449,7 @@ impl WorldAsset {
         self,
         project_root: Option<&Path>,
         runtime_registry: &runa_core::registry::RuntimeRegistry,
-    ) -> World {
+    ) -> Rc<RefCell<World>> {
         let mut world = World::default();
         world.set_atmosphere(self.atmosphere.into_atmosphere());
         let mut parent_links = Vec::new();
@@ -459,14 +461,14 @@ impl WorldAsset {
             ));
         }
         apply_parent_links(&mut world, &spawned_ids, &parent_links);
-        world
+        Rc::new(RefCell::new(world))
     }
 
     pub fn into_world_with_object_loader<F>(
         self,
         project_root: Option<&Path>,
         object_loader: F,
-    ) -> World
+    ) -> Rc<RefCell<World>>
     where
         F: Fn(&str) -> Option<WorldObjectAsset>,
     {
@@ -481,7 +483,7 @@ impl WorldAsset {
             );
         }
         apply_parent_links(&mut world, &spawned_ids, &parent_links);
-        world
+        Rc::new(RefCell::new(world))
     }
 }
 
@@ -1497,6 +1499,49 @@ mod tests {
     };
     use runa_core::ocs::{Object, Script, ScriptContext};
     use runa_core::registry::RuntimeRegistry;
+    use std::fs;
+    use tempfile::TempDir;
+    use crate::load_world_with_runtime_registry;
+
+    #[test]
+    fn test_load_world_with_runtime_registry() {
+        let temp_dir = TempDir::new().unwrap();
+        let world_path = temp_dir.path().join("world.ron");
+        let world_content = r#"
+(
+    version: 1,
+    objects: [
+        (
+            name: "TestObject",
+            transform: (
+                position: (0.0, 0.0, 0.0),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+                scale: (1.0, 1.0, 1.0),
+            ),
+            active_camera: false,
+            serialized_components: [],
+            serialized_scripts: [],
+        ),
+    ],
+)
+"#;
+        fs::write(&world_path, world_content).unwrap();
+
+        let registry = RuntimeRegistry::new();
+        let world = load_world_with_runtime_registry(&world_path, &registry).unwrap();
+        assert_eq!(world.borrow().query::<runa_core::components::Transform>().len(), 1);
+    }
+
+    #[test]
+    fn test_load_world_invalid_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let world_path = temp_dir.path().join("invalid.ron");
+        fs::write(&world_path, "invalid content").unwrap();
+
+        let registry = RuntimeRegistry::new();
+        let result = load_world_with_runtime_registry(&world_path, &registry);
+        assert!(result.is_err());
+    }
 
     #[derive(Clone)]
     struct TestScript {

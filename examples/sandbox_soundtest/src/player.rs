@@ -25,11 +25,7 @@ impl Player {
 impl SerializedFieldAccess for Player {}
 
 impl Script for Player {
-    fn start(&mut self, ctx: &mut ScriptContext) {
-        if let Some(transform) = ctx.get_component_mut::<Transform>() {
-            transform.position = Vec3::new(0.0, 0.0, 0.0);
-            transform.scale = Vec3::new(1.0, 1.0, 1.0);
-        }
+    fn start(&mut self, _ctx: &mut ScriptContext) {
     }
 
     fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {

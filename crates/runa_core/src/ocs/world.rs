@@ -312,7 +312,7 @@ impl World {
                 object.get_component::<Camera>(),
                 object.get_component::<ActiveCamera>(),
             ) {
-                Some(glam::Vec2::new(
+                Some(Vec2::new(
                     camera.viewport_size.0 as f32,
                     camera.viewport_size.1 as f32,
                 ))
@@ -461,7 +461,7 @@ impl World {
                             let array_x = (x - tilemap.offset.x) as u32;
                             let array_y = (y - tilemap.offset.y) as u32;
 
-                            if let Some(tile) = layer.get_tile(array_x as u32, array_y as u32) {
+                            if let Some(tile) = layer.get_tile(array_x, array_y) {
                                 if tile.texture.is_none() {
                                     continue;
                                 }

@@ -3,7 +3,10 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Ident, Type};
 
-#[proc_macro_derive(RunaComponent, attributes(runa, serialize_field, runa_editable, runa_runtime))]
+#[proc_macro_derive(
+    RunaComponent,
+    attributes(runa, serialize_field, runa_editable, runa_runtime)
+)]
 pub fn derive_runa_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident.clone();
@@ -65,7 +68,10 @@ pub fn derive_runa_component(input: TokenStream) -> TokenStream {
     })
 }
 
-#[proc_macro_derive(RunaScript, attributes(runa, serialize_field, runa_editable, runa_runtime))]
+#[proc_macro_derive(
+    RunaScript,
+    attributes(runa, serialize_field, runa_editable, runa_runtime)
+)]
 pub fn derive_runa_script(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident.clone();

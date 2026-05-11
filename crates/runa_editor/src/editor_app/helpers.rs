@@ -5,7 +5,7 @@ use runa_core::components::SpriteAnimator;
 
 use super::*;
 
-pub(super) fn create_preview_world() -> World {
+pub(super) fn create_preview_world() -> Rc<RefCell<World>> {
     let mut world = World::default();
 
     let mut cube = Object::new("Preview Cube");
@@ -29,7 +29,7 @@ pub(super) fn create_preview_world() -> World {
     floor.add_component(PhysicsCollision::new(8.0, 8.0));
     world.spawn(floor);
 
-    world
+    Rc::new(RefCell::new(world))
 }
 
 pub(super) fn object_title(object: &Object) -> String {

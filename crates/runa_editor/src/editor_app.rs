@@ -7,10 +7,12 @@ mod viewport;
 mod world_ops;
 
 use std::any::TypeId;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
@@ -170,7 +172,7 @@ pub struct EditorApp<'window> {
     egui_ctx: egui::Context,
     runtime_engine: Engine,
 
-    world: World,
+    world: Rc<RefCell<World>>,
     scene_queue: RenderQueue,
     selection: Option<ObjectId>,
     selected_objects: HashSet<ObjectId>,
@@ -196,6 +198,7 @@ pub struct EditorApp<'window> {
     output_lines: Vec<String>,
     output_tx: Sender<String>,
     output_rx: Receiver<String>,
+    log_file: Option<std::fs::File>,
 
     editor_camera: EditorCameraController,
     viewport_target: Option<RenderTarget>,
@@ -226,13 +229,13 @@ pub struct EditorApp<'window> {
 
 impl<'window> EditorApp<'window> {
     fn world_object_ids(&self) -> Vec<ObjectId> {
-        let mut ids = self.world.query::<Transform>();
+        let mut ids = self.world.borrow().query::<Transform>();
         ids.sort_unstable();
         ids
     }
 
     fn first_object_id(&self) -> Option<ObjectId> {
-        self.world.find_first_with::<Transform>()
+        self.world.borrow().find_first_with::<Transform>()
     }
 
     fn select_object(&mut self, object_id: ObjectId, additive: bool) {
@@ -272,9 +275,13 @@ impl<'window> EditorApp<'window> {
         if settings.prune_missing_recent_projects() {
             let _ = settings.save();
         }
-        let mut world = helpers::create_preview_world();
-        world.set_runtime_registry(Arc::new(runtime_engine.runtime_registry().clone()));
-        let selection = world.find_first_with::<Transform>();
+        let world_rc = helpers::create_preview_world();
+        {
+            let mut world_mut = world_rc.borrow_mut();
+            world_mut.set_runtime_registry(Arc::new(runtime_engine.runtime_registry().clone()));
+            world_mut.start(world_rc.clone());
+        }
+        let selection = world_rc.borrow().find_first_with::<Transform>();
         let selected_objects = selection.into_iter().collect();
         let project_dialog = ProjectDialogState {
             open: false,
@@ -310,7 +317,7 @@ impl<'window> EditorApp<'window> {
             egui_renderer: None,
             egui_ctx: egui::Context::default(),
             runtime_engine,
-            world,
+            world: world_rc,
             scene_queue: RenderQueue::new(),
             selection,
             selected_objects,
@@ -346,6 +353,7 @@ impl<'window> EditorApp<'window> {
             last_frame_time: Instant::now(),
             output_tx,
             output_rx,
+            log_file: None,
         }
     }
 }

@@ -102,6 +102,13 @@ impl Object {
         }
     }
 
+    pub fn component_type_ids(&self) -> Vec<TypeId> {
+        self.components
+            .keys()
+            .copied()
+            .collect()
+    }
+
     pub fn empty() -> Self {
         Self::new("")
     }

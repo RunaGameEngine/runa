@@ -18,6 +18,7 @@ enum AssetKind {
     ImageFile,
     AudioFile,
     ShaderFile,
+    PrefabFile,
     Runa3DModelFile,
 }
 
@@ -933,7 +934,7 @@ impl ContentBrowserState {
 
     fn create_world_in(&mut self, target_dir: &Path, settings: &EditorSettings) {
         let path = unique_world_path(target_dir, "new_world");
-        match runa_project::save_world(&path, &runa_project::create_empty_world()) {
+        match runa_project::save_world(&path, &runa_project::create_empty_world().borrow()) {
             Ok(()) => {
                 self.refresh(settings);
                 self.selected_path = Some(path.clone());
@@ -1088,6 +1089,7 @@ impl ContentBrowserState {
             AssetKind::ShaderFile => &icons.shader_file,
             AssetKind::GenericFile => &icons.file,
             AssetKind::Runa3DModelFile => &icons.r3m_file,
+            AssetKind::PrefabFile => todo!(),
         }
     }
 

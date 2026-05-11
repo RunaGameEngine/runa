@@ -295,14 +295,7 @@ fn components_section(
                 editable_asset_path(ui, "Mesh", &mut mesh_renderer.mesh_path);
                 property_row(ui, "Actions", |ui| {
                     if ui.button("Choose PNG").clicked() {
-                        if let Some(path) =
-                            pick_asset_file(project_root, &["png", "jpg", "jpeg", "webp"])
-                        {
-                            // match load_r3m_from_path(project_root, &path) {
-                            //     Ok(r3m) => mesh_renderer.set_mesh(Some(r3m.inner)),
-                            //     Err(error) => error_message = Some(error),
-                            // }
-                        }
+                        let _ = pick_asset_file(project_root, &["png", "jpg", "jpeg", "webp"]);
                     }
                     if ui.button("Clear").clicked() {
                         mesh_renderer.set_mesh(None, None);

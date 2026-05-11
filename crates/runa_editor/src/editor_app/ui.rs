@@ -13,7 +13,7 @@ impl<'window> EditorApp<'window> {
 
     fn build_ui(&mut self, ctx: &egui::Context) {
         let ui_scale = ctx.zoom_factor().max(0.75);
-        egui::Panel::top("editor_top_bar").show(ctx, |ui| {
+        egui::TopBottomPanel::top("editor_top_bar").show(ctx, |ui| {
             ui.set_min_height(38.0 * ui_scale);
             ui.spacing_mut().button_padding = egui::vec2(9.0 * ui_scale, 5.0 * ui_scale);
             ui.spacing_mut().interact_size.y = 28.0 * ui_scale;
@@ -186,7 +186,7 @@ impl<'window> EditorApp<'window> {
             return;
         }
 
-        egui::Panel::bottom("status_bar")
+        egui::TopBottomPanel::bottom("status_bar")
             .resizable(false)
             .exact_size(24.0 * ui_scale)
             .show_separator_line(false)
@@ -291,7 +291,7 @@ impl<'window> EditorApp<'window> {
                             let body_height = (ui.available_height() - 8.0).max(0.0);
                             ui.allocate_ui_with_layout(
                                 egui::vec2(ui.available_width(), body_height),
-                                egui::Layout::top_down(egui::Align::Min),
+                                Layout::top_down(egui::Align::Min),
                                 |ui| match self.bottom_tab {
                                     BottomTab::ContentBrowser => {
                                         self.content_browser.ui(ui, &self.settings);
@@ -323,7 +323,7 @@ impl<'window> EditorApp<'window> {
         }
 
         if self.panels.hierarchy {
-            egui::Panel::left("hierarchy_panel")
+            egui::SidePanel::left("hierarchy_panel")
                 .resizable(true)
                 .default_size(240.0)
                 .min_size(180.0)
@@ -339,18 +339,19 @@ impl<'window> EditorApp<'window> {
                         .id_salt("hierarchy_scroll")
                         .show(ui, |ui| {
                             let scroll_start = ui.cursor().min;
-                            let mut root_ids = self.world.root_object_ids();
+                            let mut root_ids = self.world.borrow().root_object_ids();
                             root_ids.sort_unstable();
-                            let mut visited = std::collections::HashSet::new();
+                            let mut visited = HashSet::new();
                             for object_id in root_ids {
                                 self.hierarchy_object_row(ui, object_id, 0, &mut visited);
                             }
                             for object_id in self.world_object_ids() {
                                 let has_valid_parent = self
                                     .world
+                                    .borrow()
                                     .object(object_id)
                                     .and_then(|object| object.parent())
-                                    .is_some_and(|parent_id| self.world.object(parent_id).is_some());
+                                    .is_some_and(|parent_id| self.world.borrow().object(parent_id).is_some());
                                 if !visited.contains(&object_id) && !has_valid_parent {
                                     self.hierarchy_object_row(ui, object_id, 0, &mut visited);
                                 }
@@ -369,7 +370,7 @@ impl<'window> EditorApp<'window> {
                                 && ui.input(|input| input.pointer.any_released())
                             {
                                 if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
-                                    if self.world.set_parent(dragged_id, None) {
+                                    if self.world.borrow_mut().set_parent(dragged_id, None) {
                                         self.status_line =
                                             "Moved object to hierarchy root.".to_string();
                                     }
@@ -383,7 +384,7 @@ impl<'window> EditorApp<'window> {
         }
 
         if self.panels.inspector {
-            egui::Panel::right("inspector_panel")
+            egui::SidePanel::right("inspector_panel")
                 .resizable(true)
                 .default_size(320.0)
                 .min_size(320.0)
@@ -396,7 +397,7 @@ impl<'window> EditorApp<'window> {
                         .id_salt("inspector_scroll")
                         .show(ui, |ui| {
                             if let Some(object_id) = self.selection {
-                                if let Some(object) = self.world.object_mut(object_id) {
+                                if let Some(object) = self.world.borrow_mut().object_mut(object_id) {
                                     let project_root = self
                                         .project_session
                                         .as_ref()
@@ -441,11 +442,12 @@ impl<'window> EditorApp<'window> {
                                             }
                                         }
                                     }
+
                                     ui.separator();
-                                    self.inspector_actions_ui(ui, object_id);
                                 } else {
                                     ui.label("Selection is out of bounds.");
                                 }
+                                self.inspector_actions_ui(ui, object_id);
                             } else {
                                 ui.label("Select an object in the hierarchy.");
                             }
@@ -567,7 +569,7 @@ impl<'window> EditorApp<'window> {
                                 ui.horizontal_top(|ui| {
                                     ui.allocate_ui_with_layout(
                                         egui::vec2(220.0, ui.available_height()),
-                                        egui::Layout::top_down(egui::Align::Min),
+                                        Layout::top_down(egui::Align::Min),
                                         |ui| {
                                             ui.heading("Welcome");
                                             ui.add_space(6.0);
@@ -614,7 +616,7 @@ impl<'window> EditorApp<'window> {
 
                                     ui.allocate_ui_with_layout(
                                         egui::vec2(ui.available_width(), ui.available_height()),
-                                        egui::Layout::top_down(egui::Align::Min),
+                                        Layout::top_down(egui::Align::Min),
                                         |ui| {
                                             ui.horizontal(|ui| {
                                                 ui.heading("Recent Projects");
@@ -656,7 +658,7 @@ impl<'window> EditorApp<'window> {
                                                                 ui.set_width(ui.available_width());
                                                                 ui.horizontal(|ui| {
                                                                     let preview_path =
-                                                                        super::project::project_preview_path(
+                                                                        project::project_preview_path(
                                                                             entry
                                                                                 .manifest_path
                                                                                 .parent()
@@ -736,7 +738,7 @@ impl<'window> EditorApp<'window> {
                                                                         );
                                                                         ui.horizontal(|ui| {
                                                                             if let Ok(project) =
-                                                                                runa_project::load_project(
+                                                                                load_project(
                                                                                     &entry.manifest_path,
                                                                                 )
                                                                             {
@@ -911,7 +913,7 @@ impl<'window> EditorApp<'window> {
         egui::Window::new("Loading Project")
             .collapsible(false)
             .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .anchor(Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(ctx, |ui| {
                 ui.label("Project is loading in the background.");
                 ui.add(egui::Spinner::new());
@@ -937,7 +939,7 @@ impl<'window> EditorApp<'window> {
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .anchor(Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .default_width(500.0)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -1085,18 +1087,26 @@ impl<'window> EditorApp<'window> {
         ui: &mut egui::Ui,
         object_id: ObjectId,
         depth: usize,
-        visited: &mut std::collections::HashSet<ObjectId>,
+        visited: &mut HashSet<ObjectId>,
     ) {
         if !visited.insert(object_id) {
             return;
         }
-        let Some(object) = self.world.object(object_id) else {
-            return;
+        let (title, children, has_children) = {
+            let world_ref = self.world.borrow();
+
+            let Some(object) = world_ref.object(object_id) else {
+                return;
+            };
+
+            let title = helpers::object_title(object);
+            let mut children = object.children().to_vec();
+            children.sort_unstable();
+            let has_children = !children.is_empty();
+
+            (title, children, has_children)
         };
-        let title = helpers::object_title(object);
-        let mut children = object.children().to_vec();
-        children.sort_unstable();
-        let has_children = !children.is_empty();
+
         let mut expanded = self.hierarchy_expanded.contains(&object_id);
         let mut child_state = egui::collapsing_header::CollapsingState::load_with_default_open(
             ui.ctx(),
@@ -1170,7 +1180,7 @@ impl<'window> EditorApp<'window> {
                 }
                 ui.painter().text(
                     rect.left_center() + egui::vec2(4.0, 0.0),
-                    egui::Align2::LEFT_CENTER,
+                    Align2::LEFT_CENTER,
                     title,
                     egui::TextStyle::Button.resolve(ui.style()),
                     ui.visuals().text_color(),
@@ -1189,7 +1199,7 @@ impl<'window> EditorApp<'window> {
             }
             if response.hovered() && ui.input(|input| input.pointer.any_released()) {
                 if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
-                    if dragged_id != object_id && self.world.set_parent(dragged_id, Some(object_id))
+                    if dragged_id != object_id && self.world.borrow_mut().set_parent(dragged_id, Some(object_id))
                     {
                         self.set_primary_selection(Some(dragged_id));
                         self.status_line = "Reparented object.".to_string();
@@ -1216,7 +1226,8 @@ impl<'window> EditorApp<'window> {
     }
 
     fn begin_hierarchy_rename(&mut self, object_id: ObjectId) {
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         self.hierarchy_renaming = Some(object_id);
@@ -1225,7 +1236,7 @@ impl<'window> EditorApp<'window> {
 
     fn commit_hierarchy_rename(&mut self, object_id: ObjectId) {
         let name = self.hierarchy_rename_buffer.trim();
-        if let Some(object) = self.world.object_mut(object_id) {
+        if let Some(object) = self.world.borrow_mut().object_mut(object_id) {
             object.name = if name.is_empty() {
                 "Object".to_string()
             } else {
@@ -1254,147 +1265,290 @@ impl<'window> EditorApp<'window> {
             RegisteredTypeKind::Script => "Add Script",
         };
 
-        ui.menu_button(label, |ui| {
-            let Some(object) = self.world.object(object_id) else {
-                ui.label("Object not found.");
+        // =========================================================
+        // Gather all world/object data BEFORE building UI.
+        // This prevents RefCell borrow conflicts inside egui closures.
+        // =========================================================
+
+        let (
+            object_component_type_ids,
+            serialized_entries,
+        ) = {
+            let world = self.world.borrow();
+
+            let Some(object) = world.object(object_id) else {
+                ui.menu_button(label, |ui| {
+                    ui.label("Object not found.");
+                });
                 return;
             };
 
-            let mut registered_types: Vec<(Option<TypeId>, String, bool, Option<ProjectRegisteredTypeRecord>)> = self
-                .runtime_registry()
-                .types()
-                .registered_types()
-                .into_iter()
-                .filter(|metadata| metadata.kind() == kind)
-                .filter(|metadata| metadata.type_id() != TypeId::of::<Tilemap>())
-                .filter(|metadata| !object.has_component_type_id(metadata.type_id()))
-                .map(|metadata| {
-                    (
-                        Some(metadata.type_id()),
-                        helpers::short_type_name(metadata.type_name()).to_string(),
-                        self.runtime_registry()
-                            .types()
-                            .has_object_factory(metadata.type_id()),
-                        None,
-                    )
-                })
-                .collect();
+            let object_component_type_ids: std::collections::HashSet<TypeId> =
+                object.component_type_ids().into_iter().collect();
 
-            let project_kind = match kind {
-                RegisteredTypeKind::Component => ProjectRegisteredTypeKind::Component,
-                RegisteredTypeKind::Script => ProjectRegisteredTypeKind::Script,
+            let serialized_entries = object
+                .get_component::<SerializedTypeStorage>()
+                .map(|storage| storage.entries.clone())
+                .unwrap_or_default();
+
+            (object_component_type_ids, serialized_entries)
+        };
+
+        // =========================================================
+        // Build addable type list OUTSIDE egui closures
+        // =========================================================
+
+        let runtime_registry = self.runtime_registry();
+
+        let mut registered_types: Vec<(
+            Option<TypeId>,
+            String,
+            bool,
+            Option<ProjectRegisteredTypeRecord>,
+        )> = runtime_registry
+            .types()
+            .registered_types()
+            .into_iter()
+            .filter(|metadata| metadata.kind() == kind)
+            .filter(|metadata| metadata.type_id() != TypeId::of::<Tilemap>())
+            .filter(|metadata| {
+                !object_component_type_ids.contains(&metadata.type_id())
+            })
+            .map(|metadata| {
+                (
+                    Some(metadata.type_id()),
+                    helpers::short_type_name(metadata.type_name()).to_string(),
+                    runtime_registry
+                        .types()
+                        .has_object_factory(metadata.type_id()),
+                    None,
+                )
+            })
+            .collect();
+
+        let project_kind = match kind {
+            RegisteredTypeKind::Component => {
+                ProjectRegisteredTypeKind::Component
+            }
+            RegisteredTypeKind::Script => {
+                ProjectRegisteredTypeKind::Script
+            }
+        };
+
+        for metadata in self
+            .place_object
+            .registered_types
+            .iter()
+            .filter(|metadata| metadata.kind == project_kind)
+            .filter(|metadata| {
+                metadata.source
+                    == runa_project::ProjectRegistrationSource::User
+            })
+        {
+            let serialized_kind = match metadata.kind {
+                ProjectRegisteredTypeKind::Component => {
+                    SerializedTypeKind::Component
+                }
+                ProjectRegisteredTypeKind::Script => {
+                    SerializedTypeKind::Script
+                }
             };
-            for metadata in self
-                .place_object
-                .registered_types
-                .iter()
-                .filter(|metadata| metadata.kind == project_kind)
-                .filter(|metadata| metadata.source == runa_project::ProjectRegistrationSource::User)
-            {
-                let already_attached_as_stub = object
-                    .get_component::<SerializedTypeStorage>()
-                    .map(|storage| {
-                        let kind = match metadata.kind {
-                            ProjectRegisteredTypeKind::Component => SerializedTypeKind::Component,
-                            ProjectRegisteredTypeKind::Script => SerializedTypeKind::Script,
-                        };
-                        storage
-                            .entries
-                            .iter()
-                            .any(|entry| entry.kind == kind && entry.type_name == metadata.type_name)
-                    })
-                    .unwrap_or(false);
-                if already_attached_as_stub {
-                    continue;
-                }
-                let short_name = helpers::short_type_name(&metadata.type_name).to_string();
-                let already_listed = registered_types
-                    .iter()
-                    .any(|(_, existing_name, _, _)| existing_name == &short_name);
-                if !already_listed {
-                    registered_types.push((None, short_name, true, Some(metadata.clone())));
-                }
+
+            let already_attached_as_stub =
+                serialized_entries.iter().any(|entry| {
+                    entry.kind == serialized_kind
+                        && entry.type_name == metadata.type_name
+                });
+
+            if already_attached_as_stub {
+                continue;
             }
 
-            registered_types.sort_by(|left, right| left.1.cmp(&right.1));
+            let short_name =
+                helpers::short_type_name(&metadata.type_name).to_string();
 
+            let already_listed = registered_types
+                .iter()
+                .any(|(_, existing_name, _, _)| {
+                    existing_name == &short_name
+                });
+
+            if !already_listed {
+                registered_types.push((
+                    None,
+                    short_name,
+                    true,
+                    Some(metadata.clone()),
+                ));
+            }
+        }
+
+        registered_types.sort_by(|left, right| left.1.cmp(&right.1));
+
+        // =========================================================
+        // UI
+        // =========================================================
+
+        ui.menu_button(label, |ui| {
             if registered_types.is_empty() {
                 ui.label("No registered types available.");
                 return;
             }
 
             let mut addable_count = 0usize;
-            for (type_id, name, is_addable, project_metadata) in registered_types {
+
+            for (
+                type_id,
+                name,
+                is_addable,
+                project_metadata,
+            ) in &registered_types
+            {
                 let icon_name = type_id
                     .map(|type_id| {
-                        helpers::component_icon_name(type_id, registered_kind_to_runtime_kind(kind))
+                        helpers::component_icon_name(
+                            type_id,
+                            registered_kind_to_runtime_kind(kind),
+                        )
                     })
                     .unwrap_or(match kind {
                         RegisteredTypeKind::Component => "c-Object",
                         RegisteredTypeKind::Script => "c-Script",
                     });
-                let icon = crate::editor_textures::load_component_icon(
-                    ui.ctx(),
-                    &format!("add_type_icon_{icon_name}"),
-                    icon_name,
-                );
+
+                let icon =
+                    crate::editor_textures::load_component_icon(
+                        ui.ctx(),
+                        &format!("add_type_icon_{icon_name}"),
+                        icon_name,
+                    );
+
                 let docs_url = type_id
                     .and_then(crate::inspector::component_docs_url)
-                    .unwrap_or("https://github.com/RunaGameEngine/runa/blob/main/docs/tutorials/README.md");
+                    .unwrap_or(
+                        "https://github.com/RunaGameEngine/runa/blob/main/docs/tutorials/README.md",
+                    );
 
-                if !is_addable {
+                if !*is_addable {
                     ui.horizontal(|ui| {
-                        ui.add(egui::Image::new(&icon).fit_to_exact_size(egui::vec2(16.0, 16.0)));
+                        ui.add(
+                            egui::Image::new(&icon)
+                                .fit_to_exact_size(egui::vec2(16.0, 16.0)),
+                        );
+
                         ui.add_enabled(
                             false,
-                            egui::Button::new(format!("{name} (TODO: no runtime factory)")),
+                            egui::Button::new(format!(
+                                "{name} (TODO: no runtime factory)"
+                            )),
                         );
-                        ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-                            help_icon_button(ui, docs_url, &mut self.status_line);
-                        });
+
+                        ui.with_layout(
+                            Layout::right_to_left(egui::Align::Center),
+                            |ui| {
+                                help_icon_button(
+                                    ui,
+                                    docs_url,
+                                    &mut self.status_line,
+                                );
+                            },
+                        );
                     });
+
                     continue;
                 }
 
-                if let Some(project_metadata) = project_metadata.as_ref() {
+                // =====================================================
+                // Project serialized type
+                // =====================================================
+
+                if let Some(project_metadata) = project_metadata {
                     addable_count += 1;
+
                     ui.horizontal(|ui| {
-                        ui.add(egui::Image::new(&icon).fit_to_exact_size(egui::vec2(16.0, 16.0)));
-                        if ui.button(&name).clicked() {
-                            if self.add_project_serialized_type_to_object(object_id, project_metadata) {
-                                self.status_line = format!("Added {name}.");
+                        ui.add(
+                            egui::Image::new(&icon)
+                                .fit_to_exact_size(egui::vec2(16.0, 16.0)),
+                        );
+
+                        if ui.button(name).clicked() {
+                            let success = self
+                                .add_project_serialized_type_to_object(
+                                    object_id,
+                                    project_metadata,
+                                );
+
+                            if success {
+                                self.status_line =
+                                    format!("Added {name}.");
                             } else {
-                                self.status_line = format!("Failed to add {name}.");
+                                self.status_line =
+                                    format!("Failed to add {name}.");
                             }
+
                             ui.close();
                         }
-                        ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-                            help_icon_button(ui, docs_url, &mut self.status_line);
-                        });
+
+                        ui.with_layout(
+                            Layout::right_to_left(egui::Align::Center),
+                            |ui| {
+                                help_icon_button(
+                                    ui,
+                                    docs_url,
+                                    &mut self.status_line,
+                                );
+                            },
+                        );
                     });
+
                     continue;
                 }
 
-                let Some(type_id) = type_id else {
+                // =====================================================
+                // Runtime registered type
+                // =====================================================
+
+                let Some(type_id) = *type_id else {
                     continue;
                 };
 
                 addable_count += 1;
+
                 ui.horizontal(|ui| {
-                    ui.add(egui::Image::new(&icon).fit_to_exact_size(egui::vec2(16.0, 16.0)));
-                    if ui.button(&name).clicked() {
-                        if self.add_registered_type_to_object(object_id, type_id) {
-                            self.status_line = format!("Added {name}.");
+                    ui.add(
+                        egui::Image::new(&icon)
+                            .fit_to_exact_size(egui::vec2(16.0, 16.0)),
+                    );
+
+                    if ui.button(name).clicked() {
+                        let success = self
+                            .add_registered_type_to_object(
+                                object_id,
+                                type_id,
+                            );
+
+                        if success {
+                            self.status_line =
+                                format!("Added {name}.");
                         } else {
                             self.status_line = format!(
                                 "Failed to add {name}: runtime registry did not provide a usable factory."
                             );
                         }
+
                         ui.close();
                     }
-                    ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-                        help_icon_button(ui, docs_url, &mut self.status_line);
-                    });
+
+                    ui.with_layout(
+                        Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+                            help_icon_button(
+                                ui,
+                                docs_url,
+                                &mut self.status_line,
+                            );
+                        },
+                    );
                 });
             }
 
@@ -1556,7 +1710,7 @@ impl<'window> EditorApp<'window> {
                             .pick_file()
                         {
                             session.project.manifest.startup_world =
-                                super::project::path_relative_to_project(&project_root, &path);
+                                project::path_relative_to_project(&project_root, &path);
                         }
                     }
                 });
@@ -1567,7 +1721,7 @@ impl<'window> EditorApp<'window> {
                             FileDialog::new().set_directory(&project_root).pick_folder()
                         {
                             session.project.manifest.assets_dir =
-                                super::project::path_relative_to_project(&project_root, &path);
+                                project::path_relative_to_project(&project_root, &path);
                         }
                     }
                 });
@@ -1578,7 +1732,7 @@ impl<'window> EditorApp<'window> {
                             FileDialog::new().set_directory(&project_root).pick_folder()
                         {
                             session.project.manifest.worlds_dir =
-                                super::project::path_relative_to_project(&project_root, &path);
+                                project::path_relative_to_project(&project_root, &path);
                         }
                     }
                 });
@@ -1589,7 +1743,7 @@ impl<'window> EditorApp<'window> {
                             FileDialog::new().set_directory(&project_root).pick_folder()
                         {
                             session.project.manifest.scripts_dir =
-                                super::project::path_relative_to_project(&project_root, &path);
+                                project::path_relative_to_project(&project_root, &path);
                         }
                     }
                 });
@@ -1644,7 +1798,7 @@ impl<'window> EditorApp<'window> {
                             .pick_file()
                         {
                             session.project.manifest.app.window_icon = Some(
-                                super::project::path_relative_to_project(&project_root, &path),
+                                project::path_relative_to_project(&project_root, &path),
                             );
                         }
                     }
@@ -1919,7 +2073,8 @@ impl<'window> EditorApp<'window> {
                 ui.label("World Atmosphere");
                 ui.separator();
 
-                let atmosphere = self.world.atmosphere_mut();
+                let mut world = self.world.borrow_mut();
+                let atmosphere = world.atmosphere_mut();
                 color_vec3_row(ui, "Ambient Color", &mut atmosphere.ambient_color);
                 property_row_like(ui, "Ambient Power", |ui| {
                     ui.add_sized(
@@ -1987,15 +2142,15 @@ impl<'window> EditorApp<'window> {
                 };
 
                 match &mut atmosphere.background {
-                    BackgroundMode::SolidColor { color } => {
+                    BackgroundMode::SolidColor { ref mut color } => {
                         color_vec3_row(ui, "Color", color);
                     }
                     BackgroundMode::VerticalGradient {
-                        zenith_color,
-                        horizon_color,
-                        ground_color,
-                        horizon_height,
-                        smoothness,
+                        ref mut zenith_color,
+                        ref mut horizon_color,
+                        ref mut ground_color,
+                        ref mut horizon_height,
+                        ref mut smoothness,
                     } => {
                         color_vec3_row(ui, "Zenith", zenith_color);
                         color_vec3_row(ui, "Horizon", horizon_color);
@@ -2074,7 +2229,8 @@ impl<'window> EditorApp<'window> {
                     ui.label("Select a Tilemap object to choose tiles.");
                     return;
                 };
-                let Some(object) = self.world.object_mut(object_id) else {
+                let mut world = self.world.borrow_mut();
+                let Some(object) = world.object_mut(object_id) else {
                     ui.label("Selected object is no longer available.");
                     return;
                 };
@@ -2230,7 +2386,7 @@ fn version_warning_badge(ui: &mut egui::Ui) {
     painter.circle_filled(rect.center(), 7.0, fill);
     painter.text(
         rect.center(),
-        egui::Align2::CENTER_CENTER,
+        Align2::CENTER_CENTER,
         "!",
         egui::FontId::proportional(12.0),
         egui::Color32::BLACK,

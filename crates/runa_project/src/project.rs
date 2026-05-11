@@ -198,6 +198,64 @@ pub fn load_project(path: impl AsRef<Path>) -> Result<ProjectPaths, ProjectError
     ProjectPaths::load(path)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_load_project() {
+        let temp_dir = TempDir::new().unwrap();
+        let manifest_path = temp_dir.path().join("test.runaproj");
+        let manifest_content = r#"
+(
+    name: "Test Project",
+    engine_version: "0.5.1-alpha.1",
+    startup_world: "worlds/main.ron",
+    assets_dir: "assets",
+    worlds_dir: "worlds",
+    scripts_dir: "scripts",
+    binary_name: "test",
+    app: (
+        window_title: "Test Game",
+        width: 800,
+        height: 600,
+        fullscreen: false,
+        vsync: true,
+        show_fps_in_title: false,
+    ),
+    build: (
+        output_dir: "build",
+        release: false,
+        hide_console_window_on_windows: true,
+    ),
+)
+"#;
+        fs::write(&manifest_path, manifest_content).unwrap();
+
+        let project = load_project(&manifest_path).unwrap();
+        assert_eq!(project.manifest.name, "Test Project");
+        assert_eq!(project.manifest.startup_world, "worlds/main.ron");
+    }
+
+    #[test]
+    fn test_load_project_invalid_path() {
+        let result = load_project("nonexistent.runaproj");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_project_manifest() {
+        let temp_dir = TempDir::new().unwrap();
+        let manifest_path = temp_dir.path().join("project.runaproj");
+        fs::write(&manifest_path, "").unwrap();
+
+        let found = find_project_manifest(temp_dir.path().join("subdir"));
+        assert_eq!(found, Some(manifest_path));
+    }
+}
+
 fn resolve_manifest_path(path: &Path) -> Result<PathBuf, ProjectError> {
     if path.is_file() {
         if path.extension().and_then(|ext| ext.to_str()) == Some("runaproj") {

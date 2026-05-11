@@ -15,3 +15,6 @@ gltf.workspace = true
 zip.workspace = true
 image = "0.24"
 thiserror = "1.0"
+
+[dev-dependencies]
+tempfile = "3.0"

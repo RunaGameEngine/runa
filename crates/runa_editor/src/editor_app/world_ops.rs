@@ -9,7 +9,8 @@ impl<'window> EditorApp<'window> {
 
         let object_ids = self.world_object_ids();
         for object_id in object_ids {
-            let Some(object) = self.world.object_mut(object_id) else {
+            let mut world = self.world.borrow_mut();
+            let Some(object) = world.object_mut(object_id) else {
                 continue;
             };
             let Some(storage) = object.get_component_mut::<SerializedTypeStorage>() else {
@@ -55,7 +56,8 @@ impl<'window> EditorApp<'window> {
         type_id: TypeId,
     ) -> bool {
         let registry = self.runtime_registry().clone();
-        let Some(object) = self.world.object_mut(object_id) else {
+        let mut world = self.world.borrow_mut();
+        let Some(object) = world.object_mut(object_id) else {
             return false;
         };
         registry.add_type_to_object(object, type_id)
@@ -66,7 +68,8 @@ impl<'window> EditorApp<'window> {
         object_id: ObjectId,
         metadata: &ProjectRegisteredTypeRecord,
     ) -> bool {
-        let Some(object) = self.world.object_mut(object_id) else {
+        let mut world = self.world.borrow_mut();
+        let Some(object) = world.object_mut(object_id) else {
             return false;
         };
 
@@ -91,14 +94,14 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn create_empty_object(&mut self) {
-        let object_id = self.world.spawn(Object::new("Empty"));
+        let object_id = self.world.borrow_mut().spawn(Object::new("Empty"));
         self.set_primary_selection(Some(object_id));
         self.status_line = "Created empty object.".to_string();
     }
 
     pub(super) fn create_empty_child_object(&mut self, parent_id: ObjectId) {
-        let object_id = self.world.spawn(Object::new("Empty"));
-        if self.world.set_parent(object_id, Some(parent_id)) {
+        let object_id = self.world.borrow_mut().spawn(Object::new("Empty"));
+        if self.world.borrow_mut().set_parent(object_id, Some(parent_id)) {
             self.hierarchy_expanded.insert(parent_id);
         }
         self.set_primary_selection(Some(object_id));
@@ -130,15 +133,20 @@ impl<'window> EditorApp<'window> {
             for archetype in &archetypes {
                 let name = archetype.name().to_string();
                 let key = archetype.key().clone();
+
                 if ui.button(&name).clicked() {
-                    if let Some(object_id) = self.world.spawn_def_by_key(&key) {
+                    let spawned_object_id = {
+                        let mut world = self.world.borrow_mut();
+                        world.spawn_def_by_key(&key)
+                    };
+
+                    if let Some(object_id) = spawned_object_id {
                         self.set_primary_selection(Some(object_id));
-                        self.status_line =
-                            format!("Created object from object definition {name}.");
+                        self.status_line = format!("Created object from object definition {name}.");
                     } else {
-                        self.status_line =
-                            format!("Failed to create object from object definition {name}.");
+                        self.status_line = format!("Failed to create object from object definition {name}.");
                     }
+
                     ui.close();
                 }
             }
@@ -161,21 +169,26 @@ impl<'window> EditorApp<'window> {
     }
 
     pub(super) fn ensure_world_runtime_registry(&mut self) {
-        if self.world.runtime_registry().is_none() {
-            self.world
+        if self.world.borrow().runtime_registry().is_none() {
+            self.world.borrow_mut()
                 .set_runtime_registry(Arc::new(self.runtime_engine.runtime_registry().clone()));
         }
-        self.world.refresh_object_world_ptrs();
+        self.world.borrow_mut().refresh_object_world_ptrs();
     }
 
-    pub(super) fn runtime_registry(&self) -> &RuntimeRegistry {
-        self.world
-            .runtime_registry()
-            .unwrap_or_else(|| self.runtime_engine.runtime_registry())
+    pub(super) fn runtime_registry(&self) -> RuntimeRegistry {
+        let world = self.world.borrow();
+
+        if let Some(reg) = world.runtime_registry() {
+            reg.clone()
+        } else {
+            self.runtime_engine.runtime_registry().clone()
+        }
     }
 
     pub(super) fn copy_object(&mut self, object_id: ObjectId, cut: bool) {
-        let Some(object) = self.world.object(object_id) else {
+        let world = self.world.borrow();
+        let Some(object) = world.object(object_id) else {
             return;
         };
         self.hierarchy_clipboard = Some(ObjectClipboard {
@@ -205,18 +218,18 @@ impl<'window> EditorApp<'window> {
         }
 
         if let Some(cut_id) = clipboard.cut_id {
-            self.world.despawn(cut_id);
+            self.world.borrow_mut().despawn(cut_id);
         }
-        let new_id = self.world.spawn(object);
+        let new_id = self.world.borrow_mut().spawn(object);
         if let Some(target_id) = target_id {
-            self.world.set_parent(new_id, Some(target_id));
+            self.world.borrow_mut().set_parent(new_id, Some(target_id));
         }
         self.set_primary_selection(Some(new_id));
         self.status_line = "Pasted object.".to_string();
     }
 
     pub(super) fn delete_object(&mut self, object_id: ObjectId) {
-        self.world.despawn(object_id);
+        self.world.borrow_mut().despawn(object_id);
         self.set_primary_selection(self.first_object_id());
         self.status_line = "Deleted object.".to_string();
     }
@@ -296,7 +309,7 @@ impl<'window> EditorApp<'window> {
             world_object.add_component(ObjectDefinitionInstance::new(object.id.clone()));
         }
 
-        let object_id = self.world.spawn(world_object);
+        let object_id = self.world.borrow_mut().spawn(world_object);
         self.set_primary_selection(Some(object_id));
         self.status_line = format!("Placed object {}.", object.name);
     }
