@@ -134,7 +134,11 @@ impl FontManager {
                 *ch,
                 GlyphInfo {
                     uv,
-                    advance: if advance > 0.0 { advance } else { cell_width as f32 * 0.5 },
+                    advance: if advance > 0.0 {
+                        advance
+                    } else {
+                        cell_width as f32 * 0.5
+                    },
                 },
             );
         }
@@ -201,10 +205,7 @@ impl FontManager {
             "C:\\Windows\\Fonts\\segoeui.ttf",
             "C:\\Windows\\Fonts\\calibri.ttf",
         ];
-        const MACOS_FONTS: &[&str] = &[
-            "/Library/Fonts/Arial.ttf",
-            "/Library/Fonts/Helvetica.ttf",
-        ];
+        const MACOS_FONTS: &[&str] = &["/Library/Fonts/Arial.ttf", "/Library/Fonts/Helvetica.ttf"];
         const LINUX_FONTS: &[&str] = &[
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",

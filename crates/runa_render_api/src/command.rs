@@ -76,6 +76,28 @@ pub struct UiRect {
     pub h: f32,
 }
 
+pub struct Mesh3dParams {
+    pub vertices: Vec<Vertex3D>,
+    pub indices: Vec<u32>,
+    pub model_matrix: Mat4,
+    pub color: [f32; 4],
+    pub emission: [f32; 3],
+    pub use_vertex_color: bool,
+    pub order: i32,
+    pub depth: f32,
+}
+
+pub struct TileParams {
+    pub texture: Arc<TextureAsset>,
+    pub position: Vec3,
+    pub size: Vec2,
+    pub uv_rect: [f32; 4],
+    pub flip_x: bool,
+    pub flip_y: bool,
+    pub color: [f32; 4],
+    pub order: i32,
+}
+
 pub enum RenderCommands {
     Sprite {
         texture: std::sync::Arc<TextureAsset>,
@@ -97,26 +119,8 @@ pub enum RenderCommands {
         size: Vec2,
         color: [f32; 4],
     },
-    Tile {
-        texture: Arc<TextureAsset>,
-        position: Vec3,
-        size: Vec2,
-        uv_rect: [f32; 4],
-        flip_x: bool,
-        flip_y: bool,
-        color: [f32; 4],
-        order: i32,
-    },
-    Mesh3D {
-        vertices: Vec<Vertex3D>,
-        indices: Vec<u32>,
-        model_matrix: Mat4,
-        color: [f32; 4],
-        emission: [f32; 3],
-        use_vertex_color: bool,
-        order: i32,
-        depth: f32,
-    },
+    Tile(TileParams),
+    Mesh3D(Mesh3dParams),
     // IU
     UiRect {
         rect: UiRect,

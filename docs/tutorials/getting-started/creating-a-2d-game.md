@@ -108,7 +108,7 @@ impl PlayerArchetype {
     pub fn create(world: &mut World) -> u64 {
         world.spawn(
             Object::new("Player")
-                .with(Camera::new_ortho(320.0, 180.0))
+                .with(Camera::new_orthographic(320.0, 180.0))
                 .with(ActiveCamera)
                 .with(SpriteRenderer::new(Some(load_image!("assets/art/player.png"))))
                 .with(Collider2D::new(16.0, 16.0))

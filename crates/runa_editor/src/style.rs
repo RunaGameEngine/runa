@@ -8,7 +8,7 @@ use egui::{Color32, Style, TextStyle, Visuals};
 use wgpu::Color;
 
 /// Viewport background color (dark gray).
-pub const VIEWPORT_BACKGROUND: Color32 = Color32::from_rgb(26, 26, 26);
+pub const VIEWPORT_BACKGROUND: Color32 = Color32::from_rgb(32, 32, 32);
 
 /// Render target clear color (dark blue-gray).
 /// Used for the 3D scene background.
@@ -20,10 +20,10 @@ pub const RENDER_CLEAR_COLOR: Color = Color {
 };
 
 /// Panel background color (hierarchy, inspector, content browser).
-pub const PANEL_BACKGROUND: Color32 = Color32::from_rgb(24, 24, 24);
+pub const PANEL_BACKGROUND: Color32 = Color32::from_rgb(34, 36, 42);
 
 /// Component card background color (slightly lighter than panel background).
-pub const COMPONENT_BACKGROUND: Color32 = Color32::from_rgb(32, 32, 32);
+pub const COMPONENT_BACKGROUND: Color32 = Color32::from_rgb(44, 46, 53);
 
 /// Error color for displaying errors and validation messages.
 pub const ERROR_COLOR: Color32 = Color32::from_rgb(255, 80, 80);
@@ -32,10 +32,10 @@ pub const ERROR_COLOR: Color32 = Color32::from_rgb(255, 80, 80);
 pub const SELECTION_BACKGROUND: Color32 = Color32::from_rgb(64, 87, 111);
 
 /// Hover background color (subtle highlight for hovered items).
-pub const HOVER_BACKGROUND: Color32 = Color32::from_rgb(50, 50, 50);
+pub const HOVER_BACKGROUND: Color32 = Color32::from_rgb(44, 46, 53);
 
 /// Border color for panels and separators.
-pub const BORDER_COLOR: Color32 = Color32::from_rgb(15, 15, 15);
+pub const BORDER_COLOR: Color32 = Color32::from_rgb(14, 16, 22);
 
 /// Text color for primary/normal text.
 pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(200, 200, 200);

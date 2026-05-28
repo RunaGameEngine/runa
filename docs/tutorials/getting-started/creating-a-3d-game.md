@@ -95,7 +95,6 @@ pub fn create_camera_controller() -> Object {
             75.0_f32.to_radians(),
             0.1,
             1000.0,
-            (1280, 720),
         ))
         .with(ActiveCamera)
         .with(CameraController::new())

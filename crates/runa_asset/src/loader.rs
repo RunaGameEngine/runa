@@ -6,6 +6,7 @@ use crate::texture::TextureAsset;
 
 pub use crate::audio::{AudioAsset, AudioLoadError};
 
+/// Load image/texture asset at compile time (with caching)
 #[macro_export]
 macro_rules! load_image {
     ($path:literal) => {{

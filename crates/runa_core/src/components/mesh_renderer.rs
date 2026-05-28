@@ -520,8 +520,7 @@ impl MeshRenderer {
         self.mesh.clone().unwrap()
     }
 
-    pub fn set_mesh(&mut self, mesh: Option<Handle<Mesh>>,
-                    mesh_path: Option<String>) {
+    pub fn set_mesh(&mut self, mesh: Option<Handle<Mesh>>, mesh_path: Option<String>) {
         self.mesh = mesh;
         self.mesh_path = mesh_path;
     }

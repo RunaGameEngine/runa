@@ -119,18 +119,26 @@ fn object_defs_spawn_by_type_and_name_with_component_access() {
     let world_rc = engine.create_world();
 
     let by_type = world_rc.borrow_mut().spawn_def::<DefinedPlayer>();
-    let by_name = world_rc.borrow_mut()
+    let by_name = world_rc
+        .borrow_mut()
         .spawn("defined_player")
         .expect("definition should spawn by name");
 
     assert_eq!(metadata.key().as_str(), "defined_player");
     assert_eq!(DefinedPlayer::object_def_name(), "defined_player");
     assert_eq!(world_rc.borrow().get::<Health>(by_type).unwrap().max, 100);
-    world_rc.borrow_mut().get_mut::<Health>(by_name).unwrap().max = 150;
+    world_rc
+        .borrow_mut()
+        .get_mut::<Health>(by_name)
+        .unwrap()
+        .max = 150;
     assert_eq!(world_rc.borrow().get::<Health>(by_name).unwrap().max, 150);
 
-    let fields = world_rc.borrow().get::<Health>(by_type).unwrap().serialized_fields();
+    let fields = world_rc
+        .borrow()
+        .get::<Health>(by_type)
+        .unwrap()
+        .serialized_fields();
     assert_eq!(fields.len(), 1);
     assert_eq!(fields[0].name, "max");
 }
-

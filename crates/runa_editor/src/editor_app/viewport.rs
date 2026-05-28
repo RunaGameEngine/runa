@@ -1,5 +1,5 @@
-use std::ops::Deref;
 use super::*;
+use std::ops::Deref;
 
 impl<'window> EditorApp<'window> {
     pub(super) fn ensure_viewport_target(&mut self) {
@@ -892,7 +892,8 @@ impl<'window> EditorApp<'window> {
     }
 
     fn object_world_position(&self, object_id: ObjectId) -> Option<Vec3> {
-        self.world.borrow()
+        self.world
+            .borrow()
             .world_transform_matrix(object_id, 1.0)
             .map(|matrix| matrix.transform_point3(Vec3::ZERO))
     }
@@ -1176,4 +1177,3 @@ fn draw_screen_arrow(
     painter.line_segment([end, left], egui::Stroke::new(2.0, color));
     painter.line_segment([end, right], egui::Stroke::new(2.0, color));
 }
-

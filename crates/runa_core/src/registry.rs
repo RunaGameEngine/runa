@@ -369,10 +369,7 @@ pub trait ObjectDef: ObjectDefName {
         let mut builder = ObjectBuilder::new();
         Self::build(&mut builder);
         let mut object = builder.build();
-        if object
-            .get_component::<ObjectDefinitionInstance>()
-            .is_none()
-        {
+        if object.get_component::<ObjectDefinitionInstance>().is_none() {
             object.add_component(ObjectDefinitionInstance::new(
                 <Self as ObjectDefName>::key().as_str(),
             ));

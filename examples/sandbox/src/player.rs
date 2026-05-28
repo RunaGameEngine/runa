@@ -1,19 +1,19 @@
 use runa_asset::load_image;
+use runa_core::systems::event_system::Event;
 use runa_core::{
     components::{
-        ui::CanvasSpace, ActiveCamera, Camera, UiRenderer, Collider2D, SpriteRenderer, Transform,
+        ui::CanvasSpace, ActiveCamera, Camera, Collider2D, SpriteRenderer, Transform, UiRenderer,
     },
     glam::Vec3,
     input_system::*,
     ocs::{Object, Script, ScriptContext, World},
 };
-use runa_core::systems::event_system::Event;
 use runa_engine::{Engine, RunaArchetype, RunaComponent, RunaScript};
 
 // Custom Event
 pub(crate) struct EventChangedDirectionX;
 // Just implement Event for your structure
-impl Event for EventChangedDirectionX { }
+impl Event for EventChangedDirectionX {}
 
 #[derive(Default, RunaComponent)]
 pub struct Health {
@@ -78,7 +78,6 @@ impl Script for PlayerController {
             ctx.emit_event(EventChangedDirectionX);
         }
 
-
         let Some(current_position) = ctx
             .get_component::<Transform>()
             .map(|transform| transform.position)
@@ -119,8 +118,12 @@ impl Script for PlayerCameraFollow {
             return;
         };
         let player_position = {
-            let Some(player) = ctx.get_object(player_id) else { return; };
-            let Some(transform) = player.get_component::<Transform>() else { return; };
+            let Some(player) = ctx.get_object(player_id) else {
+                return;
+            };
+            let Some(transform) = player.get_component::<Transform>() else {
+                return;
+            };
             transform.position
         };
         let Some(transform) = ctx.get_component_mut::<Transform>() else {

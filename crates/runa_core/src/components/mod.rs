@@ -29,10 +29,12 @@ pub use component::{
 };
 pub use cursor_interactable::CursorInteractable;
 pub use light::{DirectionalLight, PointLight};
+pub use mesh_renderer::AlphaMode;
 pub use mesh_renderer::BuiltinMeshPrimitive;
 pub use mesh_renderer::Material;
 pub use mesh_renderer::Mesh;
 pub use mesh_renderer::MeshRenderer;
+pub use mesh_renderer::Vertex3D;
 pub use object_definition_instance::ObjectDefinitionInstance;
 pub use physics_collision::PhysicsCollision;
 pub use serialized_type_storage::{SerializedTypeEntry, SerializedTypeKind, SerializedTypeStorage};
@@ -46,8 +48,6 @@ pub use tilemap::TilemapLayer;
 pub use tilemap::TilemapRenderer;
 pub use transform::Transform;
 pub use world_atmosphere::{BackgroundMode, WorldAtmosphere};
-pub use mesh_renderer::Vertex3D;
-pub use mesh_renderer::AlphaMode;
 
 pub use ui::UiRenderer;
 

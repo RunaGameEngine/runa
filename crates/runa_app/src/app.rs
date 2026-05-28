@@ -74,7 +74,8 @@ impl<'window> App<'window> {
         let object = world.object(object_id);
         let camera = object.unwrap().get_component::<Camera>();
         if let Some(matrix) = self
-            .world_rc.borrow()
+            .world_rc
+            .borrow()
             .world_transform_matrix(object_id, interpolation_factor)
         {
             // Camera-follow jitter is very noticeable, so the active camera
@@ -88,7 +89,11 @@ impl<'window> App<'window> {
                 previous_position: position,
                 previous_rotation: rotation,
             };
-            Some(camera.unwrap().resolved_with_transform(Some(&interpolated_transform)))
+            Some(
+                camera
+                    .unwrap()
+                    .resolved_with_transform(Some(&interpolated_transform)),
+            )
         } else {
             Some(*camera.unwrap())
         }
@@ -122,13 +127,12 @@ impl<'window> App<'window> {
         let world = self.world_rc.borrow();
 
         // ищем объект с ActiveCamera и Camera компонентом
-        let id_opt = world.query::<ActiveCamera>()
-            .into_iter()
-            .find(|id| {
-                world.object(*id)
-                    .and_then(|object| object.get_component::<Camera>())
-                    .is_some()
-            });
+        let id_opt = world.query::<ActiveCamera>().into_iter().find(|id| {
+            world
+                .object(*id)
+                .and_then(|object| object.get_component::<Camera>())
+                .is_some()
+        });
 
         id_opt.or_else(|| world.find_first_with::<Camera>())
     }
@@ -155,7 +159,9 @@ impl<'window> App<'window> {
             self.queue.clear();
 
             // Compile render commands from world
-            self.world_rc.borrow().render(&mut self.queue, interpolation_factor);
+            self.world_rc
+                .borrow()
+                .render(&mut self.queue, interpolation_factor);
 
             // Render console on top (after clearing queue and world render)
             self.console.render(&mut self.queue, &active_camera);
@@ -215,7 +221,8 @@ impl<'window> App<'window> {
                 let w = renderer.surface_config.width.max(1);
                 let h = renderer.surface_config.height.max(1);
                 if let Some(camera) = self
-                    .world_rc.borrow_mut()
+                    .world_rc
+                    .borrow_mut()
                     .object_mut(camera_id)
                     .and_then(|object| object.get_component_mut::<Camera>())
                 {
@@ -227,7 +234,8 @@ impl<'window> App<'window> {
                 self.camera = camera;
                 self.camera_matrix_override = Some(camera.matrix());
                 self.active_camera_set = self
-                    .world_rc.borrow()
+                    .world_rc
+                    .borrow()
                     .object(camera_id)
                     .and_then(|object| object.get_component::<ActiveCamera>())
                     .is_some();
@@ -309,7 +317,6 @@ impl<'window> ApplicationHandler for App<'window> {
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
         // Clear the "just" input states at the beginning of each event loop cycle
         // This ensures that "just pressed" events are only valid for one frame
-
 
         const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
 
@@ -462,4 +469,3 @@ impl<'window> ApplicationHandler for App<'window> {
         }
     }
 }
-

@@ -1,6 +1,11 @@
-use runa_engine::{runa_app::RunaApp, Engine};
-use runa_core::{components::{ActiveCamera, Camera, UiRenderer}, components::ui::{CanvasSpace, TextAlign, TextProps}, ocs::Object, glam};
 use runa_core::components::ui::ImageProps;
+use runa_core::{
+    components::ui::{CanvasSpace, TextAlign, TextProps},
+    components::{ActiveCamera, Camera, UiRenderer},
+    glam,
+    ocs::Object,
+};
+use runa_engine::{runa_app::RunaApp, Engine};
 
 fn main() {
     let engine = Engine::new();
@@ -29,8 +34,6 @@ fn main() {
 
         // Load image handle (returns Handle<TextureAsset>)
         let image_handle = runa_asset::load_image!("assets/Charactert.png");
-        // Convert handle to Arc<TextureAsset> to read dimensions
-        let image_arc: std::sync::Arc<runa_asset::TextureAsset> = image_handle.clone().into();
         // Use full texture UVs by default for visibility testing
         let uv = [0.0_f32, 0.0_f32, 1.0_f32, 1.0_f32];
 
@@ -41,20 +44,20 @@ fn main() {
                 texture: Some(image_handle),
                 tint: [1.0, 1.0, 1.0, 1.0],
                 uv,
-            }
+            },
         );
 
         // Configure layout: center top for text and below it for image
         if let Some(node) = ui_renderer.node_mut(text_node) {
             node.layout.anchor = runa_core::components::ui::Anchor::TopCenter;
             node.layout.position = glam::Vec2::new(0.0, 20.0); // 20px from top
-            // allow layout to compute size based on font_size
+                                                               // allow layout to compute size based on font_size
         }
 
         if let Some(node) = ui_renderer.node_mut(image_id) {
             node.layout.anchor = runa_core::components::ui::Anchor::TopCenter;
             node.layout.position = glam::Vec2::new(0.0, 80.0); // below text
-            // uv already provided; layout will size image based on texture
+                                                               // uv already provided; layout will size image based on texture
         }
 
         let mut camera_object = Object::new("MainCamera");
@@ -66,4 +69,3 @@ fn main() {
 
     let _ = RunaApp::run_default(world_rc);
 }
-

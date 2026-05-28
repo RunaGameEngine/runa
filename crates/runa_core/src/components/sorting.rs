@@ -7,6 +7,10 @@ pub struct Sorting {
 
 impl Sorting {
     pub fn new(order: i32) -> Self {
-        Self { order, y_sort: false, y_offset: 0.0 }
+        Self {
+            order,
+            y_sort: false,
+            y_offset: 0.0,
+        }
     }
 }

@@ -68,6 +68,7 @@ pub(super) fn query_project_metadata(
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let _ = output_tx.send(format!("Bridge failed: {error}"));
+        println!("Bridge failed: {}", error);
         return Err(error);
     }
 

@@ -80,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Camera API**
   - `viewport_size` was removed from public camera constructors
-  - `Camera::new_ortho(width, height)` now stores world-visible size directly
+   - `Camera::new_orthographic(width, height)` now stores world-visible size directly
   - `viewport_size` is now runtime-owned state updated by the app/editor from the actual render target size
 
 - **Orthographic camera behavior**

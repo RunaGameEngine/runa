@@ -3,9 +3,12 @@ use std::sync::Arc;
 use glam::Vec2;
 use runa_render_api::{command::UiRect, RenderQueue};
 
-use crate::components::ui::{Anchor, ContainerKind, ImageProps, TextProps, UiNode, UiNodeId, UiNodeKind};
+use crate::components::ui::{
+    Anchor, ContainerKind, ImageProps, TextProps, UiNode, UiNodeId, UiNodeKind,
+};
 
 pub struct UiRenderer {
+    pub root_node_path: Option<String>,
     pub space: CanvasSpace,
     pub nodes: Vec<UiNode>,
     pub root: UiNodeId,
@@ -18,6 +21,7 @@ impl UiRenderer {
         let root_node = UiNode::new(root, None, UiNodeKind::Container(ContainerKind::Free));
 
         Self {
+            root_node_path: None,
             space,
             nodes: vec![root_node],
             root,
@@ -228,5 +232,5 @@ impl UiRenderer {
 pub enum CanvasSpace {
     Screen,
     Camera,
-    World
+    World,
 }

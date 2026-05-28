@@ -233,7 +233,7 @@ impl Tilemap {
         }
     }
 
-    /// Sets a tile using world tile coordinates, which may be negative.
+    /// Sets a tile using world tile coordinates.
     pub fn set_tile(&mut self, world_x: i32, world_y: i32, tile: Tile) {
         // Convert world coordinates to array indices
         let array_x = (world_x - self.offset.x) as u32;

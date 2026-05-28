@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use runa_core::{
     components::{
-        ui::CanvasSpace, ActiveCamera, AudioListener, AudioSource, Camera, UiRenderer, Collider2D,
-        Component, CursorInteractable, DirectionalLight, MeshRenderer, ObjectDefinitionInstance,
+        ui::CanvasSpace, ActiveCamera, AudioListener, AudioSource, Camera, Collider2D, Component,
+        CursorInteractable, DirectionalLight, MeshRenderer, ObjectDefinitionInstance,
         PhysicsCollision, PointLight, SerializedTypeStorage, Sorting, SpriteAnimator,
-        SpriteRenderer, Tilemap, TilemapLayer, TilemapRenderer, Transform,
+        SpriteRenderer, Tilemap, TilemapLayer, TilemapRenderer, Transform, UiRenderer,
     },
     glam::USizeVec2,
     ocs::{Object, Script, World},
@@ -208,7 +208,9 @@ impl Engine {
         self.runtime_registry
             .register_builtin_component_factory::<Collider2D, _>(Collider2D::default);
         self.runtime_registry
-            .register_builtin_component_factory::<UiRenderer, _>(|| UiRenderer::new(CanvasSpace::Screen));
+            .register_builtin_component_factory::<UiRenderer, _>(|| {
+                UiRenderer::new(CanvasSpace::Screen)
+            });
         self.runtime_registry
             .register_builtin_component_factory::<AudioListener, _>(AudioListener::default);
         self.runtime_registry

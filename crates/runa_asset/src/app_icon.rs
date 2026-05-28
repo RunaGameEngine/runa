@@ -61,7 +61,6 @@ pub fn load_window_icon_from_bytes(bytes: &[u8]) -> Result<Icon, String> {
 /// # let _ = icons.first().cloned();
 /// # Ok::<(), String>(())
 /// ```
-
 #[allow(dead_code)]
 pub fn load_window_icons<P: AsRef<Path>>(paths: &[P]) -> Result<Vec<Icon>, String> {
     let mut icons = Vec::new();

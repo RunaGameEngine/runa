@@ -351,7 +351,9 @@ impl<'window> EditorApp<'window> {
                                     .borrow()
                                     .object(object_id)
                                     .and_then(|object| object.parent())
-                                    .is_some_and(|parent_id| self.world.borrow().object(parent_id).is_some());
+                                    .is_some_and(|parent_id| {
+                                        self.world.borrow().object(parent_id).is_some()
+                                    });
                                 if !visited.contains(&object_id) && !has_valid_parent {
                                     self.hierarchy_object_row(ui, object_id, 0, &mut visited);
                                 }
@@ -1199,7 +1201,11 @@ impl<'window> EditorApp<'window> {
             }
             if response.hovered() && ui.input(|input| input.pointer.any_released()) {
                 if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
-                    if dragged_id != object_id && self.world.borrow_mut().set_parent(dragged_id, Some(object_id))
+                    if dragged_id != object_id
+                        && self
+                            .world
+                            .borrow_mut()
+                            .set_parent(dragged_id, Some(object_id))
                     {
                         self.set_primary_selection(Some(dragged_id));
                         self.status_line = "Reparented object.".to_string();
@@ -1270,10 +1276,7 @@ impl<'window> EditorApp<'window> {
         // This prevents RefCell borrow conflicts inside egui closures.
         // =========================================================
 
-        let (
-            object_component_type_ids,
-            serialized_entries,
-        ) = {
+        let (object_component_type_ids, serialized_entries) = {
             let world = self.world.borrow();
 
             let Some(object) = world.object(object_id) else {
@@ -1311,9 +1314,7 @@ impl<'window> EditorApp<'window> {
             .into_iter()
             .filter(|metadata| metadata.kind() == kind)
             .filter(|metadata| metadata.type_id() != TypeId::of::<Tilemap>())
-            .filter(|metadata| {
-                !object_component_type_ids.contains(&metadata.type_id())
-            })
+            .filter(|metadata| !object_component_type_ids.contains(&metadata.type_id()))
             .map(|metadata| {
                 (
                     Some(metadata.type_id()),
@@ -1327,12 +1328,8 @@ impl<'window> EditorApp<'window> {
             .collect();
 
         let project_kind = match kind {
-            RegisteredTypeKind::Component => {
-                ProjectRegisteredTypeKind::Component
-            }
-            RegisteredTypeKind::Script => {
-                ProjectRegisteredTypeKind::Script
-            }
+            RegisteredTypeKind::Component => ProjectRegisteredTypeKind::Component,
+            RegisteredTypeKind::Script => ProjectRegisteredTypeKind::Script,
         };
 
         for metadata in self
@@ -1340,46 +1337,29 @@ impl<'window> EditorApp<'window> {
             .registered_types
             .iter()
             .filter(|metadata| metadata.kind == project_kind)
-            .filter(|metadata| {
-                metadata.source
-                    == runa_project::ProjectRegistrationSource::User
-            })
+            .filter(|metadata| metadata.source == runa_project::ProjectRegistrationSource::User)
         {
             let serialized_kind = match metadata.kind {
-                ProjectRegisteredTypeKind::Component => {
-                    SerializedTypeKind::Component
-                }
-                ProjectRegisteredTypeKind::Script => {
-                    SerializedTypeKind::Script
-                }
+                ProjectRegisteredTypeKind::Component => SerializedTypeKind::Component,
+                ProjectRegisteredTypeKind::Script => SerializedTypeKind::Script,
             };
 
-            let already_attached_as_stub =
-                serialized_entries.iter().any(|entry| {
-                    entry.kind == serialized_kind
-                        && entry.type_name == metadata.type_name
-                });
+            let already_attached_as_stub = serialized_entries.iter().any(|entry| {
+                entry.kind == serialized_kind && entry.type_name == metadata.type_name
+            });
 
             if already_attached_as_stub {
                 continue;
             }
 
-            let short_name =
-                helpers::short_type_name(&metadata.type_name).to_string();
+            let short_name = helpers::short_type_name(&metadata.type_name).to_string();
 
             let already_listed = registered_types
                 .iter()
-                .any(|(_, existing_name, _, _)| {
-                    existing_name == &short_name
-                });
+                .any(|(_, existing_name, _, _)| existing_name == &short_name);
 
             if !already_listed {
-                registered_types.push((
-                    None,
-                    short_name,
-                    true,
-                    Some(metadata.clone()),
-                ));
+                registered_types.push((None, short_name, true, Some(metadata.clone())));
             }
         }
 
@@ -1685,13 +1665,15 @@ impl<'window> EditorApp<'window> {
             return;
         };
 
+        let window_size = egui::vec2(540., 400.);
+
         let mut open = self.project_settings_open;
         let mut open_in_code_editor = false;
         egui::Window::new("Project Settings")
             .open(&mut open)
             .resizable(true)
-            .anchor(Align2::CENTER_CENTER, [0., 0.])
-            .default_width(540.0)
+            .default_pos(ctx.viewport_rect().center() - window_size * 0.5)
+            .default_width(window_size.x)
             .show(ctx, |ui| {
                 let project_root = session.project.root_dir.clone();
                 ui.heading("Project");
@@ -1797,9 +1779,8 @@ impl<'window> EditorApp<'window> {
                             .add_filter("Images", &["png", "jpg", "jpeg", "svg", "ico"])
                             .pick_file()
                         {
-                            session.project.manifest.app.window_icon = Some(
-                                project::path_relative_to_project(&project_root, &path),
-                            );
+                            session.project.manifest.app.window_icon =
+                                Some(project::path_relative_to_project(&project_root, &path));
                         }
                     }
                     if ui.button("Clear").clicked() {
@@ -2222,7 +2203,7 @@ impl<'window> EditorApp<'window> {
         egui::Window::new("Tile Palette")
             .open(&mut open)
             .default_width(300.0)
-            .default_height(360.0)
+            .default_height(300.0)
             .resizable(true)
             .show(ctx, |ui| {
                 let Some(object_id) = self.selection else {
@@ -2392,4 +2373,3 @@ fn version_warning_badge(ui: &mut egui::Ui) {
         egui::Color32::BLACK,
     );
 }
-

@@ -4,9 +4,9 @@ use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use runa_asset::{Handle, TextureAsset};
 use gltf;
 use image::{DynamicImage, ImageError, ImageOutputFormat, RgbaImage};
+use runa_asset::{Handle, TextureAsset};
 use runa_core::components::{AlphaMode, Material, Mesh, MeshRenderer, Transform, Vertex3D};
 use runa_core::glam::{Quat, Vec3};
 use runa_core::ocs::{Object, ObjectId};
@@ -238,18 +238,24 @@ fn import_gltf_to_runa3d(
                     None
                 },
                 normal_texture: if settings.import_textures {
-                    material.normal_texture().map(|info| info.texture().index() as u32)
+                    material
+                        .normal_texture()
+                        .map(|info| info.texture().index() as u32)
                 } else {
                     None
                 },
                 occlusion_texture: if settings.import_textures {
-                    material.occlusion_texture().map(|info| info.texture().index() as u32)
+                    material
+                        .occlusion_texture()
+                        .map(|info| info.texture().index() as u32)
                 } else {
                     None
                 },
                 emission: material.emissive_factor(),
                 emissive_texture: if settings.import_textures {
-                    material.emissive_texture().map(|info| info.texture().index() as u32)
+                    material
+                        .emissive_texture()
+                        .map(|info| info.texture().index() as u32)
                 } else {
                     None
                 },
@@ -402,7 +408,8 @@ fn import_gltf_to_runa3d(
 fn load_image_bytes(path: &Path) -> Result<Vec<u8>, ImageError> {
     let image = image::open(path)?.to_rgba8();
     let mut bytes = Vec::new();
-    DynamicImage::ImageRgba8(image).write_to(&mut Cursor::new(&mut bytes), ImageOutputFormat::Png)?;
+    DynamicImage::ImageRgba8(image)
+        .write_to(&mut Cursor::new(&mut bytes), ImageOutputFormat::Png)?;
     Ok(bytes)
 }
 

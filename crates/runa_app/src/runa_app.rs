@@ -66,7 +66,7 @@ impl RunaApp {
     /// height: 720,
     /// fullscreen: false,
     /// vsync: true
-    pub fn run_default(world_rc: Rc<RefCell<World>>,) -> Result<(), EventLoopError> {
+    pub fn run_default(world_rc: Rc<RefCell<World>>) -> Result<(), EventLoopError> {
         let event_loop = EventLoop::new().unwrap();
         event_loop.set_control_flow(ControlFlow::Poll);
 

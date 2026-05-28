@@ -11,8 +11,8 @@ pub use components::{SerializedField, SerializedFieldAccess, SerializedFieldValu
 pub use console::Console;
 pub use ocs::World;
 pub use registry::{
-    ArchetypeKey, ArchetypeMetadata, ArchetypeRegistry, RegisteredTypeKind, RegistrationSource,
-    ObjectDef, ObjectDefKey, ObjectDefMetadata, ObjectDefName, ObjectDefRegistry, RunaArchetype,
+    ArchetypeKey, ArchetypeMetadata, ArchetypeRegistry, ObjectDef, ObjectDefKey, ObjectDefMetadata,
+    ObjectDefName, ObjectDefRegistry, RegisteredTypeKind, RegistrationSource, RunaArchetype,
     RunaComponentType, RunaScriptType, RuntimeRegistry, TypeMetadata, TypeRegistry,
 };
 

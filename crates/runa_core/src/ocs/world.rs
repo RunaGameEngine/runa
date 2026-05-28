@@ -7,18 +7,18 @@ use super::command::WorldCommand;
 use glam::{Mat4, Vec2, Vec3};
 use runa_render_api::RenderQueue;
 
+use crate::systems::event_system::EventBus;
 use crate::{
     audio::{AudioEngine, SoundId},
     components::{
-        ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, UiRenderer, Collider2D,
+        ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, Collider2D,
         DirectionalLight, MeshRenderer, PointLight, Sorting, SpriteAnimator, SpriteRenderer,
-        Tilemap, Transform, WorldAtmosphere,
+        Tilemap, Transform, UiRenderer, WorldAtmosphere,
     },
     debug_renderer::DebugRenderer,
     ocs::{Object, ObjectId, Script},
     registry::{ArchetypeKey, ObjectDef, RunaArchetype, RuntimeRegistry},
 };
-use crate::systems::event_system::EventBus;
 
 pub struct World {
     objects: Vec<Object>,
@@ -383,7 +383,8 @@ impl World {
                 let mesh = mesh_renderer.get_mesh_handle();
                 // Convert Mesh vertices to render_api Vertex3D
                 let vertices: Vec<runa_render_api::command::Vertex3D> = mesh
-                    .inner.vertices
+                    .inner
+                    .vertices
                     .iter()
                     .map(|v| runa_render_api::command::Vertex3D {
                         position: v.position,
@@ -394,19 +395,19 @@ impl World {
                     .collect();
                 let material = mesh_renderer.material_for_rendering();
 
-                render_queue.draw_mesh_3d(
+                render_queue.draw_mesh_3d(runa_render_api::command::Mesh3dParams {
                     vertices,
-                    mesh.inner.indices.clone(),
+                    indices: mesh.inner.indices.clone(),
                     model_matrix,
-                    material.base_color,
-                    material.emission,
-                    material.use_vertex_color,
-                    object
+                    color: material.base_color,
+                    emission: material.emission,
+                    use_vertex_color: material.use_vertex_color,
+                    order: object
                         .get_component::<Sorting>()
                         .map(|sorting| sorting.order)
                         .unwrap_or(0),
-                    interpolated_position.z,
-                );
+                    depth: interpolated_position.z,
+                });
             }
 
             // 2D Sprite rendering
@@ -481,22 +482,22 @@ impl World {
                                 let (tile_scale, _, _) =
                                     object_matrix.to_scale_rotation_translation();
 
-                                render_queue.draw_tile(
-                                    tile.texture.clone().unwrap(),
-                                    final_pos,
-                                    tilemap.world_tile_size()
+                                render_queue.draw_tile(runa_render_api::command::TileParams {
+                                    texture: tile.texture.clone().unwrap(),
+                                    position: final_pos,
+                                    size: tilemap.world_tile_size()
                                         * Vec2::new(tile_scale.x.abs(), tile_scale.y.abs()),
-                                    [
+                                    uv_rect: [
                                         tile.uv_rect.x,
                                         tile.uv_rect.y,
                                         tile.uv_rect.width,
                                         tile.uv_rect.height,
                                     ],
-                                    tile.flip_x,
-                                    tile.flip_y,
-                                    [1.0, 1.0, 1.0, layer.opacity.clamp(0.0, 1.0)],
-                                    layer.self_order
-                                );
+                                    flip_x: tile.flip_x,
+                                    flip_y: tile.flip_y,
+                                    color: [1.0, 1.0, 1.0, layer.opacity.clamp(0.0, 1.0)],
+                                    order: layer.self_order,
+                                });
                             }
                         }
                     }
@@ -945,7 +946,9 @@ mod tests {
     #[test]
     fn deferred_despawn_applies_after_update_phase() {
         let world_rc = Rc::new(RefCell::new(World::default()));
-        world_rc.borrow_mut().spawn(Object::new("Transient").with(DespawnSelf));
+        world_rc
+            .borrow_mut()
+            .spawn(Object::new("Transient").with(DespawnSelf));
         world_rc.borrow_mut().start(world_rc.clone());
 
         assert_eq!(world_rc.borrow().query::<Transform>().len(), 1);

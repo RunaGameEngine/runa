@@ -896,7 +896,12 @@ fn collect_serialized_type_assets(
         {
             let type_name = object
                 .runtime_registry()
-                .and_then(|registry| registry.types().get_by_id(info.type_id()).map(|metadata| metadata.type_name().to_string()))
+                .and_then(|registry| {
+                    registry
+                        .types()
+                        .get_by_id(info.type_id())
+                        .map(|metadata| metadata.type_name().to_string())
+                })
                 .unwrap_or_else(|| info.type_name().to_string());
             assets.push(SerializedObjectTypeAsset { type_name, fields });
         }
@@ -1224,7 +1229,7 @@ impl SortingAsset {
         Sorting {
             order: self.order,
             y_sort: false,
-            y_offset: 0.0
+            y_offset: 0.0,
         }
     }
 }
@@ -1493,6 +1498,7 @@ fn load_texture_handle(project_root: &Path, relative_path: &str) -> Option<Handl
 #[cfg(test)]
 mod tests {
     use super::{apply_serialized_type_assets, SerializedObjectTypeAsset, WorldObjectAsset};
+    use crate::load_world_with_runtime_registry;
     use runa_core::components::{
         SerializedField, SerializedFieldAccess, SerializedFieldValue, SerializedTypeKind,
         SerializedTypeStorage,
@@ -1501,7 +1507,6 @@ mod tests {
     use runa_core::registry::RuntimeRegistry;
     use std::fs;
     use tempfile::TempDir;
-    use crate::load_world_with_runtime_registry;
 
     #[test]
     fn test_load_world_with_runtime_registry() {
@@ -1529,7 +1534,13 @@ mod tests {
 
         let registry = RuntimeRegistry::new();
         let world = load_world_with_runtime_registry(&world_path, &registry).unwrap();
-        assert_eq!(world.borrow().query::<runa_core::components::Transform>().len(), 1);
+        assert_eq!(
+            world
+                .borrow()
+                .query::<runa_core::components::Transform>()
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -1760,4 +1771,3 @@ mod tests {
         assert!(object.get_component::<SerializedTypeStorage>().is_none());
     }
 }
-

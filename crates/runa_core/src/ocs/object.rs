@@ -3,8 +3,8 @@ use crate::ocs::{ScriptContext, World};
 use crate::registry::RuntimeRegistry;
 use glam::Vec2;
 use std::any::TypeId;
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
@@ -103,10 +103,7 @@ impl Object {
     }
 
     pub fn component_type_ids(&self) -> Vec<TypeId> {
-        self.components
-            .keys()
-            .copied()
-            .collect()
+        self.components.keys().copied().collect()
     }
 
     pub fn empty() -> Self {

@@ -101,7 +101,11 @@ impl<'window> EditorApp<'window> {
 
     pub(super) fn create_empty_child_object(&mut self, parent_id: ObjectId) {
         let object_id = self.world.borrow_mut().spawn(Object::new("Empty"));
-        if self.world.borrow_mut().set_parent(object_id, Some(parent_id)) {
+        if self
+            .world
+            .borrow_mut()
+            .set_parent(object_id, Some(parent_id))
+        {
             self.hierarchy_expanded.insert(parent_id);
         }
         self.set_primary_selection(Some(object_id));
@@ -144,7 +148,8 @@ impl<'window> EditorApp<'window> {
                         self.set_primary_selection(Some(object_id));
                         self.status_line = format!("Created object from object definition {name}.");
                     } else {
-                        self.status_line = format!("Failed to create object from object definition {name}.");
+                        self.status_line =
+                            format!("Failed to create object from object definition {name}.");
                     }
 
                     ui.close();
@@ -170,7 +175,8 @@ impl<'window> EditorApp<'window> {
 
     pub(super) fn ensure_world_runtime_registry(&mut self) {
         if self.world.borrow().runtime_registry().is_none() {
-            self.world.borrow_mut()
+            self.world
+                .borrow_mut()
                 .set_runtime_registry(Arc::new(self.runtime_engine.runtime_registry().clone()));
         }
         self.world.borrow_mut().refresh_object_world_ptrs();
@@ -392,4 +398,3 @@ impl<'window> EditorApp<'window> {
 fn short_type_name(type_name: &str) -> &str {
     type_name.rsplit("::").next().unwrap_or(type_name)
 }
-

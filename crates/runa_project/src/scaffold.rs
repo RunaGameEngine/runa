@@ -68,7 +68,10 @@ pub fn create_empty_project(
     }
 
     fs::write(root_dir.join(".gitignore"), default_gitignore())?;
-    fs::write(root_dir.join("Cargo.toml"), cargo_toml_template(&binary_name))?;
+    fs::write(
+        root_dir.join("Cargo.toml"),
+        cargo_toml_template(&binary_name),
+    )?;
     fs::write(src_dir.join("main.rs"), main_rs_template())?;
 
     ensure_editor_bridge_files(&root_dir)?;

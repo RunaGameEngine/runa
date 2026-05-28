@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::command::{AtmosphereData, DirectionalLightData, PointLightData, UiRect, Vertex3D};
+use crate::command::{AtmosphereData, DirectionalLightData, Mesh3dParams, PointLightData, TileParams, UiRect};
 use crate::RenderCommands;
-use glam::{Mat4, Quat, Vec2, Vec3};
+use glam::{Quat, Vec2, Vec3};
 use runa_asset::TextureAsset;
 
 #[derive(Default)]
@@ -37,7 +37,7 @@ impl RenderQueue {
 
     pub fn draw_sprite(
         &mut self,
-        texture: std::sync::Arc<TextureAsset>,
+        texture: Arc<TextureAsset>,
         position: Vec3,
         rotation: Quat,
         scale: Vec3,
@@ -65,50 +65,12 @@ impl RenderQueue {
         });
     }
 
-    pub fn draw_tile(
-        &mut self,
-        texture: Arc<TextureAsset>,
-        position: Vec3,
-        size: Vec2,
-        uv_rect: [f32; 4],
-        flip_x: bool,
-        flip_y: bool,
-        color: [f32; 4],
-        order: i32,
-    ) {
-        self.commands.push(RenderCommands::Tile {
-            texture,
-            position,
-            size,
-            uv_rect,
-            flip_x,
-            flip_y,
-            color,
-            order,
-        });
+    pub fn draw_tile(&mut self, params: TileParams) {
+        self.commands.push(RenderCommands::Tile(params));
     }
 
-    pub fn draw_mesh_3d(
-        &mut self,
-        vertices: Vec<Vertex3D>,
-        indices: Vec<u32>,
-        model_matrix: Mat4,
-        color: [f32; 4],
-        emission: [f32; 3],
-        use_vertex_color: bool,
-        order: i32,
-        depth: f32,
-    ) {
-        self.commands.push(RenderCommands::Mesh3D {
-            vertices,
-            indices,
-            model_matrix,
-            color,
-            emission,
-            use_vertex_color,
-            order,
-            depth,
-        });
+    pub fn draw_mesh_3d(&mut self, params: Mesh3dParams) {
+        self.commands.push(RenderCommands::Mesh3D(params));
     }
 
     // UI

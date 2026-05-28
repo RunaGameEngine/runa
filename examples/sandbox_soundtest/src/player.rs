@@ -25,8 +25,7 @@ impl Player {
 impl SerializedFieldAccess for Player {}
 
 impl Script for Player {
-    fn start(&mut self, _ctx: &mut ScriptContext) {
-    }
+    fn start(&mut self, _ctx: &mut ScriptContext) {}
 
     fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {
         self.direction = Vec3::ZERO;

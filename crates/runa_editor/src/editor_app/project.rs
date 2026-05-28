@@ -9,7 +9,8 @@ impl<'window> EditorApp<'window> {
         }
 
         self.world = helpers::create_preview_world();
-        self.world.borrow_mut()
+        self.world
+            .borrow_mut()
             .set_runtime_registry(Arc::new(self.runtime_engine.runtime_registry().clone()));
         self.set_primary_selection(self.first_object_id());
         self.project_session = None;

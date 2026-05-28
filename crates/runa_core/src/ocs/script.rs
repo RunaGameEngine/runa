@@ -87,7 +87,8 @@ impl<'a> ScriptContext<'a> {
 
     pub fn overlaps_collider_2d(&self, center: Vec2, collider: &Collider2D) -> bool {
         let self_ptr = self.object as *const Object;
-        self.world.overlaps_collider_2d(center, collider, Some(self_ptr))
+        self.world
+            .overlaps_collider_2d(center, collider, Some(self_ptr))
     }
 
     pub fn emit_event<E: 'static>(&self, event: E) {

@@ -9,11 +9,11 @@ use rfd::FileDialog;
 use runa_asset::loader::load_image;
 use runa_asset::AudioAsset;
 use runa_core::components::{
-    ActiveCamera, AudioListener, AudioSource, BuiltinMeshPrimitive, Camera, UiRenderer, Collider2D,
+    ActiveCamera, AudioListener, AudioSource, BuiltinMeshPrimitive, Camera, Collider2D,
     ComponentRuntimeKind, CursorInteractable, DirectionalLight, MeshRenderer, PhysicsCollision,
     PointLight, ProjectionType, SerializedField, SerializedFieldValue, SerializedTypeKind,
     SerializedTypeStorage, Sorting, SpriteAnimationClip, SpriteAnimator, SpriteRenderer, Tilemap,
-    TilemapRenderer, Transform,
+    TilemapRenderer, Transform, UiRenderer,
 };
 use runa_core::glam::{EulerRot, Quat, USizeVec2, Vec3};
 use runa_core::ocs::Object;
@@ -302,10 +302,24 @@ fn components_section(
                     }
                 });
                 property_row(ui, "Vertices", |ui| {
-                    ui.label(mesh_renderer.get_mesh_handle().inner.vertices.len().to_string());
+                    ui.label(
+                        mesh_renderer
+                            .get_mesh_handle()
+                            .inner
+                            .vertices
+                            .len()
+                            .to_string(),
+                    );
                 });
                 property_row(ui, "Indices", |ui| {
-                    ui.label(mesh_renderer.get_mesh_handle().inner.indices.len().to_string());
+                    ui.label(
+                        mesh_renderer
+                            .get_mesh_handle()
+                            .inner
+                            .indices
+                            .len()
+                            .to_string(),
+                    );
                 });
                 color_editor(ui, "Tint", &mut mesh_renderer.color);
             },
@@ -779,8 +793,7 @@ fn components_section(
                                 property_row(ui, "Render Order", |ui| {
                                     ui.add_sized(
                                         [96.0, 22.0],
-                                        egui::DragValue::new(&mut layer.self_order)
-                                            .speed(1),
+                                        egui::DragValue::new(&mut layer.self_order).speed(1),
                                     );
                                 });
                                 property_row(ui, "Actions", |ui| {
@@ -1005,6 +1018,29 @@ fn components_section(
                         egui::DragValue::new(&mut collision.size.y).speed(0.05),
                     );
                 });
+            },
+        );
+    }
+
+    if let Some(ui_renderer) = object.get_component_mut::<UiRenderer>() {
+        component_block(
+            ui,
+            "UI Renderer",
+            true,
+            actions,
+            TypeId::of::<UiRenderer>(),
+            ComponentRuntimeKind::Component,
+            None,
+            None,
+            editor_settings,
+            |ui| {
+                // let mut error_message = None;
+                editable_asset_path(ui, "Ui Definition", &mut ui_renderer.root_node_path);
+                property_row(ui, "Actions", |ui| {
+                    if ui.button("Choose UI Node").clicked() {}
+                    if ui.button("Clear").clicked() {}
+                });
+                property_row(ui, "UI", |ui| {});
             },
         );
     }
@@ -1993,6 +2029,7 @@ fn is_supported_component_type(type_id: TypeId) -> bool {
         TypeId::of::<AudioListener>(),
         TypeId::of::<CursorInteractable>(),
         TypeId::of::<PhysicsCollision>(),
+        TypeId::of::<UiRenderer>(),
     ]
     .contains(&type_id)
 }

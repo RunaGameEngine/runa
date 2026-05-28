@@ -22,10 +22,10 @@ use egui_wgpu::{Renderer as EguiRenderer, RendererOptions, ScreenDescriptor};
 use egui_winit::State as EguiWinitState;
 use rfd::FileDialog;
 use runa_core::components::{
-    ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, UiRenderer, Collider2D,
+    ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, Collider2D,
     ComponentRuntimeKind, CursorInteractable, DirectionalLight, Mesh, MeshRenderer,
     ObjectDefinitionInstance, PhysicsCollision, SerializedTypeEntry, SerializedTypeKind,
-    SerializedTypeStorage, SpriteRenderer, Tilemap, TilemapRenderer, Transform,
+    SerializedTypeStorage, SpriteRenderer, Tilemap, TilemapRenderer, Transform, UiRenderer,
 };
 use runa_core::glam::{EulerRot, Mat4, Quat, Vec2, Vec3};
 use runa_core::ocs::{Object, ObjectId};
