@@ -20,7 +20,6 @@ Runa is a workspace, not just one crate. It currently includes:
 - `runa_asset`: asset loading helpers
 - `runa_project`: project and world serialization/scaffolding
 - `runa_editor`: optional editor
-- `runa_hub`: optional launcher/project hub
 - `runa_engine`: umbrella crate for normal game-side usage
 
 The runtime is code-first:
@@ -65,7 +64,6 @@ The runtime is code-first:
 - world save/load in RON
 - project scaffolding
 - experimental editor
-- experimental hub/launcher
 - editor-side build flow with project/build settings
 
 ## Current Limits

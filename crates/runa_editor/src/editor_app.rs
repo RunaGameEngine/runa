@@ -35,10 +35,10 @@ use runa_engine::Engine;
 use runa_project::{
     create_empty_project, create_empty_world, ensure_editor_bridge_files,
     ensure_release_windows_subsystem, load_project, load_world_with_runtime_registry, save_world,
-    AudioSourceAsset, PlaceableObjectDescriptor, PlaceableObjectRecord, ProjectMetadataSnapshot,
-    ProjectPaths, ProjectRegisteredTypeKind, ProjectRegisteredTypeRecord, SpriteRendererAsset,
-    TilemapAsset, TilemapLayerAsset, TransformAsset, WorldObjectAsset,
+    PlaceableObjectDescriptor, PlaceableObjectRecord, ProjectMetadataSnapshot,
+    ProjectPaths, ProjectRegisteredTypeKind, ProjectRegisteredTypeRecord, WorldObjectAsset,
 };
+
 use runa_render::{RenderTarget, Renderer};
 use runa_render_api::RenderQueue;
 use winit::application::ApplicationHandler;

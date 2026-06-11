@@ -15,10 +15,49 @@ const GENERATED_FILE_HEADER: &str = r#"// --------------------------------------
 
 "#;
 
+fn cargo_installed() -> bool {
+    std::process::Command::new("cargo")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok()
+}
+
+fn validate_project_name(name: &str) -> Result<(), ProjectError> {
+    if name.trim().is_empty() {
+        return Err(ProjectError::InvalidProjectName(name.into()));
+    }
+    let sanitized = sanitize_binary_name(name);
+    if sanitized.is_empty() || sanitized == "runa_game" {
+        return Err(ProjectError::InvalidProjectName(name.into()));
+    }
+    Ok(())
+}
+
+fn validate_destination(destination: &Path) -> Result<(), ProjectError> {
+    if destination.exists() {
+        let mut entries = match destination.read_dir() {
+            Ok(reader) => reader,
+            Err(error) => return Err(ProjectError::Io(error)),
+        };
+        if entries.next().is_some() {
+            return Err(ProjectError::DestinationNotEmpty(destination.to_path_buf()));
+        }
+    }
+    Ok(())
+}
+
 pub fn create_empty_project(
     destination: &Path,
     project_name: &str,
 ) -> Result<ProjectPaths, ProjectError> {
+    if !cargo_installed() {
+        return Err(ProjectError::CargoNotInstalled);
+    }
+    validate_project_name(project_name)?;
+    validate_destination(destination)?;
+
     let root_dir = destination.to_path_buf();
     let binary_name = sanitize_binary_name(project_name);
 
@@ -95,6 +134,80 @@ pub fn ensure_editor_bridge_files(project_root: &Path) -> Result<(), ProjectErro
         proj_dir.join("runa_object_bridge.rs"),
         object_bridge_rs_template(),
     )?;
+
+    Ok(())
+}
+
+/// Path to the cached bridge binary in .proj/
+pub fn cached_bridge_path(project_root: &Path) -> PathBuf {
+    let binary_name = if cfg!(target_os = "windows") {
+        "runa_object_bridge.exe"
+    } else {
+        "runa_object_bridge"
+    };
+    project_root.join(".proj").join(binary_name)
+}
+
+pub fn ensure_bridge_binary(project_root: &Path) -> Result<(), ProjectError> {
+    let cached = cached_bridge_path(project_root);
+
+    // If binary already exists and sources haven't changed, skip compilation
+    if cached.exists() {
+        let binary_modified = fs::metadata(&cached)
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+        let src_dir = project_root.join("src");
+        let proj_dir = project_root.join(".proj");
+        let mut latest_source = binary_modified;
+
+        let mut check = |path: &Path| {
+            if path.exists() {
+                if let Ok(m) = fs::metadata(path).and_then(|m| m.modified()) {
+                    if m > latest_source {
+                        latest_source = m;
+                    }
+                }
+            }
+        };
+        check(&src_dir.join("main.rs"));
+
+        if let Ok(entries) = fs::read_dir(&proj_dir) {
+            for entry in entries.flatten() {
+                check(&entry.path());
+            }
+        }
+
+        if latest_source <= binary_modified {
+            return Ok(());
+        }
+    }
+
+    let status = std::process::Command::new("cargo")
+        .args(["build", "--bin", "runa_object_bridge", "--quiet"])
+        .current_dir(project_root)
+        .status()
+        .map_err(|error| ProjectError::Message(format!("failed to run cargo build for bridge: {error}")))?;
+
+    if !status.success() {
+        return Err(ProjectError::BridgeCompilationFailed(
+            "cargo build --bin runa_object_bridge failed".into(),
+        ));
+    }
+
+    // Copy binary from target to .proj/
+    let profile = if cfg!(debug_assertions) { "debug" } else { "release" };
+    let target_binary = project_root.join("target").join(profile).join(
+        if cfg!(target_os = "windows") {
+            "runa_object_bridge.exe"
+        } else {
+            "runa_object_bridge"
+        },
+    );
+
+    if target_binary.exists() {
+        fs::copy(&target_binary, &cached)?;
+    }
 
     Ok(())
 }
@@ -347,264 +460,29 @@ fn main() {{
 }
 
 fn generate_place_objects_rs(_project_root: &Path) -> Result<String, ProjectError> {
-    let mut content = String::new();
-    content.push_str(GENERATED_FILE_HEADER);
+    Ok(format!(
+        r#"{}use runa_engine::runa_project::placeable_objects;
 
-    content.push_str(
-        r#"use runa_engine::runa_project::{
-    AudioSourceAsset, CameraAsset, MeshPrimitiveAsset, MeshRendererAsset,
-    PhysicsCollisionAsset, PlaceableObjectDescriptor, PlaceableObjectRecord,
-    SpriteRendererAsset, TilemapAsset, TilemapLayerAsset, TransformAsset, WorldObjectAsset,
-};
-
-pub fn descriptors() -> Vec<PlaceableObjectDescriptor> {
-    vec![
-        descriptor("empty", "Empty", "Basic"),
-        descriptor("camera", "Camera", "Basic"),
-        descriptor("cube", "Cube", "Basic"),
-        descriptor("floor", "Floor", "Basic"),
-        descriptor("sprite", "Sprite", "2D"),
-        descriptor("tilemap", "Tilemap", "2D"),
-        descriptor("audio-source", "Audio Source", "Audio"),
-    ]
-}
-
-pub fn spawn(object_id: &str) -> Option<WorldObjectAsset> {
-    match object_id {
-        "empty" => Some(empty_object()),
-        "camera" => Some(camera_object()),
-        "cube" => Some(cube_object()),
-        "floor" => Some(floor_object()),
-        "sprite" => Some(sprite_object()),
-        "tilemap" => Some(tilemap_object()),
-        "audio-source" => Some(audio_source_object()),
-        _ => None,
-    }
-}
-
-pub fn records() -> Vec<PlaceableObjectRecord> {
-    descriptors()
+pub fn descriptors() -> Vec<runa_engine::runa_project::PlaceableObjectDescriptor> {{
+    placeable_objects::default_records()
         .into_iter()
-        .filter_map(|descriptor| {
-            spawn(&descriptor.id).map(|object| PlaceableObjectRecord {
-                descriptor,
-                object,
-            })
-        })
+        .map(|r| r.descriptor)
         .collect()
-}
+}}
 
-fn descriptor(id: &str, name: &str, category: &str) -> PlaceableObjectDescriptor {
-    PlaceableObjectDescriptor {
-        id: id.to_string(),
-        name: name.to_string(),
-        category: category.to_string(),
-    }
-}
+pub fn spawn(object_id: &str) -> Option<runa_engine::runa_project::WorldObjectAsset> {{
+    placeable_objects::default_records()
+        .into_iter()
+        .find(|r| r.descriptor.id == object_id)
+        .map(|r| r.object)
+}}
 
+pub fn records() -> Vec<runa_engine::runa_project::PlaceableObjectRecord> {{
+    placeable_objects::default_records()
+}}
 "#,
-    );
-
-    content.push_str(place_objects_body_template());
-
-    Ok(content)
-}
-
-fn place_objects_body_template() -> &'static str {
-    r#"
-fn empty_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Empty".to_string(),
-        object_id: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn camera_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Camera".to_string(),
-        object_id: None,
-        transform: TransformAsset {
-            position: [0.0, 2.0, 6.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: Some(CameraAsset::default()),
-        active_camera: true,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn cube_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Cube".to_string(),
-        object_id: None,
-        transform: TransformAsset {
-            position: [0.0, 0.75, 0.0],
-            scale: [1.0, 1.0, 1.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: Some(MeshRendererAsset {
-            primitive: MeshPrimitiveAsset::Cube { size: 1.5 },
-            color: [0.95, 0.55, 0.22, 1.0],
-        }),
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: Some(PhysicsCollisionAsset {
-            size: [0.75, 0.75],
-            enabled: true,
-        }),
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn floor_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Floor".to_string(),
-        object_id: None,
-        transform: TransformAsset {
-            position: [0.0, -1.5, 0.0],
-            scale: [8.0, 0.2, 8.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: Some(MeshRendererAsset {
-            primitive: MeshPrimitiveAsset::Cube { size: 1.0 },
-            color: [0.24, 0.27, 0.32, 1.0],
-        }),
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: Some(PhysicsCollisionAsset {
-            size: [4.0, 4.0],
-            enabled: true,
-        }),
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn sprite_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Sprite".to_string(),
-        object_id: None,
-        transform: TransformAsset {
-            position: [0.0, 0.0, 0.0],
-            scale: [1.0, 1.0, 1.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: None,
-        sprite_renderer: Some(SpriteRendererAsset {
-            sprite: None,
-            pixels_per_unit: 16.0,
-            uv_rect: [0.0, 0.0, 1.0, 1.0],
-        }),
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn tilemap_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Tilemap".to_string(),
-        object_id: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: Some(TilemapAsset {
-            width: 16,
-            height: 16,
-            tile_size: [32, 32],
-            offset: [-8, -8],
-            pixels_per_unit: 16.0,
-            atlas: None,
-            selected_tile: 0,
-            layers: vec![TilemapLayerAsset {
-                name: "Base".to_string(),
-                visible: true,
-                opacity: 1.0,
-                tiles: Vec::new(),
-            }],
-        }),
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn audio_source_object() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Audio Source".to_string(),
-        object_id: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: Some(AudioSourceAsset {
-            source: None,
-            volume: 1.0,
-            looped: false,
-            play_on_awake: false,
-            spatial: false,
-            min_distance: 1.0,
-            max_distance: 100.0,
-        }),
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-"#
+        GENERATED_FILE_HEADER
+    ))
 }
 
 fn default_gitignore() -> &'static str {

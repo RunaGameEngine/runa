@@ -8,7 +8,6 @@ members = [
     "crates/runa_render",
     "crates/runa_asset",
     "crates/runa_project",
-    "crates/runa_hub",
     "crates/runa_editor",
     "crates/runa_render_api",
     "examples/sandbox",

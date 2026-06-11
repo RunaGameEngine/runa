@@ -1,3 +1,4 @@
+pub mod placeable_objects;
 mod project;
 mod scaffold;
 mod world_asset;
@@ -7,7 +8,8 @@ pub use project::{
     ProjectManifest, ProjectPaths,
 };
 pub use scaffold::{
-    create_empty_project, ensure_editor_bridge_files, ensure_release_windows_subsystem,
+    cached_bridge_path, create_empty_project, ensure_bridge_binary, ensure_editor_bridge_files,
+    ensure_release_windows_subsystem,
 };
 pub use world_asset::{
     create_empty_world, load_world, load_world_with_object_loader,

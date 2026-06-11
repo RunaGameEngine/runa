@@ -14,6 +14,11 @@ pub enum ProjectError {
     Zip(zip::result::ZipError),
     Gltf(gltf::Error),
     Message(String),
+    CargoNotInstalled,
+    InvalidProjectName(String),
+    DestinationNotEmpty(std::path::PathBuf),
+    BridgeCompilationFailed(String),
+    BridgeTimeout,
 }
 
 impl Display for ProjectError {
@@ -26,6 +31,17 @@ impl Display for ProjectError {
             Self::Zip(error) => write!(f, "{error}"),
             Self::Gltf(error) => write!(f, "{error}"),
             Self::Message(message) => write!(f, "{message}"),
+            Self::CargoNotInstalled => write!(f, "cargo is not installed or not found in PATH"),
+            Self::InvalidProjectName(name) => {
+                write!(f, "invalid project name: \"{name}\". Use only letters, digits, hyphens and underscores")
+            }
+            Self::DestinationNotEmpty(path) => {
+                write!(f, "destination is not empty: {}", path.display())
+            }
+            Self::BridgeCompilationFailed(stderr) => {
+                write!(f, "bridge compilation failed:\n{stderr}")
+            }
+            Self::BridgeTimeout => write!(f, "bridge process timed out"),
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::*;
 
 pub(super) fn latest_source_stamp(root: &PathBuf) -> Option<SystemTime> {
@@ -44,35 +46,144 @@ pub(super) fn latest_place_object_stamp(project: &ProjectPaths) -> Option<System
     latest
 }
 
-pub(super) fn query_project_metadata(
+fn run_bridge_binary(
+    bridge_path: &Path,
     project: &ProjectPaths,
     output_tx: &Sender<String>,
 ) -> Result<ProjectMetadataSnapshot, String> {
-    let _ = output_tx.send("Refreshing project metadata...".to_string());
+    let _ = output_tx.send("Running cached bridge binary...".to_string());
 
-    let mut command = Command::new("cargo");
-    command
-        .args([
-            "run",
-            "--quiet",
-            "--bin",
-            "runa_object_bridge",
-            "--",
-            "--project-metadata",
-        ])
-        .current_dir(&project.root_dir);
+    let mut command = Command::new(bridge_path);
+    command.args(["--project-metadata"]);
     configure_background_command(&mut command);
 
     let output = command.output().map_err(|error| error.to_string())?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let _ = output_tx.send(format!("Bridge failed: {error}"));
-        println!("Bridge failed: {}", error);
+        let _ = output_tx.send(format!("Bridge binary failed: {error}"));
         return Err(error);
     }
 
     ron::from_str(&String::from_utf8_lossy(&output.stdout)).map_err(|error| error.to_string())
+}
+
+fn compile_and_run_bridge(
+    project: &ProjectPaths,
+    output_tx: &Sender<String>,
+) -> Result<ProjectMetadataSnapshot, String> {
+    let _ = output_tx.send("Compiling bridge (first build may take several minutes)...".to_string());
+
+    // First compile the bridge binary with stderr piped for progress
+    let proj_dir = project.root_dir.join(".proj");
+    let mut compile = std::process::Command::new("cargo");
+    compile
+        .args(["build", "--bin", "runa_object_bridge"])
+        .current_dir(&project.root_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    configure_background_command(&mut compile);
+
+    let mut child = compile.spawn().map_err(|error| error.to_string())?;
+
+    // Read stderr (cargo build output) and send to output_tx
+    if let Some(stderr) = child.stderr.take() {
+        let tx = output_tx.clone();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stderr).lines() {
+                if let Ok(line) = line {
+                    let trimmed = line.trim().to_string();
+                    if !trimmed.is_empty() {
+                        let _ = tx.send(format!("[cargo] {trimmed}"));
+                    }
+                }
+            }
+        });
+    }
+
+    // Read stdout too
+    if let Some(stdout) = child.stdout.take() {
+        let tx = output_tx.clone();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stdout).lines() {
+                if let Ok(line) = line {
+                    let trimmed = line.trim().to_string();
+                    if !trimmed.is_empty() {
+                        let _ = tx.send(format!("[cargo] {trimmed}"));
+                    }
+                }
+            }
+        });
+    }
+
+    // Wait for compilation with timeout (5 minutes)
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(300);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = output_tx.send("Bridge compilation timed out after 5 minutes.".to_string());
+                    return Err("Bridge compilation timed out after 5 minutes.".to_string());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(error) => {
+                return Err(format!("Failed to wait for bridge compilation: {error}"));
+            }
+        }
+    };
+
+    match status {
+        Some(s) if s.success() => {}
+        Some(_) => {
+            let _ = output_tx.send("Bridge compilation failed.".to_string());
+            return Err("Bridge compilation failed. See console output for details.".to_string());
+        }
+        None => {
+            return Err("Bridge process terminated unexpectedly.".to_string());
+        }
+    }
+
+    // Copy binary from target to .proj/
+    let profile = if cfg!(debug_assertions) { "debug" } else { "release" };
+    let target_binary = project.root_dir.join("target").join(profile).join(
+        if cfg!(target_os = "windows") {
+            "runa_object_bridge.exe"
+        } else {
+            "runa_object_bridge"
+        },
+    );
+    let cached = runa_project::cached_bridge_path(&project.root_dir);
+    if target_binary.exists() {
+        let _ = std::fs::copy(&target_binary, &cached);
+    }
+
+    let _ = output_tx.send("Bridge compiled successfully. Running...".to_string());
+
+    // Run the cached binary
+    run_bridge_binary(&cached, project, output_tx)
+}
+
+pub(super) fn query_project_metadata(
+    project: &ProjectPaths,
+    output_tx: &Sender<String>,
+) -> Result<ProjectMetadataSnapshot, String> {
+    let _ = output_tx.send("Refreshing project metadata...".to_string());
+
+    // Try running cached bridge binary first (fast path)
+    let cached = runa_project::cached_bridge_path(&project.root_dir);
+    if cached.exists() {
+        let result = run_bridge_binary(&cached, project, output_tx);
+        if result.is_ok() {
+            return result;
+        }
+        let _ = output_tx.send("Cached bridge binary failed, recompiling...".to_string());
+    }
+
+    compile_and_run_bridge(project, output_tx)
 }
 
 pub(super) fn attach_child_output(
@@ -113,7 +224,7 @@ pub(super) fn merge_placeable_object_records(
     project_records: Vec<PlaceableObjectRecord>,
 ) -> Vec<PlaceableObjectRecord> {
     let mut merged = HashMap::new();
-    for record in default_placeable_object_records() {
+    for record in runa_project::placeable_objects::default_records() {
         merged.insert(record.descriptor.id.clone(), record);
     }
     for record in project_records {
@@ -134,233 +245,4 @@ pub(super) fn merge_placeable_object_records(
             .then(left.descriptor.name.cmp(&right.descriptor.name))
     });
     records
-}
-
-fn default_placeable_object_records() -> Vec<PlaceableObjectRecord> {
-    vec![
-        placeable_record("empty", "Empty", "Basic", empty_object_asset()),
-        placeable_record("camera", "Camera", "Basic", camera_object_asset()),
-        placeable_record("cube", "Cube", "Basic", cube_object_asset()),
-        placeable_record("floor", "Floor", "Basic", floor_object_asset()),
-        placeable_record("sprite", "Sprite", "2D", sprite_object_asset()),
-        placeable_record("tilemap", "Tilemap", "2D", tilemap_object_asset()),
-        placeable_record(
-            "audio-source",
-            "Audio Source",
-            "Audio",
-            audio_source_object_asset(),
-        ),
-    ]
-}
-
-fn placeable_record(
-    id: &str,
-    name: &str,
-    category: &str,
-    object: WorldObjectAsset,
-) -> PlaceableObjectRecord {
-    PlaceableObjectRecord {
-        descriptor: PlaceableObjectDescriptor {
-            id: id.to_string(),
-            name: name.to_string(),
-            category: category.to_string(),
-        },
-        object,
-    }
-}
-
-fn empty_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Empty".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn camera_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Camera".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset {
-            position: [0.0, 2.0, 6.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: Some(runa_project::CameraAsset::default()),
-        active_camera: true,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn cube_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Cube".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset {
-            position: [0.0, 0.75, 0.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: Some(runa_project::MeshRendererAsset {
-            primitive: runa_project::MeshPrimitiveAsset::Cube { size: 1.5 },
-            color: [0.95, 0.55, 0.22, 1.0],
-        }),
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: Some(runa_project::PhysicsCollisionAsset {
-            size: [0.75, 0.75],
-            enabled: true,
-        }),
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn floor_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Floor".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset {
-            position: [0.0, -1.5, 0.0],
-            scale: [8.0, 0.2, 8.0],
-            ..TransformAsset::default()
-        },
-        mesh_renderer: Some(runa_project::MeshRendererAsset {
-            primitive: runa_project::MeshPrimitiveAsset::Cube { size: 1.0 },
-            color: [0.24, 0.27, 0.32, 1.0],
-        }),
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: Some(runa_project::PhysicsCollisionAsset {
-            size: [4.0, 4.0],
-            enabled: true,
-        }),
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn sprite_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Sprite".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: Some(SpriteRendererAsset {
-            sprite: None,
-            pixels_per_unit: 16.0,
-            uv_rect: [0.0, 0.0, 1.0, 1.0],
-        }),
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn tilemap_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Tilemap".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: Some(TilemapAsset {
-            width: 16,
-            height: 16,
-            tile_size: [32, 32],
-            offset: [-8, -8],
-            pixels_per_unit: 16.0,
-            atlas: None,
-            selected_tile: 0,
-            layers: vec![TilemapLayerAsset {
-                name: "Base".to_string(),
-                visible: true,
-                opacity: 1.0,
-                tiles: Vec::new(),
-                self_order: 0,
-            }],
-        }),
-        camera: None,
-        active_camera: false,
-        audio_source: None,
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
-}
-
-fn audio_source_object_asset() -> WorldObjectAsset {
-    WorldObjectAsset {
-        name: "Audio Source".to_string(),
-        object_id: None,
-        parent: None,
-        transform: TransformAsset::default(),
-        mesh_renderer: None,
-        sprite_renderer: None,
-        sprite_animator: None,
-        sorting: None,
-        tilemap: None,
-        camera: None,
-        active_camera: false,
-        audio_source: Some(AudioSourceAsset {
-            source: None,
-            volume: 1.0,
-            looped: false,
-            play_on_awake: false,
-            spatial: false,
-            min_distance: 1.0,
-            max_distance: 100.0,
-        }),
-        collider2d: None,
-        physics_collision: None,
-        serialized_components: Vec::new(),
-        serialized_scripts: Vec::new(),
-    }
 }

@@ -916,10 +916,22 @@ impl<'window> EditorApp<'window> {
             .collapsible(false)
             .resizable(false)
             .anchor(Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .default_width(500.0)
             .show(ctx, |ui| {
-                ui.label("Project is loading in the background.");
-                ui.add(egui::Spinner::new());
-                ui.label("Preparing bridge, loading world, and caching placeable objects.");
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Project is loading...");
+                });
+                ui.add_space(8.0);
+
+                // Show recent output lines (up to 5) for progress feedback
+                let start = self.output_lines.len().saturating_sub(5);
+                for line in self.output_lines.iter().skip(start) {
+                    ui.small(line);
+                }
+
+                ui.add_space(6.0);
+                ui.label("The first build compiles all dependencies and may take several minutes.");
             });
     }
 
