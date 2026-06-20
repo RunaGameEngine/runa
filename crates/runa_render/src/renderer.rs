@@ -171,9 +171,8 @@ impl<'window> Renderer<'window> {
             })
             .unwrap_or(capabilities.formats[0]);
 
-        let surface_config: wgpu::SurfaceConfiguration;
-        if vsync {
-            surface_config = wgpu::SurfaceConfiguration {
+        let surface_config: wgpu::SurfaceConfiguration = if vsync {
+            wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: preferred_format,
                 width: size.width.max(1),
@@ -182,9 +181,9 @@ impl<'window> Renderer<'window> {
                 alpha_mode: wgpu::CompositeAlphaMode::Opaque,
                 view_formats: vec![],
                 desired_maximum_frame_latency: 2,
-            };
+            }
         } else {
-            surface_config = wgpu::SurfaceConfiguration {
+            wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: preferred_format,
                 width: size.width.max(1),
@@ -193,8 +192,8 @@ impl<'window> Renderer<'window> {
                 alpha_mode: wgpu::CompositeAlphaMode::Opaque,
                 view_formats: vec![],
                 desired_maximum_frame_latency: 2,
-            };
-        }
+            }
+        };
 
         surface.configure(&device, &surface_config);
 
@@ -535,6 +534,7 @@ impl<'window> Renderer<'window> {
         self.queue.submit(Some(encoder.finish()));
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn encode_render_passes(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -622,9 +622,7 @@ impl<'window> Renderer<'window> {
                     };
 
                     let key = Arc::as_ptr(texture) as usize;
-                    if !self.textures_cache.contains_key(&key) {
-                        self.textures_cache.insert(key, texture.clone());
-                    }
+                    self.textures_cache.entry(key).or_insert_with(|| texture.clone());
 
                     sprite_instances.push((*order, position.z, cmd_index, key, instance));
                 }
@@ -640,9 +638,7 @@ impl<'window> Renderer<'window> {
                     };
 
                     let key = Arc::as_ptr(&params.texture) as usize;
-                    if !self.textures_cache.contains_key(&key) {
-                        self.textures_cache.insert(key, params.texture.clone());
-                    }
+                    self.textures_cache.entry(key).or_insert_with(|| params.texture.clone());
 
                     sprite_instances.push((params.order, params.position.z, cmd_index, key, instance));
                 }
@@ -712,7 +708,7 @@ impl<'window> Renderer<'window> {
                                 let atlas_key = Arc::as_ptr(atlas_tex) as usize;
                                 let entry = ui_text_vertices_map
                                     .entry(atlas_key)
-                                    .or_insert_with(Vec::new);
+                                    .or_default();
                                 entry.extend_from_slice(&[
                                     UITexturedVertex {
                                         position: [left, top],
@@ -761,7 +757,7 @@ impl<'window> Renderer<'window> {
                 RenderCommands::UiRect {
                     rect,
                     color,
-                    z_index,
+                    z_index: _,
                 } => {
                     let left = rect.x - rect.w / 2.0;
                     let top = rect.y - rect.h / 2.0;
@@ -800,12 +796,10 @@ impl<'window> Renderer<'window> {
                     rect,
                     tint,
                     uv_rect,
-                    z_index,
+                    z_index: _,
                 } => {
                     let key = Arc::as_ptr(texture) as usize;
-                    if !self.textures_cache.contains_key(&key) {
-                        self.textures_cache.insert(key, texture.clone());
-                    }
+                    self.textures_cache.entry(key).or_insert_with(|| texture.clone());
 
                     // Normalize UVs if caller supplied pixel-based UVs (>1.0)
                     let mut uv_n = *uv_rect;
@@ -907,7 +901,7 @@ impl<'window> Renderer<'window> {
                                 let atlas_key = Arc::as_ptr(atlas_tex) as usize;
                                 let entry = ui_text_vertices_map
                                     .entry(atlas_key)
-                                    .or_insert_with(Vec::new);
+                                    .or_default();
                                 entry.extend_from_slice(&[
                                     UITexturedVertex {
                                         position: [left, top],
