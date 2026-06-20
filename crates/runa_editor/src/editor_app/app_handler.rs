@@ -10,27 +10,30 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
 
         let window_icon =
             runa_asset::load_window_icon_from_bytes(include_bytes!("../../assets/icon.png")).ok();
+        #[cfg(target_os = "windows")]
         let taskbar_icon =
             runa_asset::load_window_icon_from_bytes(include_bytes!("../../assets/big_icon.png"))
                 .ok();
 
+        #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
+        let mut window_attributes = Window::default_attributes()
+            .with_title(&self.window_title())
+            .with_visible(false)
+            .with_inner_size(egui_winit::winit::dpi::LogicalSize::new(1600.0, 960.0))
+            .with_min_inner_size(egui_winit::winit::dpi::LogicalSize::new(1200.0, 720.0));
+        #[cfg(target_os = "windows")]
+        {
+            window_attributes = window_attributes.with_taskbar_icon(taskbar_icon.clone());
+        }
         let window = Arc::new(
             event_loop
-                .create_window(
-                    Window::default_attributes()
-                        .with_title(&self.window_title())
-                        .with_visible(false)
-                        .with_taskbar_icon(taskbar_icon.clone())
-                        .with_inner_size(egui_winit::winit::dpi::LogicalSize::new(1600.0, 960.0))
-                        .with_min_inner_size(egui_winit::winit::dpi::LogicalSize::new(
-                            1200.0, 720.0,
-                        )),
-                )
+                .create_window(window_attributes)
                 .expect("Failed to create editor window"),
         );
         if let Some(icon) = window_icon {
             window.set_window_icon(Some(icon));
         }
+        #[cfg(target_os = "windows")]
         if let Some(icon) = taskbar_icon {
             window.set_taskbar_icon(Some(icon));
         }

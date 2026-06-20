@@ -32,7 +32,7 @@ impl Default for UiEditorPanel {
 }
 
 impl UiEditorPanel {
-    pub fn open_new(&mut self, project_root: &ProjectPaths) {
+    pub fn open_new(&mut self, _project_root: &ProjectPaths) {
         self.asset = UiAssetFile::empty();
         self.path = None;
         self.selected_node = Some(0);
@@ -97,7 +97,7 @@ impl UiEditorPanel {
 
         let mut open = self.open;
         let preview_size = egui::vec2(400.0, 300.0);
-        let panel_width = 300.0;
+        let _panel_width = 300.0;
 
         egui::Window::new("UI Editor")
             .open(&mut open)
@@ -196,13 +196,12 @@ impl UiEditorPanel {
             format!("{} ({})", name, node_kind_name(&kind))
         };
 
-        let indent = depth as f32 * 16.0;
         let selected = self.selected_node == Some(node_id);
 
         let response = ui
             .add_sized(
                 egui::vec2(ui.available_width(), 20.0),
-                egui::SelectableLabel::new(selected, label),
+                egui::Button::selectable(selected, label),
             )
             .on_hover_text(format!("id: {}", node_id));
 

@@ -2190,10 +2190,10 @@ fn load_texture_from_path(
 }
 
 fn load_r3m_from_path(
-    project_root: Option<&Path>,
-    relative_path: &str,
+    _project_root: Option<&Path>,
+    _relative_path: &str,
 ) -> Result<runa_asset::Handle<RunaModel>, String> {
-    let Some(project_root) = project_root else {
+    let Some(_project_root) = _project_root else {
         return Err("Open a project before assigning model assets.".to_string());
     };
     // RunaModel::from_file(project_root.to_string_lossy().as_ref(), relative_path)

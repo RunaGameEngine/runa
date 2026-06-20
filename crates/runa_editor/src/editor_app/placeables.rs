@@ -48,7 +48,7 @@ pub(super) fn latest_place_object_stamp(project: &ProjectPaths) -> Option<System
 
 fn run_bridge_binary(
     bridge_path: &Path,
-    project: &ProjectPaths,
+    _project: &ProjectPaths,
     output_tx: &Sender<String>,
 ) -> Result<ProjectMetadataSnapshot, String> {
     let _ = output_tx.send("Running cached bridge binary...".to_string());
@@ -75,7 +75,7 @@ fn compile_and_run_bridge(
     let _ = output_tx.send("Compiling bridge (first build may take several minutes)...".to_string());
 
     // First compile the bridge binary with stderr piped for progress
-    let proj_dir = project.root_dir.join(".proj");
+    let _proj_dir = project.root_dir.join(".proj");
     let mut compile = std::process::Command::new("cargo");
     compile
         .args(["build", "--bin", "runa_object_bridge"])
@@ -211,6 +211,7 @@ pub(super) fn attach_child_output(
     }
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
 pub(super) fn configure_background_command(command: &mut Command) {
     #[cfg(target_os = "windows")]
     {

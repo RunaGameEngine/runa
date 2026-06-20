@@ -46,6 +46,7 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
+#[cfg(target_os = "windows")]
 use winit::platform::windows::{WindowAttributesExtWindows, WindowExtWindows};
 use winit::window::{Window, WindowId};
 

@@ -1,5 +1,4 @@
 use super::*;
-use std::ops::Deref;
 
 impl<'window> EditorApp<'window> {
     pub(super) fn ensure_viewport_target(&mut self) {
@@ -399,7 +398,7 @@ impl<'window> EditorApp<'window> {
         camera: Camera,
     ) {
         for object_id in self.world_object_ids() {
-            let mut world = self.world.borrow();
+            let world = self.world.borrow();
             let Some(object) = world.object(object_id) else {
                 continue;
             };

@@ -11,9 +11,10 @@ impl<'window> EditorApp<'window> {
         })
     }
 
+    #[allow(deprecated)]
     fn build_ui(&mut self, ctx: &egui::Context) {
         let ui_scale = ctx.zoom_factor().max(0.75);
-        egui::TopBottomPanel::top("editor_top_bar").show(ctx, |ui| {
+        egui::Panel::top("editor_top_bar").show(ctx, |ui| {
             ui.set_min_height(38.0 * ui_scale);
             ui.spacing_mut().button_padding = egui::vec2(9.0 * ui_scale, 5.0 * ui_scale);
             ui.spacing_mut().interact_size.y = 28.0 * ui_scale;
@@ -196,7 +197,7 @@ impl<'window> EditorApp<'window> {
             return;
         }
 
-        egui::TopBottomPanel::bottom("status_bar")
+        egui::Panel::bottom("status_bar")
             .resizable(false)
             .exact_size(24.0 * ui_scale)
             .show_separator_line(false)
@@ -333,7 +334,7 @@ impl<'window> EditorApp<'window> {
         }
 
         if self.panels.hierarchy {
-            egui::SidePanel::left("hierarchy_panel")
+            egui::Panel::left("hierarchy_panel")
                 .resizable(true)
                 .default_size(240.0)
                 .min_size(180.0)
@@ -396,7 +397,7 @@ impl<'window> EditorApp<'window> {
         }
 
         if self.panels.inspector {
-            egui::SidePanel::right("inspector_panel")
+            egui::Panel::right("inspector_panel")
                 .resizable(true)
                 .default_size(320.0)
                 .min_size(320.0)
@@ -575,6 +576,7 @@ impl<'window> EditorApp<'window> {
         );
     }
 
+    #[allow(deprecated)]
     fn welcome_screen(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(style::VIEWPORT_BACKGROUND))
