@@ -35,6 +35,7 @@ impl RenderQueue {
         self.point_lights.push(light);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_sprite(
         &mut self,
         texture: Arc<TextureAsset>,
