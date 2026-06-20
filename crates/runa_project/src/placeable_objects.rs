@@ -49,6 +49,7 @@ fn base_object(name: &str) -> WorldObjectAsset {
         collider2d: None,
         physics_collision: None,
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }
@@ -77,6 +78,7 @@ pub fn camera() -> WorldObjectAsset {
         collider2d: None,
         physics_collision: None,
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }
@@ -108,6 +110,7 @@ pub fn cube() -> WorldObjectAsset {
             enabled: true,
         }),
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }
@@ -139,6 +142,7 @@ pub fn floor() -> WorldObjectAsset {
             enabled: true,
         }),
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }
@@ -164,6 +168,7 @@ pub fn sprite() -> WorldObjectAsset {
         collider2d: None,
         physics_collision: None,
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }
@@ -200,6 +205,7 @@ pub fn tilemap() -> WorldObjectAsset {
         collider2d: None,
         physics_collision: None,
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }
@@ -229,6 +235,7 @@ pub fn audio_source() -> WorldObjectAsset {
         collider2d: None,
         physics_collision: None,
         serialized_components: Vec::new(),
+        ui_renderer: None,
         serialized_scripts: Vec::new(),
     }
 }

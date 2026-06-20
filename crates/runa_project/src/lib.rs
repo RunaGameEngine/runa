@@ -1,6 +1,7 @@
 pub mod placeable_objects;
 mod project;
 mod scaffold;
+pub mod ui_asset;
 mod world_asset;
 
 pub use project::{
@@ -17,7 +18,7 @@ pub use world_asset::{
     MeshPrimitiveAsset, MeshRendererAsset, PhysicsCollisionAsset, PlaceableObjectDescriptor,
     PlaceableObjectRecord, ProjectMetadataSnapshot, ProjectRegisteredTypeKind,
     ProjectRegisteredTypeRecord, ProjectRegistrationSource, SerializedObjectTypeAsset,
-    SpriteRendererAsset, TilemapAsset, TilemapLayerAsset, TransformAsset, WorldAsset,
-    WorldObjectAsset,
+    SpriteRendererAsset, TilemapAsset, TilemapLayerAsset, TransformAsset, UiRendererAsset,
+    WorldAsset, WorldObjectAsset,
 };
 pub mod runa3d;

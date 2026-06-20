@@ -170,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Unified Camera System**
   - New `Camera` component supporting both 2D orthographic and 3D perspective projections
-  - `Camera::new_ortho()` - Simple 2D camera setup
+  - `Camera::new_orthographic()` - Simple 2D camera setup
   - `Camera::new_perspective()` - Full 3D camera with position, target, FOV
   - Automatic aspect ratio correction for proper rendering
   - `screen_to_world()` conversion for accurate mouse input
@@ -191,7 +191,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** Camera component refactored
   - `Camera2D` and `Camera3D` deprecated in favor of unified `Camera`
   - Old components remain for backward compatibility with deprecation warnings
-  - Migration path: Replace `Camera2D::new()` with `Camera::new_ortho()`
+  - Migration path: Replace `Camera2D::new()` with `Camera::new_orthographic()`
   - Migration path: Replace `Camera3D { ... }` with `Camera::new_perspective()`
 
 - **Rendering Pipeline**
@@ -215,7 +215,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-- `Camera2D` - Use `Camera::new_ortho()` instead
+- `Camera2D` - Use `Camera::new_orthographic()` instead
 - `Camera3D` - Use `Camera::new_perspective()` instead
 
 ## [0.2.0-alpha.1] - 2026-03-26
@@ -288,7 +288,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Script::update()` signature simplified (removed `world` parameter)
 - Audio playback via `AudioSource::play()` component method
 
-## [Unreleased] %% 0.1.0 %%
+## [0.1.0]
 
 ### Added
 

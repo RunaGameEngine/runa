@@ -30,6 +30,4 @@ Known limitations and next steps
 - Consider splitting font rendering and image rendering into separate pipelines if more control is needed (e.g., handling subpixel AA for fonts vs linear sampling for images).
 - The shader heuristic (alpha check) is pragmatic but not perfect; explicit metadata for texture type (font atlas vs image) would be cleaner.
 
-If you want, I can:
-- Add detailed inline comments to the changed Rust files (short comments near logic) in addition to these docs.
-- Implement a more complete layout system or the egui_dock integration prototype discussed earlier.
+(This document captures implementation details for the current UI feature set. A more complete layout system or egui_dock integration may be explored separately.)

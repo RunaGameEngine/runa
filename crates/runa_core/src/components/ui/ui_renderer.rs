@@ -9,6 +9,7 @@ use crate::components::ui::{
 
 pub struct UiRenderer {
     pub root_node_path: Option<String>,
+    pub ui_asset_path: Option<String>,
     pub space: CanvasSpace,
     pub nodes: Vec<UiNode>,
     pub root: UiNodeId,
@@ -22,6 +23,7 @@ impl UiRenderer {
 
         Self {
             root_node_path: None,
+            ui_asset_path: None,
             space,
             nodes: vec![root_node],
             root,

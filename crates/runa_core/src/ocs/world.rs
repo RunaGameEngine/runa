@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use super::command::WorldCommand;
 use glam::{Mat4, Vec2, Vec3};
+use runa_render_api::command::{Mesh3dParams, TileParams};
 use runa_render_api::RenderQueue;
 
 use crate::systems::event_system::EventBus;
@@ -395,7 +396,7 @@ impl World {
                     .collect();
                 let material = mesh_renderer.material_for_rendering();
 
-                render_queue.draw_mesh_3d(runa_render_api::command::Mesh3dParams {
+                render_queue.draw_mesh_3d(Mesh3dParams {
                     vertices,
                     indices: mesh.inner.indices.clone(),
                     model_matrix,
@@ -482,7 +483,7 @@ impl World {
                                 let (tile_scale, _, _) =
                                     object_matrix.to_scale_rotation_translation();
 
-                                render_queue.draw_tile(runa_render_api::command::TileParams {
+                                render_queue.draw_tile(TileParams {
                                     texture: tile.texture.clone().unwrap(),
                                     position: final_pos,
                                     size: tilemap.world_tile_size()

@@ -25,6 +25,7 @@ use crate::style;
 #[derive(Debug, Default)]
 pub struct InspectorActions {
     pub removals: Vec<InspectorRemoval>,
+    pub open_ui_editor: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1023,6 +1024,7 @@ fn components_section(
     }
 
     if let Some(ui_renderer) = object.get_component_mut::<UiRenderer>() {
+        let mut open_ui_editor: Option<String> = None;
         component_block(
             ui,
             "UI Renderer",
@@ -1033,16 +1035,39 @@ fn components_section(
             None,
             None,
             editor_settings,
-            |ui| {
-                // let mut error_message = None;
-                editable_asset_path(ui, "Ui Definition", &mut ui_renderer.root_node_path);
+             |ui| {
+                editable_asset_path(ui, "UI Asset", &mut ui_renderer.ui_asset_path);
                 property_row(ui, "Actions", |ui| {
-                    if ui.button("Choose UI Node").clicked() {}
-                    if ui.button("Clear").clicked() {}
+                    if ui.button("Choose UI...").clicked() {
+                        let path = pick_asset_file(project_root, &["ron"]);
+                        if let Some(p) = path {
+                            // Only accept .ui.ron files
+                            if p.ends_with(".ui.ron") {
+                                ui_renderer.ui_asset_path = Some(p);
+                            } else {
+                                ui_renderer.ui_asset_path = Some(p);
+                            }
+                        }
+                    }
+                    if ui.button("Clear").clicked() {
+                        ui_renderer.ui_asset_path = None;
+                        ui_renderer.clear();
+                    }
+                    if ui.button("Open In Editor").clicked() {
+                        if let Some(path) = &ui_renderer.ui_asset_path {
+                            open_ui_editor = Some(path.clone());
+                        }
+                    }
+                    if ui.button("New UI...").clicked() {
+                        open_ui_editor = Some(String::new());
+                    }
                 });
-                property_row(ui, "UI", |ui| {});
+                ui.label("Space: Screen (fixed)");
             },
         );
+        if let Some(path) = open_ui_editor {
+            actions.open_ui_editor = Some(path);
+        }
     }
 
     for info in component_infos {

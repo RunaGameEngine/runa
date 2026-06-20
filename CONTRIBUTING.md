@@ -9,7 +9,7 @@ or a new feature — is very welcome.
 1. Fork the repo on GitHub.
 2. Clone your fork:
    ```bash
-   git clone https://github.com/YOUR_USER/runa.git
+   git clone https://github.com/RunaGameEngine/runa.git
    cd runa
    ```
 3. Build the project:
@@ -29,9 +29,8 @@ crates/
   runa_render/      # wgpu renderer (2D sprites, 3D meshes, UI, background)
   runa_app/         # Window bootstrap and app loop (winit)
   runa_asset/       # Asset loading (textures, audio, fonts)
-  ruan_project/     # Project manifests, world serialization, scaffolding
+  runa_project/     # Project manifests, world serialization, scaffolding
   runa_editor/      # Optional egui-based editor
-  runa_hub/         # Optional project hub/launcher
   runa_engine/      # Umbrella crate for game code
   runa_macros/      # Derive macros
   runa_render_api/  # Render command queue (no GPU dependency)

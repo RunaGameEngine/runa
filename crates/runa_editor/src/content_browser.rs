@@ -20,6 +20,7 @@ enum AssetKind {
     ShaderFile,
     PrefabFile,
     Runa3DModelFile,
+    UiFile,
 }
 
 #[derive(Clone)]
@@ -1090,6 +1091,7 @@ impl ContentBrowserState {
             AssetKind::GenericFile => &icons.file,
             AssetKind::Runa3DModelFile => &icons.r3m_file,
             AssetKind::PrefabFile => todo!(),
+            AssetKind::UiFile => &icons.file,
         }
     }
 
@@ -1230,6 +1232,7 @@ fn classify_asset_kind(path: &Path) -> AssetKind {
         .map(|ext| ext.to_ascii_lowercase())
         .as_deref()
     {
+        Some(_) if is_ui_file(path) => AssetKind::UiFile,
         Some(_) if is_world_file(path) => AssetKind::WorldFile,
         Some("rs") => AssetKind::RustFile,
         Some("png" | "jpg" | "jpeg" | "svg") => AssetKind::ImageFile,
@@ -1237,6 +1240,13 @@ fn classify_asset_kind(path: &Path) -> AssetKind {
         Some("wgsl") => AssetKind::ShaderFile,
         _ => AssetKind::GenericFile,
     }
+}
+
+fn is_ui_file(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.ends_with(".ui.ron"))
+        .unwrap_or(false)
 }
 
 fn is_world_file(path: &Path) -> bool {

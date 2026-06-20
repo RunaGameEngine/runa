@@ -3,6 +3,7 @@ mod helpers;
 mod placeables;
 mod project;
 mod ui;
+pub mod ui_editor;
 mod viewport;
 mod world_ops;
 
@@ -82,11 +83,11 @@ enum BottomTab {
     Console,
 }
 
-#[derive(Default)]
 struct ProjectDialogState {
     open: bool,
     name: String,
     location: String,
+    error: Option<String>,
 }
 
 #[derive(Clone)]
@@ -223,8 +224,16 @@ pub struct EditorApp<'window> {
     rendering_settings_open: bool,
     gizmo_settings_open: bool,
 
+    pub ui_editor: ui_editor::UiEditorPanel,
+
     status_line: String,
     last_frame_time: Instant,
+
+    // Global log (outside project scope)
+    global_log_path: PathBuf,
+    global_log_file: Option<std::fs::File>,
+    // Project load error (persistent until dismissed)
+    project_load_error: Option<String>,
 }
 
 impl<'window> EditorApp<'window> {
@@ -290,7 +299,18 @@ impl<'window> EditorApp<'window> {
                 .unwrap_or_else(|| startup_root.clone())
                 .to_string_lossy()
                 .to_string(),
+            error: None,
         };
+
+        let global_log_path = dirs::home_dir()
+            .unwrap_or_else(|| startup_root.clone())
+            .join(".runa_editor")
+            .join("runa-editor.log");
+        let global_log_file = (|| -> Option<std::fs::File> {
+            let parent = global_log_path.parent()?;
+            std::fs::create_dir_all(parent).ok()?;
+            std::fs::File::create(&global_log_path).ok()
+        })();
 
         Self {
             output_lines: vec!["Editor started.".to_string()],
@@ -354,6 +374,10 @@ impl<'window> EditorApp<'window> {
             output_tx,
             output_rx,
             log_file: None,
+            ui_editor: ui_editor::UiEditorPanel::default(),
+            global_log_path,
+            global_log_file,
+            project_load_error: None,
         }
     }
 }

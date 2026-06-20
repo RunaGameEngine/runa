@@ -6,10 +6,10 @@
 ## Near-term (0.6.x — 0.7.x)
 
 ### Fix documentation drift
-- [ ] Fix `Camera::new_ortho(...)` → `Camera::new_orthographic(...)` in 2D tutorial
-- [ ] Fix `Camera::new_perspective(..., viewport_size)` signature in 3D tutorial (remove
+- [x] Fix `Camera::new_ortho(...)` → `Camera::new_orthographic(...)` in 2D tutorial
+- [x] Fix `Camera::new_perspective(..., viewport_size)` signature in 3D tutorial (remove
       the stale 7th argument)
-- [ ] CHANGELOG mentions `new_ortho` — update to `new_orthographic`
+- [x] CHANGELOG mentions `new_ortho` — update to `new_orthographic`
 - [ ] Document all currently undocumented public APIs (see list below)
 
 ### Performance — no-regressions baseline

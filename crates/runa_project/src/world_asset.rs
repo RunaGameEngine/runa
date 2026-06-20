@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use runa_asset::{AudioAsset, Handle, TextureAsset};
+use runa_core::components::ui::{CanvasSpace, UiAssetFile, UiRenderer};
 use runa_core::components::{
     ActiveCamera, AudioSource, BackgroundMode, Camera, Collider2D, Material, Mesh, MeshRenderer,
     ObjectDefinitionInstance, PhysicsCollision, ProjectionType, SerializedField,
@@ -122,6 +123,8 @@ pub struct WorldObjectAsset {
     #[serde(default)]
     pub collider2d: Option<Collider2DAsset>,
     pub physics_collision: Option<PhysicsCollisionAsset>,
+    #[serde(default)]
+    pub ui_renderer: Option<UiRendererAsset>,
     pub serialized_components: Vec<SerializedObjectTypeAsset>,
     pub serialized_scripts: Vec<SerializedObjectTypeAsset>,
 }
@@ -320,6 +323,26 @@ pub struct Collider2DAsset {
     pub enabled: bool,
     #[serde(default)]
     pub is_trigger: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UiRendererAsset {
+    #[serde(default)]
+    pub ui_asset_path: Option<String>,
+    #[serde(default)]
+    pub space: String,
+    #[serde(default)]
+    pub inline_ui: Option<UiAssetFile>,
+}
+
+impl Default for UiRendererAsset {
+    fn default() -> Self {
+        Self {
+            ui_asset_path: None,
+            space: "Screen".to_string(),
+            inline_ui: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -623,6 +646,9 @@ impl WorldObjectAsset {
             physics_collision: object
                 .get_component::<PhysicsCollision>()
                 .map(PhysicsCollisionAsset::from_component),
+            ui_renderer: object
+                .get_component::<UiRenderer>()
+                .map(UiRendererAsset::from_component),
             serialized_components: collect_serialized_type_assets(
                 object,
                 SerializedTypeKind::Component,
@@ -654,6 +680,7 @@ impl WorldObjectAsset {
             audio_source,
             collider2d,
             physics_collision,
+            ui_renderer,
             serialized_components,
             serialized_scripts,
             parent: _,
@@ -681,6 +708,7 @@ impl WorldObjectAsset {
                             audio_source,
                             collider2d,
                             physics_collision,
+                            ui_renderer,
                             serialized_components,
                             serialized_scripts,
                             project_root,
@@ -706,6 +734,7 @@ impl WorldObjectAsset {
             audio_source,
             collider2d,
             physics_collision,
+            ui_renderer,
             serialized_components,
             serialized_scripts,
             project_root,
@@ -758,6 +787,9 @@ impl WorldObjectAsset {
                 if self.physics_collision.is_some() {
                     spawned.physics_collision = self.physics_collision;
                 }
+                if self.ui_renderer.is_some() {
+                    spawned.ui_renderer = self.ui_renderer;
+                }
                 if !self.serialized_components.is_empty() {
                     spawned.serialized_components = self.serialized_components;
                 }
@@ -788,6 +820,7 @@ fn apply_asset_overrides_to_object(
     audio_source: Option<AudioSourceAsset>,
     collider2d: Option<Collider2DAsset>,
     physics_collision: Option<PhysicsCollisionAsset>,
+    ui_renderer: Option<UiRendererAsset>,
     serialized_components: Vec<SerializedObjectTypeAsset>,
     serialized_scripts: Vec<SerializedObjectTypeAsset>,
     project_root: Option<&Path>,
@@ -845,6 +878,10 @@ fn apply_asset_overrides_to_object(
     if let Some(physics_collision) = physics_collision {
         let _ = object.remove_component_type_id(TypeId::of::<PhysicsCollision>());
         object.add_component(physics_collision.into_component());
+    }
+    if let Some(ui_renderer) = ui_renderer {
+        let _ = object.remove_component_type_id(TypeId::of::<UiRenderer>());
+        object.add_component(ui_renderer.into_component(project_root));
     }
     if let Some(object_id) = object_id {
         let _ = object.remove_component_type_id(TypeId::of::<ObjectDefinitionInstance>());
@@ -1078,6 +1115,7 @@ fn is_builtin_serialized_type(type_id: TypeId) -> bool {
         TypeId::of::<PhysicsCollision>(),
         TypeId::of::<ObjectDefinitionInstance>(),
         TypeId::of::<SerializedTypeStorage>(),
+        TypeId::of::<UiRenderer>(),
     ]
     .contains(&type_id)
 }
@@ -1212,6 +1250,37 @@ impl SpriteAnimationClipAsset {
             end_frame: self.end_frame,
             fps: self.fps,
             looping: self.looping,
+        }
+    }
+}
+
+impl UiRendererAsset {
+    fn from_component(component: &UiRenderer) -> Self {
+        Self {
+            ui_asset_path: component.ui_asset_path.clone(),
+            space: "Screen".to_string(),
+            inline_ui: None,
+        }
+    }
+
+    fn into_component(self, project_root: Option<&Path>) -> UiRenderer {
+        if let Some(inline) = self.inline_ui {
+            inline.into_ui_renderer(project_root)
+        } else if let Some(asset_path) = &self.ui_asset_path {
+            let full_path = project_root.map(|r| r.join(asset_path));
+            if let Some(path) = full_path {
+                if let Ok(asset) = crate::ui_asset::load_ui_asset(&path) {
+                    let mut renderer = asset.into_ui_renderer(project_root);
+                    renderer.ui_asset_path = self.ui_asset_path;
+                    renderer
+                } else {
+                    UiRenderer::new(CanvasSpace::Screen)
+                }
+            } else {
+                UiRenderer::new(CanvasSpace::Screen)
+            }
+        } else {
+            UiRenderer::new(CanvasSpace::Screen)
         }
     }
 }

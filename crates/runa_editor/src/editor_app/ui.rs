@@ -61,6 +61,16 @@ impl<'window> EditorApp<'window> {
                             }
                             ui.separator();
                             if ui
+                                .add_enabled(project_open, egui::Button::new("UI Editor"))
+                                .clicked()
+                            {
+                                if let Some(session) = self.project_session.as_ref() {
+                                    self.ui_editor.open_new(&session.project);
+                                }
+                                ui.close();
+                            }
+                            ui.separator();
+                            if ui
                                 .add_enabled(project_open, egui::Button::new("Return to Welcome"))
                                 .clicked()
                             {
@@ -444,6 +454,16 @@ impl<'window> EditorApp<'window> {
                                             }
                                         }
                                     }
+                                    if let Some(ui_path) = &inspector_actions.open_ui_editor {
+                                        if let Some(session) = self.project_session.as_ref() {
+                                            if ui_path.is_empty() {
+                                                self.ui_editor.open_new(&session.project);
+                                            } else {
+                                                let full_path = session.project.root_dir.join(ui_path);
+                                                self.ui_editor.open_asset(full_path);
+                                            }
+                                        }
+                                    }
 
                                     ui.separator();
                                 } else {
@@ -547,6 +567,12 @@ impl<'window> EditorApp<'window> {
         self.project_dialog_window(ctx);
         self.project_loading_overlay(ctx);
         self.project_version_prompt_window(ctx);
+        self.ui_editor.window(
+            ctx,
+            self.project_session
+                .as_ref()
+                .map(|session| &session.project),
+        );
     }
 
     fn welcome_screen(&mut self, ctx: &egui::Context) {
@@ -908,6 +934,41 @@ impl<'window> EditorApp<'window> {
     }
 
     fn project_loading_overlay(&mut self, ctx: &egui::Context) {
+        if let Some(error) = &self.project_load_error {
+            let mut open = true;
+            let mut close_clicked = false;
+            let error_text = error.clone();
+            let log_path = self.global_log_path.clone();
+            egui::Window::new("Failed to Open Project")
+                .open(&mut open)
+                .collapsible(false)
+                .resizable(false)
+                .anchor(Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .default_width(500.0)
+                .show(ctx, |ui| {
+                    ui.colored_label(style::ERROR_COLOR, &error_text);
+                    ui.add_space(8.0);
+                    ui.label(
+                        RichText::new("Check the editor log for details:")
+                            .size(12.0),
+                    );
+                    ui.add_space(4.0);
+                    if ui.button("Open Log Folder").clicked() {
+                        let _ = std::process::Command::new("explorer")
+                            .arg("/select,")
+                            .arg(&log_path)
+                            .spawn();
+                    }
+                    if ui.button("Close").clicked() {
+                        close_clicked = true;
+                    }
+                });
+            if !open || close_clicked {
+                self.project_load_error = None;
+            }
+            return;
+        }
+
         if self.project_load.is_none() {
             return;
         }
@@ -1897,17 +1958,41 @@ impl<'window> EditorApp<'window> {
     }
 
     fn project_dialog_window(&mut self, ctx: &egui::Context) {
-        if !self.project_dialog.open {
+        if !self.project_dialog.open && self.project_dialog.error.is_none() {
             return;
         }
 
-        let mut open = self.project_dialog.open;
+        let mut open = self.project_dialog.open || self.project_dialog.error.is_some();
+        let mut is_dismissed = false;
+        let dialog_error = self.project_dialog.error.clone();
+        let log_path = self.global_log_path.clone();
         egui::Window::new("New Project")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
             .default_width(520.0)
             .show(ctx, |ui| {
+                if let Some(error) = &dialog_error {
+                    ui.colored_label(style::ERROR_COLOR, error);
+                    ui.add_space(8.0);
+                    ui.label(
+                        RichText::new("Check the editor log for details:")
+                            .size(12.0),
+                    );
+                    ui.horizontal(|ui| {
+                        if ui.button("Open Log Folder").clicked() {
+                            let _ = std::process::Command::new("explorer")
+                                .arg("/select,")
+                                .arg(&log_path)
+                                .spawn();
+                        }
+                        if ui.button("Close").clicked() {
+                            is_dismissed = true;
+                        }
+                    });
+                    return;
+                }
+
                 ui.horizontal(|ui| {
                     ui.label("Name");
                     ui.text_edit_singleline(&mut self.project_dialog.name);
@@ -1927,7 +2012,10 @@ impl<'window> EditorApp<'window> {
                     self.create_project_from_dialog();
                 }
             });
-        self.project_dialog.open = open;
+        if !open || is_dismissed {
+            self.project_dialog.error = None;
+            self.project_dialog.open = false;
+        }
     }
 
     fn viewport_settings_window(&mut self, ctx: &egui::Context) {

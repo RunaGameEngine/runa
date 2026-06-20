@@ -624,8 +624,9 @@ impl<'window> EditorApp<'window> {
                         }
                     }
                     Err(error) => {
-                        self.status_line = format!("Failed to open project: {error}");
-                        self.push_output(self.status_line.clone());
+                        let error_msg = format!("Failed to open project: {error}");
+                        self.push_output(&error_msg);
+                        self.project_load_error = Some(error_msg);
                     }
                 }
             }
@@ -640,11 +641,7 @@ impl<'window> EditorApp<'window> {
 
     pub(super) fn poll_output(&mut self) {
         while let Ok(line) = self.output_rx.try_recv() {
-            self.output_lines.push(line);
-            if self.output_lines.len() > 500 {
-                let drain_len = self.output_lines.len() - 500;
-                self.output_lines.drain(0..drain_len);
-            }
+            self.push_output(line);
         }
     }
 
@@ -655,8 +652,11 @@ impl<'window> EditorApp<'window> {
             let drain_len = self.output_lines.len() - 500;
             self.output_lines.drain(0..drain_len);
         }
+        use std::io::Write;
+        if let Some(file) = &mut self.global_log_file {
+            writeln!(file, "{}", line).ok();
+        }
         if let Some(file) = &mut self.log_file {
-            use std::io::Write;
             writeln!(file, "{}", line).ok();
         }
     }
@@ -721,7 +721,8 @@ impl<'window> EditorApp<'window> {
         let name = self.project_dialog.name.trim();
         let location = self.project_dialog.location.trim();
         if name.is_empty() || location.is_empty() {
-            self.status_line = "Project name and location are required.".to_string();
+            self.project_dialog.error = Some("Project name and location are required.".to_string());
+            self.push_output("Project name and location are required.");
             return;
         }
 
@@ -733,7 +734,9 @@ impl<'window> EditorApp<'window> {
                 self.status_line = format!("Created project {}.", project.manifest.name);
             }
             Err(error) => {
-                self.status_line = format!("Failed to create project: {error}");
+                let error_msg = format!("Failed to create project: {error}");
+                self.push_output(&error_msg);
+                self.project_dialog.error = Some(error_msg);
             }
         }
     }
