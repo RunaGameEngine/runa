@@ -1741,6 +1741,7 @@ mod tests {
             audio_source: None,
             collider2d: None,
             physics_collision: None,
+            ui_renderer: None,
             serialized_components: Vec::new(),
             serialized_scripts: Vec::new(),
             parent: None,
@@ -1778,6 +1779,7 @@ mod tests {
             audio_source: None,
             collider2d: None,
             physics_collision: None,
+            ui_renderer: None,
             serialized_components: Vec::new(),
             serialized_scripts: vec![SerializedObjectTypeAsset {
                 type_name: "TestScript".to_string(),
@@ -1819,6 +1821,7 @@ mod tests {
             audio_source: None,
             collider2d: None,
             physics_collision: None,
+            ui_renderer: None,
             serialized_components: Vec::new(),
             serialized_scripts: vec![SerializedObjectTypeAsset {
                 type_name: "TestScript".to_string(),
