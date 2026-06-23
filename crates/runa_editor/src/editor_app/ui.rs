@@ -208,19 +208,22 @@ impl<'window> EditorApp<'window> {
         if self.panels.bottom_bar {
             let max_bottom_bar_height = (ctx.content_rect().height() - 140.0).max(120.0);
             self.bottom_bar_height = self.bottom_bar_height.clamp(80.0, max_bottom_bar_height);
-            let content_rect = ctx.content_rect();
+
+            // Position overlay above status bar with gap
+            let screen_rect = ctx.screen_rect();
             let side_margin = 12.0;
-            let bottom_gap = 32.0 * ui_scale;
+            let bottom_gap = 28.0 * ui_scale;
             let right_reserved = if self.panels.inspector {
                 self.inspector_panel_width + side_margin
             } else {
                 0.0
             };
             let overlay_width =
-                (content_rect.width() - side_margin * 2.0 - right_reserved).max(240.0);
+                (screen_rect.width() - side_margin * 2.0 - right_reserved).max(240.0);
+            let overlay_top = screen_rect.bottom() - bottom_gap - self.bottom_bar_height;
             let overlay_pos = egui::pos2(
-                content_rect.left() + side_margin,
-                content_rect.bottom() - bottom_gap - self.bottom_bar_height,
+                screen_rect.left() + side_margin,
+                overlay_top,
             );
             egui::Area::new("bottom_bar_overlay".into())
                 .order(egui::Order::Middle)
@@ -293,7 +296,11 @@ impl<'window> EditorApp<'window> {
                                     }
                                     BottomTab::Console => {
                                         if ui.button("Clear").clicked() {
-                                            self.output_lines.clear();
+                                            self.console.clear_messages();
+                                        }
+                                        ui.separator();
+                                        if ui.button("Clear History").clicked() {
+                                            // History stays, just scroll to bottom
                                         }
                                     }
                                 }
@@ -316,16 +323,150 @@ impl<'window> EditorApp<'window> {
                                         }
                                     }
                                     BottomTab::Console => {
-                                        egui::ScrollArea::vertical()
-                                            .auto_shrink([false, false])
-                                            .stick_to_bottom(true)
-                                            .id_salt("editor_output_scroll")
-                                            .show(ui, |ui| {
-                                                ui.set_min_width(ui.available_width());
-                                                for line in &self.output_lines {
-                                                    ui.monospace(line);
+                                        let body_rect = ui.max_rect();
+                                        let input_h = 24.0;
+                                        let input_y = body_rect.bottom() - input_h;
+
+                                        // Messages area (fills from top to input line)
+                                        let messages_rect = egui::Rect::from_min_max(
+                                            body_rect.left_top(),
+                                            egui::pos2(body_rect.right(), input_y),
+                                        );
+
+                                        // Suggestion panel (floats above messages, will be painted as overlay)
+                                        let suggestions = self.console.matching_commands();
+                                        let has_suggestions = !suggestions.is_empty();
+                                        let suggestion_h = 24.0;
+
+                                        // Reserve space for input
+                                        ui.allocate_ui_at_rect(messages_rect, |ui| {
+                                            let scroll_h = if has_suggestions {
+                                                ui.available_height() - suggestion_h - 2.0
+                                            } else {
+                                                ui.available_height()
+                                            };
+
+                                            // Scrollable messages
+                                            egui::ScrollArea::vertical()
+                                                .auto_shrink([false, false])
+                                                .stick_to_bottom(true)
+                                                .id_salt("editor_console_scroll")
+                                                .show(ui, |ui| {
+                                                    ui.set_min_height(scroll_h.max(0.0));
+                                                    for msg in self.console.messages() {
+                                                        ui.monospace(msg);
+                                                    }
+                                                });
+
+                                            // Suggestion overlay at bottom of messages area
+                                            if has_suggestions {
+                                                let sel = self.console.selected_suggestion();
+                                                let max = ui.max_rect();
+                                                let suggest_rect = egui::Rect::from_min_max(
+                                                    egui::pos2(max.left(), max.bottom() - suggestion_h - 2.0),
+                                                    egui::pos2(max.right(), max.bottom()),
+                                                );
+                                                let painter = ui.painter_at(suggest_rect);
+                                                painter.rect_filled(
+                                                    suggest_rect,
+                                                    2.0,
+                                                    egui::Color32::from_black_alpha(230),
+                                                );
+                                                painter.rect_stroke(
+                                                    suggest_rect,
+                                                    2.0,
+                                                    egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 100, 180)),
+                                                    egui::StrokeKind::Inside,
+                                                );
+                                                let mut x = suggest_rect.left() + 4.0;
+                                                let text_y = suggest_rect.top() + 2.0;
+                                                for (i, s) in suggestions.iter().enumerate().take(20) {
+                                                    let text = if sel == Some(i) {
+                                                        format!("[{}]", s)
+                                                    } else {
+                                                        s.clone()
+                                                    };
+                                                    let color = if sel == Some(i) {
+                                                        egui::Color32::from_rgb(200, 220, 255)
+                                                    } else {
+                                                        egui::Color32::from_rgb(150, 200, 255)
+                                                    };
+                                                    let font_id = egui::FontId::monospace(14.0);
+                                                    let galley = painter.layout_no_wrap(text, font_id, color);
+                                                    let w = galley.size().x;
+                                                    painter.galley(egui::pos2(x, text_y), galley, color);
+                                                    x += w + 8.0;
                                                 }
-                                            });
+                                            }
+                                        });
+
+                                        // Input line at the very bottom
+                                        ui.allocate_ui_at_rect(
+                                            egui::Rect::from_min_max(
+                                                egui::pos2(body_rect.left(), input_y),
+                                                egui::pos2(body_rect.right(), body_rect.bottom()),
+                                            ),
+                                            |ui| {
+                                                let input_id = ui.id().with("editor_console_input");
+
+                                                // Consume Tab/Enter BEFORE widget (prevents focus-steal)
+                                                let tab_consumed = ui.memory(|mem| mem.has_focus(input_id))
+                                                    && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Tab));
+                                                let enter_consumed = ui.memory(|mem| mem.has_focus(input_id))
+                                                    && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+
+                                                // Consume Left/Right for suggestion navigation (only when suggestions exist)
+                                                let left_consumed = has_suggestions
+                                                    && ui.memory(|mem| mem.has_focus(input_id))
+                                                    && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft));
+                                                let right_consumed = has_suggestions
+                                                    && ui.memory(|mem| mem.has_focus(input_id))
+                                                    && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight));
+
+                                                let resp = ui.add_sized(
+                                                    egui::vec2(ui.available_width(), input_h),
+                                                    egui::TextEdit::singleline(&mut self.console.input_buffer)
+                                                        .hint_text("Type a command...")
+                                                        .font(egui::TextStyle::Monospace)
+                                                        .desired_width(f32::INFINITY)
+                                                        .id(input_id),
+                                                );
+
+                                                let mut needs_focus = false;
+                                                if tab_consumed {
+                                                    self.console.advance_suggestion();
+                                                    needs_focus = true;
+                                                }
+                                                if enter_consumed {
+                                                    self.execute_console_input();
+                                                }
+                                                if left_consumed {
+                                                    self.console.select_previous_suggestion();
+                                                }
+                                                if right_consumed {
+                                                    self.console.select_next_suggestion();
+                                                }
+                                                if needs_focus {
+                                                    resp.request_focus();
+                                                }
+
+                                                if self.console_focus_requested {
+                                                    resp.request_focus();
+                                                    self.console_focus_requested = false;
+                                                }
+
+                                                // Handle up/down arrows after widget
+                                                if resp.has_focus() {
+                                                    let egui_ctx = ui.ctx().clone();
+                                                    if egui_ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp)) {
+                                                        self.console.navigate_history_up();
+                                                    }
+                                                    if egui_ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown)) {
+                                                        self.console.navigate_history_down();
+                                                    }
+                                                }
+                                            },
+                                        );
                                     }
                                 },
                             );
@@ -382,7 +523,12 @@ impl<'window> EditorApp<'window> {
                             if blank_response.hovered()
                                 && ui.input(|input| input.pointer.any_released())
                             {
-                                if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
+                                if self.content_browser.is_dragging_asset() {
+                                    let path = self.content_browser.take_dragging_asset_path();
+                                    if let Some(path) = path {
+                                        self.spawn_from_asset_path(&path, None);
+                                    }
+                                } else if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
                                     if self.world.borrow_mut().set_parent(dragged_id, None) {
                                         self.status_line =
                                             "Moved object to hierarchy root.".to_string();
@@ -987,10 +1133,11 @@ impl<'window> EditorApp<'window> {
                 });
                 ui.add_space(8.0);
 
-                // Show recent output lines (up to 5) for progress feedback
-                let start = self.output_lines.len().saturating_sub(5);
-                for line in self.output_lines.iter().skip(start) {
-                    ui.small(line);
+                // Show recent console messages (up to 5) for progress feedback
+                let all_msgs: Vec<&str> = self.console.messages().collect();
+                let start = all_msgs.len().saturating_sub(5);
+                for line in all_msgs.iter().skip(start) {
+                    ui.small(*line);
                 }
 
                 ui.add_space(6.0);
@@ -1275,7 +1422,12 @@ impl<'window> EditorApp<'window> {
                 self.hierarchy_dragging_object = Some(object_id);
             }
             if response.hovered() && ui.input(|input| input.pointer.any_released()) {
-                if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
+                if self.content_browser.is_dragging_asset() {
+                    let path = self.content_browser.take_dragging_asset_path();
+                    if let Some(path) = path {
+                        self.spawn_from_asset_path(&path, Some(object_id));
+                    }
+                } else if let Some(dragged_id) = self.hierarchy_dragging_object.take() {
                     if dragged_id != object_id
                         && self
                             .world

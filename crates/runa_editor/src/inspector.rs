@@ -1459,6 +1459,40 @@ fn serialized_field_row(ui: &mut Ui, object: &mut Object, type_id: TypeId, field
                 });
             }
         }
+        SerializedFieldValue::ObjectRef(mut value) => {
+            let mut changed = false;
+            property_row(ui, &field.name, |ui| {
+                let world = match object.get_world() {
+                    Some(w) => w.borrow().object_names_sorted(),
+                    None => Vec::new(),
+                };
+                let current_label = if value.is_empty() {
+                    "None".to_string()
+                } else {
+                    value.clone()
+                };
+                egui::ComboBox::from_id_salt(format!("objref_{}", &field.name))
+                    .selected_text(current_label)
+                    .show_ui(ui, |ui| {
+                        if ui.selectable_label(value.is_empty(), "None").clicked() {
+                            value.clear();
+                            changed = true;
+                        }
+                        for obj_name in &world {
+                            let selected = obj_name == &value;
+                            if ui.selectable_label(selected, obj_name).clicked() {
+                                value = obj_name.clone();
+                                changed = true;
+                            }
+                        }
+                    });
+            });
+            if changed {
+                let _ = object.with_component_mut_by_type_id(type_id, |component| {
+                    component.set_serialized_field(&field.name, SerializedFieldValue::ObjectRef(value))
+                });
+            }
+        }
     }
 }
 
@@ -1530,6 +1564,22 @@ fn serialized_field_asset_row(ui: &mut Ui, field: &mut SerializedField) {
                     axis_drag(ui, "Z", &mut value[2], 0.05);
                 });
             }
+        }
+        SerializedFieldValue::ObjectRef(value) => {
+            let selected_text = if value.is_empty() {
+                "None".to_string()
+            } else {
+                value.clone()
+            };
+            property_row(ui, &field.name, |ui| {
+                egui::ComboBox::from_id_salt(format!("objref_asset_{}", &field.name))
+                    .selected_text(selected_text)
+                    .show_ui(ui, |ui| {
+                        if ui.selectable_label(value.is_empty(), "None").clicked() {
+                            *value = String::new();
+                        }
+                    });
+            });
         }
     }
 }
@@ -1814,6 +1864,13 @@ fn serialized_field_value_text(value: &SerializedFieldValue) -> String {
         }
         SerializedFieldValue::Vec3(value) => {
             format!("X {:.3}  Y {:.3}  Z {:.3}", value[0], value[1], value[2])
+        }
+        SerializedFieldValue::ObjectRef(value) => {
+            if value.is_empty() {
+                "None (ObjectRef)".to_string()
+            } else {
+                format!("{} (ObjectRef)", value)
+            }
         }
     }
 }

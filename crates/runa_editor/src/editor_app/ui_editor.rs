@@ -96,14 +96,19 @@ impl UiEditorPanel {
         }
 
         let mut open = self.open;
-        let preview_size = egui::vec2(400.0, 300.0);
-        let _panel_width = 300.0;
+        const LEFT_WIDTH: f32 = 180.0;
+        const RIGHT_WIDTH: f32 = 220.0;
+
+        let viewport = ctx.viewport_rect();
 
         egui::Window::new("UI Editor")
             .open(&mut open)
             .resizable(true)
-            .default_width(900.0)
-            .default_height(600.0)
+            .default_width(viewport.width() * 0.75)
+            .default_height(viewport.height() * 0.75)
+            .min_width(640.0)
+            .min_height(400.0)
+            .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if ui.button("Save").clicked() {
@@ -137,43 +142,50 @@ impl UiEditorPanel {
                 ui.separator();
 
                 ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new("Nodes").strong());
-                        ui.separator();
-                        egui::ScrollArea::vertical()
-                            .id_salt("ui_editor_tree")
-                            .max_height(ui.available_height())
-                            .show(ui, |ui| {
-                                self.node_tree_ui(ui, 0, 0);
-                            });
-                    });
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(LEFT_WIDTH, ui.available_height()),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            ui.label(RichText::new("Nodes").strong());
+                            ui.separator();
+                            egui::ScrollArea::vertical()
+                                .id_salt("ui_editor_tree")
+                                .show(ui, |ui| {
+                                    self.node_tree_ui(ui, 0, 0);
+                                });
+                        },
+                    );
 
                     ui.separator();
 
                     ui.vertical(|ui| {
                         ui.label(RichText::new("Canvas").strong());
                         ui.separator();
-                        let (_id, canvas_rect) = ui.allocate_space(preview_size);
+                        let canvas_size = ui.available_size();
+                        let (_id, canvas_rect) = ui.allocate_space(canvas_size);
                         let canvas_rect = canvas_rect.intersect(ui.clip_rect());
                         self.canvas_preview(ui, canvas_rect);
                     });
 
                     ui.separator();
 
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new("Properties").strong());
-                        ui.separator();
-                        egui::ScrollArea::vertical()
-                            .id_salt("ui_editor_properties")
-                            .max_height(ui.available_height())
-                            .show(ui, |ui| {
-                                if let Some(node_id) = self.selected_node {
-                                    self.properties_ui(ui, node_id);
-                                } else {
-                                    ui.label("Select a node");
-                                }
-                            });
-                    });
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(RIGHT_WIDTH, ui.available_height()),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            ui.label(RichText::new("Properties").strong());
+                            ui.separator();
+                            egui::ScrollArea::vertical()
+                                .id_salt("ui_editor_properties")
+                                .show(ui, |ui| {
+                                    if let Some(node_id) = self.selected_node {
+                                        self.properties_ui(ui, node_id);
+                                    } else {
+                                        ui.label("Select a node");
+                                    }
+                                });
+                        },
+                    );
                 });
             });
         self.open = open;

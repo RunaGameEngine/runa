@@ -1,4 +1,5 @@
 mod app_handler;
+mod editor_commands;
 mod helpers;
 mod placeables;
 mod project;
@@ -78,7 +79,7 @@ impl Default for PanelState {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BottomTab {
     ContentBrowser,
     Console,
@@ -197,7 +198,8 @@ pub struct EditorApp<'window> {
     hierarchy_expanded: HashSet<ObjectId>,
     hierarchy_renaming: Option<ObjectId>,
     hierarchy_rename_buffer: String,
-    output_lines: Vec<String>,
+    pub console: runa_core::Console,
+    console_focus_requested: bool,
     output_tx: Sender<String>,
     output_rx: Receiver<String>,
     log_file: Option<std::fs::File>,
@@ -277,6 +279,50 @@ impl<'window> EditorApp<'window> {
         self.selected_objects.clear();
     }
 
+    pub fn execute_console_input(&mut self) {
+        let input = self.console.input_buffer.clone();
+        if input.is_empty() {
+            return;
+        }
+        self.console.add_message(format!("> {}", input));
+        self.console.push_history(&input);
+
+        let trimmed = input.trim();
+        let mut parts = trimmed.split_whitespace();
+        let cmd = parts.next().unwrap_or("").to_lowercase();
+        let args: Vec<&str> = parts.collect();
+
+        // Handle "help" specially to include editor commands
+        if cmd == "help" {
+            if args.is_empty() {
+                self.console.try_execute("help"); // show console commands
+                self.console.add_message("");
+                self.console.add_message("--- Editor Commands ---");
+                for (name, desc) in editor_commands::descriptions() {
+                    self.console.add_message(format!("  {:<12} {}", name, desc));
+                }
+            } else {
+                let topic = args[0];
+                // Check if it's an editor command
+                let is_editor = editor_commands::descriptions().iter().any(|(n, _)| *n == topic);
+                if is_editor {
+                    self.console.add_message(format!("{} - Editor command", topic));
+                    self.console.add_message("Usage: see editor documentation.");
+                } else {
+                    self.console.try_execute(trimmed);
+                }
+            }
+        } else if !self.console.try_execute(trimmed) && !editor_commands::execute(self, &cmd, &args) {
+            self.console.add_message(format!(
+                "Unknown command: '{}'. Type 'help' for commands.",
+                trimmed
+            ));
+        }
+
+        self.console.input_buffer.clear();
+        self.console_focus_requested = true;
+    }
+
     fn new(project_path: Option<PathBuf>) -> Self {
         let startup_root = std::env::current_dir().unwrap_or_default();
         let (output_tx, output_rx) = mpsc::channel();
@@ -313,8 +359,17 @@ impl<'window> EditorApp<'window> {
             std::fs::File::create(&global_log_path).ok()
         })();
 
+        let mut console = runa_core::Console::new();
+        console.add_message("Editor started.");
+        console.add_message("Type 'help' for available commands.");
+        let editor_names: Vec<&str> = std::iter::once("editor")
+            .chain(editor_commands::descriptions().iter().map(|(name, _)| *name))
+            .collect();
+        console.add_suggestion_names(&editor_names);
+
         Self {
-            output_lines: vec!["Editor started.".to_string()],
+            console,
+            console_focus_requested: false,
             settings,
             editor_settings_open: false,
             project_settings_open: false,

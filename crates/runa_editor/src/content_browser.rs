@@ -280,13 +280,20 @@ impl ContentBrowserState {
             self.open_dir(dir, settings);
         }
 
-        if !ui.ctx().input(|input| input.pointer.primary_down()) {
+        if self.dragging_asset_path.is_some()
+            && !ui.ctx().input(|input| input.pointer.primary_down())
+        {
             self.dragging_asset_path = None;
         }
     }
 
     pub fn is_dragging_asset(&self) -> bool {
         self.dragging_asset_path.is_some()
+    }
+
+    /// Consume the currently dragged asset path. Returns `None` if nothing is being dragged.
+    pub fn take_dragging_asset_path(&mut self) -> Option<PathBuf> {
+        self.dragging_asset_path.take()
     }
 
     fn handle_shortcuts(&mut self, ui: &Ui) {

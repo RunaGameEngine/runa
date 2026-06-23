@@ -392,6 +392,82 @@ impl<'window> EditorApp<'window> {
                     "Object refresh failed because the background job disconnected.".to_string();
             }
         }
+        }
+    }
+
+impl<'window> EditorApp<'window> {
+    pub(super) fn spawn_from_asset_path(
+        &mut self,
+        asset_path: &std::path::Path,
+        parent_id: Option<ObjectId>,
+    ) -> Option<ObjectId> {
+        let ext = asset_path.extension()?.to_str()?.to_lowercase();
+        let file_name = asset_path
+            .file_stem()
+            .and_then(|s: &std::ffi::OsStr| s.to_str())
+            .unwrap_or("Asset")
+            .to_string();
+
+        let project_root = self
+            .project_session
+            .as_ref()
+            .map(|session| session.project.root_dir.as_path());
+
+        match ext.as_str() {
+            "world" | "ron" if asset_path.to_string_lossy().ends_with(".world.ron") => {
+                let world_asset = match std::fs::read_to_string(asset_path) {
+                    Ok(content) => ron::from_str::<runa_project::WorldAsset>(&content).ok()?,
+                    Err(_) => return None,
+                };
+                let mut last_id = None;
+                for obj_asset in &world_asset.objects {
+                    let object = obj_asset.clone().into_object(project_root);
+                    let id = self.world.borrow_mut().spawn(object);
+                    if let Some(pid) = parent_id {
+                        self.world.borrow_mut().set_parent(id, Some(pid));
+                    }
+                    last_id = Some(id);
+                }
+                self.status_line = format!("Loaded world from {}", asset_path.display());
+                last_id
+            }
+            "png" | "jpg" | "jpeg" | "webp" => {
+                let mut object = Object::new(&file_name);
+                let texture_path = asset_path
+                    .strip_prefix(project_root.unwrap_or(std::path::Path::new("")))
+                    .ok()
+                    .and_then(|p: &std::path::Path| p.to_str())
+                    .map(|s: &str| s.to_string());
+                let sprite = SpriteRenderer {
+                    texture: None,
+                    texture_path,
+                    pixels_per_unit: runa_core::components::DEFAULT_SPRITE_PIXELS_PER_UNIT,
+                    uv_rect: SpriteRenderer::FULL_UV_RECT,
+                };
+                object.add_component(sprite);
+                let id = self.world.borrow_mut().spawn(object);
+                if let Some(pid) = parent_id {
+                    self.world.borrow_mut().set_parent(id, Some(pid));
+                }
+                self.status_line = format!("Created sprite from {}", asset_path.display());
+                Some(id)
+            }
+            _ => {
+                self.status_line = format!("Unsupported asset type: .{ext}");
+                None
+            }
+        }
+    }
+
+    pub(super) fn handle_content_browser_drop(
+        &mut self,
+        _ui: &egui::Ui,
+        parent_id: Option<ObjectId>,
+    ) -> bool {
+        let Some(asset_path) = self.content_browser.take_dragging_asset_path() else {
+            return false;
+        };
+        self.spawn_from_asset_path(&asset_path, parent_id).is_some()
     }
 }
 

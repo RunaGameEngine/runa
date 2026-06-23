@@ -166,6 +166,17 @@ impl<'window> EditorApp<'window> {
             }
         }
 
+        // Content browser drop handling
+        if response.hovered()
+            && !ctx.input(|input| input.pointer.primary_down())
+            && self.content_browser.is_dragging_asset()
+        {
+            if let Some(path) = self.content_browser.take_dragging_asset_path() {
+                self.spawn_from_asset_path(&path, None);
+                self.status_line = format!("Dropped asset: {}", path.display());
+            }
+        }
+
         let camera = self.editor_camera.camera(self.pending_viewport_size);
         self.viewport_camera = Some(camera);
         self.draw_viewport_overlay(ui, response.rect, camera);

@@ -124,6 +124,18 @@ impl<'window> ApplicationHandler for EditorApp<'window> {
                         window.request_redraw();
                     }
                 }
+                // Backtick toggles console tab
+                if event.state.is_pressed()
+                    && !event.repeat
+                    && !self.editor_camera.is_look_active()
+                    && !self.modifiers.control_key()
+                    && !self.modifiers.alt_key()
+                    && matches!(event.physical_key, PhysicalKey::Code(KeyCode::Backquote))
+                {
+                    self.panels.bottom_bar = true;
+                    self.bottom_tab = BottomTab::Console;
+                    window.request_redraw();
+                }
             }
             WindowEvent::CloseRequested => {
                 let shutdown_window = window.clone();

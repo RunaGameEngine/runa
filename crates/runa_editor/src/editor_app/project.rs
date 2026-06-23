@@ -647,11 +647,7 @@ impl<'window> EditorApp<'window> {
 
     pub(super) fn push_output(&mut self, line: impl Into<String>) {
         let line = line.into();
-        self.output_lines.push(line.clone());
-        if self.output_lines.len() > 500 {
-            let drain_len = self.output_lines.len() - 500;
-            self.output_lines.drain(0..drain_len);
-        }
+        self.console.add_message(line.clone());
         use std::io::Write;
         if let Some(file) = &mut self.global_log_file {
             writeln!(file, "{}", line).ok();

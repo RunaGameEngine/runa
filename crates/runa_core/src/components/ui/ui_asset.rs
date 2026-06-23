@@ -260,7 +260,7 @@ impl UiNodeAsset {
             layout: LayoutPropsAsset::from_layout(&node.layout),
             style: StylePropsAsset::from_style(&node.style),
             visible: node.visible,
-            name: String::new(),
+            name: node.name.clone(),
         }
     }
 
@@ -269,7 +269,8 @@ impl UiNodeAsset {
             UiNodeId(self.id),
             self.parent.map(UiNodeId),
             self.kind.to_kind(project_root),
-        );
+        )
+        .named(self.name.clone());
         node.children = self.children.iter().map(|c| UiNodeId(*c)).collect();
         node.layout = self.layout.to_layout();
         node.style = self.style.to_style();

@@ -25,6 +25,7 @@ pub struct UiNodeId(pub u32);
 
 pub struct UiNode {
     pub id: UiNodeId,
+    pub name: String,
     pub parent: Option<UiNodeId>,
     pub children: Vec<UiNodeId>,
     pub kind: UiNodeKind,
@@ -38,6 +39,7 @@ impl UiNode {
     pub fn new(id: UiNodeId, parent: Option<UiNodeId>, kind: UiNodeKind) -> Self {
         Self {
             id,
+            name: String::new(),
             parent,
             children: Vec::new(),
             kind,
@@ -47,6 +49,44 @@ impl UiNode {
             visible: true,
         }
     }
+
+    pub fn named(mut self, name: impl Into<String>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    pub fn with_layout(mut self, layout: LayoutProps) -> Self {
+        self.layout = layout;
+        self
+    }
+
+    pub fn with_style(mut self, style: StyleProps) -> Self {
+        self.style = style;
+        self
+    }
+
+    /// Returns the computed center position of this node
+    pub fn center(&self) -> (f32, f32) {
+        (self.computed.rect.x, self.computed.rect.y)
+    }
+
+    /// Returns the computed bounds (left, top, right, bottom)
+    pub fn bounds(&self) -> (f32, f32, f32, f32) {
+        let half_w = self.computed.rect.w * 0.5;
+        let half_h = self.computed.rect.h * 0.5;
+        (
+            self.computed.rect.x - half_w,
+            self.computed.rect.y - half_h,
+            self.computed.rect.x + half_w,
+            self.computed.rect.y + half_h,
+        )
+    }
+
+    /// Check if a point (in screen coords) is inside this node
+    pub fn contains_point(&self, px: f32, py: f32) -> bool {
+        let (left, top, right, bottom) = self.bounds();
+        px >= left && px <= right && py >= top && py <= bottom
+    }
 }
 
 pub enum UiNodeKind {
@@ -55,6 +95,7 @@ pub enum UiNodeKind {
     Text(TextProps),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ContainerKind {
     Free,
     HorizontalBox,
