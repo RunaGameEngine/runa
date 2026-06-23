@@ -69,6 +69,22 @@ impl<'a> ScriptContext<'a> {
         }
     }
 
+    pub fn find_by_name(&self, name: &str) -> Option<ObjectId> {
+        self.world.find_by_name(name)
+    }
+
+    pub fn find_by_path(&self, path: &str) -> Option<ObjectId> {
+        self.world.find_by_path(path)
+    }
+
+    pub fn get_component_in_children<T: 'static>(&self) -> Option<&T> {
+        self.object.get_component_in_children(self.world)
+    }
+
+    pub fn get_component_in_parent<T: 'static>(&self) -> Option<&T> {
+        self.object.get_component_in_parent(self.world)
+    }
+
     pub fn find_first_with<T: 'static>(&self) -> Option<ObjectId> {
         self.world.find_first_with::<T>()
     }

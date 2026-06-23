@@ -161,6 +161,14 @@ impl Object {
         self
     }
 
+    pub fn find_in_world_by_name(&self, name: &str) -> Option<ObjectId> {
+        self.get_world()?.borrow().find_by_name(name)
+    }
+
+    pub fn find_in_world_by_path(&self, path: &str) -> Option<ObjectId> {
+        self.get_world()?.borrow().find_by_path(path)
+    }
+
     pub fn runtime_registry(&self) -> Option<Arc<RuntimeRegistry>> {
         self.get_world()
             .and_then(|world_rc| world_rc.borrow().runtime_registry_arc())
@@ -192,6 +200,42 @@ impl Object {
         self.components
             .get_mut(&TypeId::of::<T>())
             .and_then(|c| c.as_any_mut().downcast_mut())
+    }
+
+    /// Recursively search this object and its children for a component of type T.
+    /// Uses an explicit world reference to avoid RefCell double-borrow.
+    pub fn get_component_in_children<'a, T: 'static>(
+        &'a self,
+        world: &'a World,
+    ) -> Option<&'a T> {
+        if let Some(component) = self.get_component::<T>() {
+            return Some(component);
+        }
+        for child_id in &self.children {
+            if let Some(child) = world.object(*child_id) {
+                if let Some(component) = child.get_component_in_children::<T>(world) {
+                    return Some(component);
+                }
+            }
+        }
+        None
+    }
+
+    /// Recursively search this object and its parents for a component of type T.
+    /// Uses an explicit world reference to avoid RefCell double-borrow.
+    pub fn get_component_in_parent<'a, T: 'static>(
+        &'a self,
+        world: &'a World,
+    ) -> Option<&'a T> {
+        if let Some(component) = self.get_component::<T>() {
+            return Some(component);
+        }
+        if let Some(parent_id) = self.parent {
+            if let Some(parent) = world.object(parent_id) {
+                return parent.get_component_in_parent::<T>(world);
+            }
+        }
+        None
     }
 
     pub fn has_component<T: 'static>(&self) -> bool {
