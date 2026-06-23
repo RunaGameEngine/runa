@@ -24,6 +24,8 @@ use crate::{
 
 pub struct World {
     objects: Vec<Object>,
+    /// O(1) lookup: ObjectId → index in `objects`.
+    object_index: HashMap<ObjectId, usize>,
     debug_renderer: DebugRenderer,
     pub audio_engine: AudioEngine,
     pub events: RefCell<EventBus>,
@@ -70,6 +72,7 @@ impl World {
     pub fn new() -> Self {
         Self {
             objects: Vec::new(),
+            object_index: HashMap::new(),
             debug_renderer: DebugRenderer::new(),
             audio_engine: AudioEngine::default(),
             events: RefCell::new(EventBus::new()),
@@ -177,6 +180,7 @@ impl World {
         object.set_id(id);
 
         self.objects.push(object);
+        self.object_index.insert(id, self.objects.len() - 1);
         let object = self.objects.last_mut().unwrap();
 
         if let Some(world_rc) = maybe_world_rc {
@@ -658,13 +662,13 @@ impl World {
     }
 
     pub fn object(&self, id: ObjectId) -> Option<&Object> {
-        self.objects.iter().find(|object| object.id() == Some(id))
+        let idx = *self.object_index.get(&id)?;
+        self.objects.get(idx)
     }
 
     pub fn object_mut(&mut self, id: ObjectId) -> Option<&mut Object> {
-        self.objects
-            .iter_mut()
-            .find(|object| object.id() == Some(id))
+        let idx = *self.object_index.get(&id)?;
+        self.objects.get_mut(idx)
     }
 
     pub fn get<T: 'static>(&self, id: ObjectId) -> Option<&T> {
@@ -931,11 +935,15 @@ impl World {
     }
 
     fn despawn_immediate_single(&mut self, id: ObjectId) -> Option<Object> {
-        let index = self
-            .objects
-            .iter()
-            .position(|object| object.id() == Some(id))?;
+        let index = self.object_index.get(&id).copied()?;
         let mut object = self.objects.remove(index);
+        self.object_index.remove(&id);
+        // shift indices of objects that were after the removed position
+        for (_, idx) in self.object_index.iter_mut() {
+            if *idx > index {
+                *idx -= 1;
+            }
+        }
         if let Some(parent_id) = object.parent() {
             if let Some(parent) = self.object_mut(parent_id) {
                 parent.remove_child_id(id);

@@ -4,7 +4,6 @@ use crate::registry::RuntimeRegistry;
 use glam::Vec2;
 use std::any::TypeId;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
@@ -30,7 +29,7 @@ pub struct Object {
     pub name: String,
     parent: Option<ObjectId>,
     children: Vec<ObjectId>,
-    components: HashMap<TypeId, Box<dyn Component>>,
+    components: Vec<(TypeId, Box<dyn Component>)>,
     world: Option<Weak<RefCell<World>>>,
 }
 
@@ -89,21 +88,18 @@ impl Default for ObjectBuilder {
 
 impl Object {
     pub fn new(name: impl Into<String>) -> Self {
-        let mut components: HashMap<TypeId, Box<dyn Component>> = HashMap::new();
-        components.insert(TypeId::of::<Transform>(), Box::new(Transform::default()));
-
         Self {
             id: None,
             name: name.into(),
             parent: None,
             children: Vec::new(),
-            components,
+            components: vec![(TypeId::of::<Transform>(), Box::new(Transform::default()))],
             world: None,
         }
     }
 
     pub fn component_type_ids(&self) -> Vec<TypeId> {
-        self.components.keys().copied().collect()
+        self.components.iter().map(|(tid, _)| *tid).collect()
     }
 
     pub fn empty() -> Self {
@@ -149,7 +145,7 @@ impl Object {
     }
 
     pub fn get_world(&self) -> Option<Rc<RefCell<World>>> {
-        self.world.as_ref()?.upgrade() // None, if World killed
+        self.world.as_ref()?.upgrade()
     }
 
     pub(crate) fn set_id(&mut self, id: ObjectId) {
@@ -174,32 +170,30 @@ impl Object {
             .and_then(|world_rc| world_rc.borrow().runtime_registry_arc())
     }
 
-    /// Add a component to the object. Only one component of a given type is allowed.
     pub fn add_component<T: Component>(&mut self, component: T) -> &mut Object {
         let type_id = TypeId::of::<T>();
-        if type_id == TypeId::of::<Transform>() {
-            self.components.insert(type_id, Box::new(component));
-            return self;
+        if let Some(pos) = self.components.iter().position(|(tid, _)| *tid == type_id) {
+            self.components[pos] = (type_id, Box::new(component));
+        } else {
+            self.components.push((type_id, Box::new(component)));
         }
-
-        assert!(
-            !self.components.contains_key(&type_id),
-            "Component already exists {type_id:?}"
-        );
-        self.components.insert(type_id, Box::new(component));
         self
     }
 
     pub fn get_component<T: 'static>(&self) -> Option<&T> {
+        let type_id = TypeId::of::<T>();
         self.components
-            .get(&TypeId::of::<T>())
-            .and_then(|c| c.as_any().downcast_ref())
+            .iter()
+            .find(|(tid, _)| *tid == type_id)
+            .and_then(|(_, c)| c.as_any().downcast_ref())
     }
 
     pub fn get_component_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        let type_id = TypeId::of::<T>();
         self.components
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|c| c.as_any_mut().downcast_mut())
+            .iter_mut()
+            .find(|(tid, _)| *tid == type_id)
+            .and_then(|(_, c)| c.as_any_mut().downcast_mut())
     }
 
     /// Recursively search this object and its children for a component of type T.
@@ -239,11 +233,12 @@ impl Object {
     }
 
     pub fn has_component<T: 'static>(&self) -> bool {
-        self.get_component::<T>().is_some()
+        let type_id = TypeId::of::<T>();
+        self.components.iter().any(|(tid, _)| *tid == type_id)
     }
 
     pub fn has_component_type_id(&self, type_id: TypeId) -> bool {
-        self.components.contains_key(&type_id)
+        self.components.iter().any(|(tid, _)| *tid == type_id)
     }
 
     pub fn with_component_mut_by_type_id<R>(
@@ -251,8 +246,11 @@ impl Object {
         type_id: TypeId,
         apply: impl FnOnce(&mut dyn Component) -> R,
     ) -> Option<R> {
-        let component = self.components.get_mut(&type_id)?;
-        Some(apply(component.as_mut()))
+        let component = self
+            .components
+            .iter_mut()
+            .find(|(tid, _)| *tid == type_id)?;
+        Some(apply(component.1.as_mut()))
     }
 
     pub fn with_component_by_type_id<R>(
@@ -260,16 +258,19 @@ impl Object {
         type_id: TypeId,
         apply: impl FnOnce(&dyn Component) -> R,
     ) -> Option<R> {
-        let component = self.components.get(&type_id)?;
-        Some(apply(component.as_ref()))
+        let component = self.components.iter().find(|(tid, _)| *tid == type_id)?;
+        Some(apply(component.1.as_ref()))
     }
 
     pub fn remove_component_type_id(&mut self, type_id: TypeId) -> bool {
         if type_id == TypeId::of::<Transform>() {
             return false;
         }
-
-        self.components.remove(&type_id).is_some()
+        let Some(pos) = self.components.iter().position(|(tid, _)| *tid == type_id) else {
+            return false;
+        };
+        self.components.swap_remove(pos);
+        true
     }
 
     pub fn component_infos(&self) -> Vec<ObjectComponentInfo> {
@@ -285,40 +286,34 @@ impl Object {
 
     pub(crate) fn run_start(&mut self, world: *mut World) {
         let world = unsafe { &mut *world };
-        let component_ids: Vec<TypeId> = self.components.keys().copied().collect();
-        for type_id in component_ids {
-            let Some(mut component) = self.components.remove(&type_id) else {
-                continue;
-            };
+        let count = self.components.len();
+        for _ in 0..count {
+            let Some((type_id, mut component)) = self.components.pop() else { break; };
             let mut ctx = ScriptContext::new(self, world);
             component.on_start(&mut ctx);
-            self.components.insert(type_id, component);
+            self.components.push((type_id, component));
         }
     }
 
     pub(crate) fn run_update(&mut self, world: *mut World, dt: f32) {
         let world = unsafe { &mut *world };
-        let component_ids: Vec<TypeId> = self.components.keys().copied().collect();
-        for type_id in component_ids {
-            let Some(mut component) = self.components.remove(&type_id) else {
-                continue;
-            };
+        let count = self.components.len();
+        for _ in 0..count {
+            let Some((type_id, mut component)) = self.components.pop() else { break; };
             let mut ctx = ScriptContext::new(self, world);
             component.on_update(&mut ctx, dt);
-            self.components.insert(type_id, component);
+            self.components.push((type_id, component));
         }
     }
 
     pub(crate) fn run_late_update(&mut self, world: *mut World, dt: f32) {
         let world = unsafe { &mut *world };
-        let component_ids: Vec<TypeId> = self.components.keys().copied().collect();
-        for type_id in component_ids {
-            let Some(mut component) = self.components.remove(&type_id) else {
-                continue;
-            };
+        let count = self.components.len();
+        for _ in 0..count {
+            let Some((type_id, mut component)) = self.components.pop() else { break; };
             let mut ctx = ScriptContext::new(self, world);
             component.on_late_update(&mut ctx, dt);
-            self.components.insert(type_id, component);
+            self.components.push((type_id, component));
         }
     }
 
