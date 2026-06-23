@@ -57,16 +57,14 @@ Code-first means **Rust code is the primary way to build a game**. The engine
 exposes its power through typed, composable, documented APIs — not through
 drag-and-drop or visual scripting.
 
-A great code-first engine feels like:
+A great code-first engine should feel like:
 
-```
+```rust
+// 🎯 TARGET API (not yet implemented — aspirational)
 use runa::prelude::*;
 
 #[derive(Component)]
 struct Health(f32);
-
-#[derive(Component)]
-struct Player;
 
 fn spawn_player(world: &mut World) {
     world.spawn((
@@ -83,10 +81,23 @@ fn heal_system(mut q: Query<&mut Health, With<Player>>) {
 }
 ```
 
+**Current API** (works today):
+
+```rust
+fn spawn_player(world: &mut World) -> ObjectId {
+    world.spawn(
+        Object::new("Player")
+            .with(Player)
+            .with(Health(100.0))
+            .with(SpriteRenderer::from("hero.png")),
+    )
+}
+```
+
 Not like:
 
-```
-// What it shouldn't feel like
+```rust
+// What it shouldn't feel like (manual Vec<Box<dyn Component>>)
 fn spawn_player(world: &mut World) -> u64 {
     let mut obj = Object::new("Player");
     obj.add_component(Box::new(Player));

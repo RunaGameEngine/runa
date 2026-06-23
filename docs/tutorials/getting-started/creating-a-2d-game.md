@@ -25,8 +25,8 @@ fn main() {
     let mut engine = Engine::new();
     register_game_types(&mut engine);
 
-    let mut world = engine.create_world();
-    let _ = world.spawn_archetype::<player::PlayerArchetype>();
+    let world_rc = engine.create_world();
+    world_rc.borrow_mut().spawn_archetype::<player::PlayerArchetype>();
 
     let config = RunaWindowConfig {
         title: "My 2D Game".to_string(),
@@ -38,7 +38,7 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world, config);
+    let _ = RunaApp::run_with_config(world_rc, config);
 }
 ```
 

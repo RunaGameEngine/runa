@@ -31,8 +31,8 @@ fn main() {
     let mut engine = Engine::new();
     engine.register_archetype::<EmptyArchetype>();
 
-    let mut world = engine.create_world();
-    let _ = world.spawn_archetype::<EmptyArchetype>();
+    let world_rc = engine.create_world();
+    world_rc.borrow_mut().spawn_archetype::<EmptyArchetype>();
 
     let config = RunaWindowConfig {
         title: "My First Game".to_string(),
@@ -44,7 +44,7 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world, config);
+    let _ = RunaApp::run_with_config(world_rc, config);
 }
 ```
 
@@ -66,9 +66,11 @@ You can still build objects manually and call `world.spawn(...)` directly. The e
 ```rust
 use runa_engine::runa_core::ocs::Object;
 
-let mut world = Engine::new().create_world();
+let world_rc = Engine::new().create_world();
+let mut world = world_rc.borrow_mut();
 let id = world.spawn(Object::new("Manual Object"));
-let object = world.get(id);
+// world.object(id) returns Option<&Object>
+// world.get::<T>(id) returns a specific component Option<&T>
 ```
 
 ## Notes

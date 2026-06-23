@@ -72,8 +72,8 @@ The intended public surface is:
 
 - `spawn(...)`
 - `despawn(id)`
-- `get(id)`
-- `get_mut(id)`
+- `object(id)` / `object_mut(id)` — get the whole Object
+- `get::<T>(id)` / `get_mut::<T>(id)` — get a specific component
 - `find_first_with::<T>()`
 - `find_all_with::<T>()`
 - `query::<T>()`

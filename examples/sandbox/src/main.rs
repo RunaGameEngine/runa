@@ -1,9 +1,11 @@
 // #![windows_subsystem = "windows"]
 
+use runa_core::Vec3;
 use runa_engine::{
     runa_app::{RunaApp, RunaWindowConfig},
     Engine,
 };
+use crate::player::{Health, PlayerController};
 
 mod collider_demo;
 mod player;
@@ -30,6 +32,7 @@ fn main() {
         let _ = world.spawn_archetype::<collider_demo::ColliderDemoBoxArchetype>();
         let _ = world.spawn_archetype::<player::PlayerArchetype>();
         let _ = world.spawn_archetype::<player::PlayerCameraArchetype>();
+
     }
 
     let config = RunaWindowConfig {

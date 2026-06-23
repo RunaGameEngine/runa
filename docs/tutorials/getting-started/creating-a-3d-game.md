@@ -39,9 +39,9 @@ fn main() {
     engine.register_archetype::<CameraControllerArchetype>();
     engine.register_archetype::<RotatingCubeArchetype>();
 
-    let mut world = engine.create_world();
-    let _ = world.spawn_archetype::<CameraControllerArchetype>();
-    let _ = world.spawn_archetype::<RotatingCubeArchetype>();
+    let world_rc = engine.create_world();
+    world_rc.borrow_mut().spawn_archetype::<CameraControllerArchetype>();
+    world_rc.borrow_mut().spawn_archetype::<RotatingCubeArchetype>();
 
     let config = RunaWindowConfig {
         title: "My 3D Game".to_string(),
@@ -53,7 +53,7 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world, config);
+    let _ = RunaApp::run_with_config(world_rc, config);
 }
 ```
 

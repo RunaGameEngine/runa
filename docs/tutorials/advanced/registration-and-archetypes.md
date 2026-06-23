@@ -108,8 +108,8 @@ Spawn them later through the world:
 let mut engine = Engine::new();
 register_game_types(&mut engine);
 
-let mut world = engine.create_world();
-let _ = world.spawn_archetype::<PlayerArchetype>();
+let world_rc = engine.create_world();
+world_rc.borrow_mut().spawn_archetype::<PlayerArchetype>();
 ```
 
 String lookup still exists as a secondary API for tooling, serialization, and editor flows:
