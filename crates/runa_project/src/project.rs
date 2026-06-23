@@ -116,7 +116,7 @@ impl Default for ProjectAppConfig {
             window_title: "Runa Game".to_string(),
             width: 1280,
             height: 720,
-            fullscreen: false,
+            fullscreen: true,
             vsync: true,
             show_fps_in_title: false,
             window_icon: None,

@@ -1456,6 +1456,7 @@ impl TilemapAsset {
             atlas: None,
             selected_tile: self.selected_tile,
             pixels_per_unit: self.pixels_per_unit.max(f32::EPSILON),
+            generation: 0,
         };
         if let Some(atlas) = self.atlas {
             if let (Some(project_root), Some(path)) = (project_root, atlas.texture.clone()) {

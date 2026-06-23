@@ -9,7 +9,7 @@ use runa_engine::RunaArchetype;
 
 pub fn create_tilemap_tester() -> Object {
     let tilemap = {
-        let tilesize = 10;
+        let tilesize = 100;
         // The sandbox tilemap intentionally uses simple 2x2 world-unit tiles so
         // sprite/camera alignment bugs are easy to spot while moving around.
         let mut tilemap = Tilemap::centered(tilesize, tilesize, USizeVec2::new(32, 32));

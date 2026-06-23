@@ -1,22 +1,30 @@
-use crate::handle::Handle;
+use std::sync::Arc;
 
-// Simple font asset that contains character textures
+/// A font asset that can be loaded from a TTF file.
 pub struct FontAsset {
-    pub character_size: (u32, u32), // Size of each character in the font atlas
-    pub characters: std::collections::HashMap<char, Handle<crate::texture::TextureAsset>>,
+    pub name: String,
+    pub data: Arc<Vec<u8>>,
 }
 
 impl FontAsset {
-    pub fn load_default() -> Self {
-        // For now, we'll create a minimal font asset
-        // In a real implementation, this would load a font file and generate character textures
+    pub fn load_from_bytes(data: Vec<u8>, name: impl Into<String>) -> Self {
         Self {
-            character_size: (8, 8), // Default character size
-            characters: std::collections::HashMap::new(),
+            name: name.into(),
+            data: Arc::new(data),
         }
     }
 
-    pub fn get_character_texture(&self, c: char) -> Option<&Handle<crate::texture::TextureAsset>> {
-        self.characters.get(&c)
+    pub fn load_from_ttf(path: impl AsRef<std::path::Path>) -> Result<Self, std::io::Error> {
+        let data = std::fs::read(path.as_ref())?;
+        let name = path
+            .as_ref()
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("font")
+            .to_string();
+        Ok(Self {
+            name,
+            data: Arc::new(data),
+        })
     }
 }

@@ -1,3 +1,4 @@
+use runa_app::RunaWindowConfig;
 use runa_core::components::ui::ImageProps;
 use runa_core::{
     components::ui::{CanvasSpace, TextAlign, TextProps},
@@ -67,5 +68,15 @@ fn main() {
         world.spawn(camera_object);
     }
 
-    let _ = RunaApp::run_default(world_rc);
+    let cfg = RunaWindowConfig {
+        title: "".to_string(),
+        width: 1280,
+        height: 720,
+        fullscreen: false,
+        vsync: false,
+        show_fps_in_title: false,
+        window_icon: None,
+    };
+
+    let _ = RunaApp::run_with_config(world_rc, cfg);
 }
