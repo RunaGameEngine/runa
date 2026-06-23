@@ -46,8 +46,8 @@ docs/
 
 ## Code Philosophy
 
-- **Code-first**: objects are composed in Rust. The editor is a tool, not a
-  requirement.
+- **Code-first**: Rust code is the primary way to build a game. The editor
+  is a future concern — we stabilise the code API first.
 - **Zero-cost**: unused features must not affect runtime performance. Use
   Cargo feature flags and `#[cfg]`.
 - **Clarity**: explicit is better than magic. Typed archetypes, explicit

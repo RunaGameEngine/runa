@@ -6,9 +6,13 @@
  
 [![RunaGameEngine](TheRunaGameEngine.png)](https://github.com/RunaGameEngine/runa)
 
-Runa Engine is an experimental Rust game engine workspace built around a code-first runtime, a `wgpu` renderer, project tooling, and an optional editor.
+Runa Engine is an experimental **code-first** Rust game engine. The primary way to build a game is through typed, composable Rust APIs. An optional editor exists as a prototype and is currently frozen — all effort goes into stabilising the core engine first.
 
 > Status: pre-alpha. APIs are still evolving. The runtime is usable for prototypes and internal tools, but the engine is not production-ready yet.
+>
+> **Strategic focus (v0.6+):** code-first core engine. The editor is frozen
+> as a prototype until the core API stabilises (target: v0.10).
+> See [`docs/architecture/strategic-direction.md`](docs/architecture/strategic-direction.md).
 
 ## What Runa Is 
 
@@ -19,7 +23,7 @@ Runa is a workspace, not just one crate. It currently includes:
 - `runa_render`: `wgpu` renderer
 - `runa_asset`: asset loading helpers
 - `runa_project`: project and world serialization/scaffolding
-- `runa_editor`: optional editor
+- `runa_editor`: optional editor (frozen — see [strategic direction](docs/architecture/strategic-direction.md))
 - `runa_engine`: umbrella crate for normal game-side usage
 
 The runtime is code-first:
@@ -63,7 +67,7 @@ The runtime is code-first:
 - `.runaproj` project manifest
 - world save/load in RON
 - project scaffolding
-- experimental editor
+- experimental editor (frozen — strategic pause)
 - editor-side build flow with project/build settings
 
 ## Current Limits
@@ -73,7 +77,7 @@ The runtime is code-first:
 - no mature animation pipeline
 - 3D support is still basic
 - generic registry-driven serialization is not finished yet
-- editor is optional and incomplete
+- editor is frozen as a prototype (will be rewritten after core stabilises)
 - API stability is not guaranteed between alpha revisions
 
 ## Quick Start
@@ -212,11 +216,10 @@ Good practice in Runa:
 
 Script fields intended for editor/runtime serialization must be marked explicitly with `#[serialize_field]` when using the derive macros. For script/component default values visible to the editor, the recommended path is `impl Default` on the type.
 
-Editor workflow notes:
-
-- `Project Settings` edits the project manifest, including the `RunaWindowConfig` values used by `Play In Window`
-- `Build Settings` controls release/debug output and Windows console-hiding for final builds
-- `Content Browser -> Live Rust` now separates `New Rust Script` from `New Rust Archetype`, so scripts can be authored without bundling archetype code into the same file
+> **Editor note:** The editor is currently frozen as a prototype (see
+> [`strategic-direction.md`](docs/architecture/strategic-direction.md)).
+> The notes below describe the prototype's current behaviour and will
+> be relevant when the editor rewrite begins.
 
 ## Documentation
 

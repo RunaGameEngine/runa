@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Strategic pivot:** editor feature development frozen. All effort goes into
+  code-first core engine API until v0.10. Editor remains as prototype.
+  See [`docs/architecture/strategic-direction.md`](docs/architecture/strategic-direction.md).
+- ROADMAP.md restructured: editor moved to deferred section, added code-first DX
+  goals and workflow/tooling items.
+
 ## [0.5.1-alpha.1] - 2026-04-26
 
 ### Added

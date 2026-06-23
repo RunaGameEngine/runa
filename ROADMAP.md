@@ -1,7 +1,12 @@
 # Runa Engine Roadmap
 
-> Philosophy: code-first runtime + convenient editor. Nothing that hurts performance,
-> even when unused. Community-driven. Clarity and performance are the two pillars.
+> **Strategic pivot (v0.6+): Code-first is the primary path.**
+> The editor is frozen as a prototype — it will not receive new features until
+> the core engine reaches API stability (target: v0.10). All effort goes into
+> making the code-first Rust API productive, performant, and well-documented.
+>
+> See [`docs/architecture/strategic-direction.md`](docs/architecture/strategic-direction.md)
+> for the full rationale.
 
 ## Near-term (0.6.x — 0.7.x)
 
@@ -34,7 +39,23 @@
 - [ ] Add doc examples for every component type
 - [ ] Architecture decision records (ADR) for major past decisions
 
+### Workflow & tooling
+- [ ] Set up GitHub Issues with labels (`area:core`, `area:render`, `area:docs`, `perf`)
+- [ ] Create a GitHub Project board (or maintain ROADMAP.md as the single source of truth)
+- [ ] Add a `tasks/` or `TODO.md` for day-to-day micro-tasks (optional for solo flow)
+- [ ] Conventional commits checklist in `.github/PULL_REQUEST_TEMPLATE.md`
+
 ## Medium-term (0.8.x — 0.9.x)
+
+### Code-first DX (core stabilisation)
+- [ ] Audit every public API for consistency and discoverability
+- [ ] Ensure all derive macros produce helpful compiler errors
+- [ ] Add doc-tests for every public item (`cargo test --doc` passes)
+- [ ] `World` API review: reduce footguns, make common patterns one-liners
+- [ ] Script ergonomics: `ctx.get_component::<T>()` → `ctx.component::<T>()`?
+- [ ] ObjectBuilder ergonomics: chaining, defaults, required fields
+- [ ] First-class examples: 2D platformer, 3D walker, UI dashboard, audio playground
+- [ ] Release 0.8 with `runa_core` on crates.io
 
 ### 2D polish (first-class 2D experience)
 - [ ] Pixel-perfect 2D pipeline (pixel snapping, sub-pixel rendering)
@@ -45,14 +66,6 @@
 - [ ] UI layout engine (measure/arrange, text wrapping, anchoring, stretch)
 - [ ] Skeleton animation / spritesheet state machine
 
-### Editor maturity
-- [ ] Live asset hot-reload (textures, audio, scenes)
-- [ ] Scene graph / hierarchy drag-drop from editor
-- [ ] Inspector: multi-object editing, prefab overrides
-- [ ] Play-In-Editor (embedded viewport instead of separate window)
-- [ ] Gizmo improvements (scale, rotation arcball, grid snapping)
-- [ ] Editor plugin API (community can extend editor panels)
-
 ### 3D foundations
 - [ ] PBR material pipeline (metallic-roughness, normal maps, occlusion)
 - [ ] Shadow maps (directional + point light)
@@ -60,7 +73,16 @@
 - [ ] Skybox / skysphere
 - [ ] Fog (distance + height)
 
-## Long-term (0.10.x +)
+## Long-term (0.10.x +) — editor unfrozen
+
+### Editor reset (rebuild on stable core)
+- [ ] Design editor architecture from scratch, backed by lessons from the prototype
+- [ ] Live asset hot-reload (textures, audio, scenes)
+- [ ] Scene graph / hierarchy drag-drop from editor
+- [ ] Inspector: multi-object editing, prefab overrides
+- [ ] Play-In-Editor (embedded viewport instead of separate window)
+- [ ] Gizmo improvements (scale, rotation arcball, grid snapping)
+- [ ] Editor plugin API (community can extend editor panels)
 
 ### 3D expansion
 - [ ] Deferred or clustered rendering for many lights
