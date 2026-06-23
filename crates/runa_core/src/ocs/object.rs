@@ -286,9 +286,8 @@ impl Object {
 
     pub(crate) fn run_start(&mut self, world: *mut World) {
         let world = unsafe { &mut *world };
-        let count = self.components.len();
-        for _ in 0..count {
-            let Some((type_id, mut component)) = self.components.pop() else { break; };
+        for i in (0..self.components.len()).rev() {
+            let (type_id, mut component) = self.components.swap_remove(i);
             let mut ctx = ScriptContext::new(self, world);
             component.on_start(&mut ctx);
             self.components.push((type_id, component));
@@ -297,9 +296,8 @@ impl Object {
 
     pub(crate) fn run_update(&mut self, world: *mut World, dt: f32) {
         let world = unsafe { &mut *world };
-        let count = self.components.len();
-        for _ in 0..count {
-            let Some((type_id, mut component)) = self.components.pop() else { break; };
+        for i in (0..self.components.len()).rev() {
+            let (type_id, mut component) = self.components.swap_remove(i);
             let mut ctx = ScriptContext::new(self, world);
             component.on_update(&mut ctx, dt);
             self.components.push((type_id, component));
@@ -308,9 +306,8 @@ impl Object {
 
     pub(crate) fn run_late_update(&mut self, world: *mut World, dt: f32) {
         let world = unsafe { &mut *world };
-        let count = self.components.len();
-        for _ in 0..count {
-            let Some((type_id, mut component)) = self.components.pop() else { break; };
+        for i in (0..self.components.len()).rev() {
+            let (type_id, mut component) = self.components.swap_remove(i);
             let mut ctx = ScriptContext::new(self, world);
             component.on_late_update(&mut ctx, dt);
             self.components.push((type_id, component));
