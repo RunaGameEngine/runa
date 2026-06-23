@@ -13,6 +13,20 @@ pub struct Vertex3D {
     pub color: [f32; 4],
 }
 
+/// Per-instance data for sprite/tile rendering.
+/// Contains transform, UV coordinates, and flip information.
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct InstanceData {
+    pub position: [f32; 3],
+    pub rotation: f32,
+    pub scale: [f32; 3],
+    pub color: [f32; 4],
+    pub uv_offset: [f32; 2],
+    pub uv_size: [f32; 2],
+    pub flip: u32,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct DirectionalLightData {
     pub direction: Vec3,
@@ -52,6 +66,50 @@ pub struct AtmosphereData {
     pub background: BackgroundModeData,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ScreenEffectData {
+    /// 0.0 = fully transparent overlay, 1.0 = fully opaque
+    pub fade_color: [f32; 4],
+    /// Vignette: 0.0 = no effect, 1.0 = full vignette
+    pub vignette_strength: f32,
+    pub vignette_radius: f32,
+    pub vignette_softness: f32,
+    /// Color distortion (RGB shift): offset in UV coordinates
+    pub rgb_shift: [f32; 2],
+    /// Screen-wide color tint applied as multiply
+    pub tint_color: [f32; 4],
+    /// Screen-wide brightness/gamma adjustment
+    pub brightness: f32,
+    pub contrast: f32,
+    /// Effect enabled flags
+    pub enabled: ScreenEffectFlags,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ScreenEffectFlags {
+    pub fade: bool,
+    pub vignette: bool,
+    pub rgb_shift: bool,
+    pub tint: bool,
+    pub color_adjust: bool,
+}
+
+impl ScreenEffectFlags {
+    pub fn has_any(&self) -> bool {
+        self.fade || self.vignette || self.rgb_shift || self.tint || self.color_adjust
+    }
+
+    pub fn to_u32(&self) -> u32 {
+        let mut flags = 0u32;
+        if self.fade { flags |= 1; }
+        if self.vignette { flags |= 2; }
+        if self.rgb_shift { flags |= 4; }
+        if self.tint { flags |= 8; }
+        if self.color_adjust { flags |= 16; }
+        flags
+    }
+}
+
 impl Default for AtmosphereData {
     fn default() -> Self {
         Self {
@@ -77,6 +135,8 @@ pub struct UiRect {
 }
 
 pub struct Mesh3dParams {
+    /// Stable identifier for GPU cache deduplication (Arc::as_ptr).
+    pub mesh_id: u64,
     pub vertices: Vec<Vertex3D>,
     pub indices: Vec<u32>,
     pub model_matrix: Mat4,
@@ -98,6 +158,12 @@ pub struct TileParams {
     pub order: i32,
 }
 
+#[derive(Clone, Debug)]
+pub struct TextOutline {
+    pub color: [f32; 4],
+    pub width: f32,
+}
+
 pub enum RenderCommands {
     Sprite {
         texture: std::sync::Arc<TextureAsset>,
@@ -113,6 +179,7 @@ pub enum RenderCommands {
         position: Vec2,
         color: [f32; 4],
         size: f32,
+        outline: Option<TextOutline>,
     },
     DebugRect {
         position: Vec3,
@@ -120,6 +187,12 @@ pub enum RenderCommands {
         color: [f32; 4],
     },
     Tile(TileParams),
+    TileBatch {
+        texture: Arc<TextureAsset>,
+        instances: Vec<InstanceData>,
+        order: i32,
+        depth: f32,
+    },
     Mesh3D(Mesh3dParams),
     // IU
     UiRect {

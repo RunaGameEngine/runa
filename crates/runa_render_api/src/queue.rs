@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::command::{AtmosphereData, DirectionalLightData, Mesh3dParams, PointLightData, TileParams, UiRect};
+use crate::command::{AtmosphereData, DirectionalLightData, InstanceData, Mesh3dParams, PointLightData, ScreenEffectData, TextOutline, TileParams, UiRect};
 use crate::RenderCommands;
 use glam::{Quat, Vec2, Vec3};
 use runa_asset::TextureAsset;
@@ -11,6 +11,7 @@ pub struct RenderQueue {
     pub directional_lights: Vec<DirectionalLightData>,
     pub point_lights: Vec<PointLightData>,
     pub atmosphere: AtmosphereData,
+    pub screen_effects: ScreenEffectData,
 }
 
 impl RenderQueue {
@@ -20,11 +21,16 @@ impl RenderQueue {
             directional_lights: Vec::new(),
             point_lights: Vec::new(),
             atmosphere: AtmosphereData::default(),
+            screen_effects: ScreenEffectData::default(),
         }
     }
 
     pub fn set_atmosphere(&mut self, atmosphere: AtmosphereData) {
         self.atmosphere = atmosphere;
+    }
+
+    pub fn set_screen_effects(&mut self, effects: ScreenEffectData) {
+        self.screen_effects = effects;
     }
 
     pub fn add_directional_light(&mut self, light: DirectionalLightData) {
@@ -57,17 +63,42 @@ impl RenderQueue {
         });
     }
 
-    pub fn draw_text(&mut self, text: String, position: Vec2, color: [f32; 4], size: f32) {
+    pub fn draw_text(
+        &mut self,
+        text: String,
+        position: Vec2,
+        color: [f32; 4],
+        size: f32,
+        outline: Option<TextOutline>,
+    ) {
         self.commands.push(RenderCommands::Text {
             text,
             position,
             color,
             size,
+            outline,
         });
     }
 
     pub fn draw_tile(&mut self, params: TileParams) {
         self.commands.push(RenderCommands::Tile(params));
+    }
+
+    pub fn draw_tiles_batch(
+        &mut self,
+        texture: Arc<TextureAsset>,
+        instances: Vec<InstanceData>,
+        order: i32,
+    ) {
+        if instances.is_empty() {
+            return;
+        }
+        self.commands.push(RenderCommands::TileBatch {
+            texture,
+            instances,
+            order,
+            depth: 0.0,
+        });
     }
 
     pub fn draw_mesh_3d(&mut self, params: Mesh3dParams) {
@@ -122,5 +153,6 @@ impl RenderQueue {
         self.directional_lights.clear();
         self.point_lights.clear();
         self.atmosphere = AtmosphereData::default();
+        self.screen_effects = ScreenEffectData::default();
     }
 }

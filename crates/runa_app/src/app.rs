@@ -154,6 +154,17 @@ impl<'window> App<'window> {
             self.camera
         };
 
+        // Resolve screen effects from active camera before borrowing renderer
+        let mut effects_data = None;
+        if let Some(camera_id) = self.active_camera_id() {
+            let world = self.world_rc.borrow();
+            if let Some(camera_obj) = world.object(camera_id) {
+                if let Some(effects) = camera_obj.get_component::<runa_core::components::ScreenEffects>() {
+                    effects_data = Some(effects.to_render_data());
+                }
+            }
+        }
+
         if let (Some(renderer), Some(window)) = (&mut self.renderer, &self.window) {
             // Clear queue
             self.queue.clear();
@@ -163,8 +174,14 @@ impl<'window> App<'window> {
                 .borrow()
                 .render(&mut self.queue, interpolation_factor);
 
-            // Render console on top (after clearing queue and world render)
+            // Update console's FPS and render on top
+            self.console.current_fps = self.current_fps;
             self.console.render(&mut self.queue, &active_camera);
+
+            // Apply screen effects from active camera
+            if let Some(data) = effects_data {
+                self.queue.set_screen_effects(data);
+            }
 
             // Always render through the camera resolved for this exact frame.
             // Using the last fixed-step camera matrix here causes visible jitter

@@ -1,6 +1,6 @@
 use wgpu::{Device, TextureFormat, VertexState};
 
-use crate::renderer::InstanceData;
+use runa_render_api::command::InstanceData;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]

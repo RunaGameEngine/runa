@@ -9,6 +9,7 @@ mod light;
 mod mesh_renderer;
 mod object_definition_instance;
 mod physics_collision;
+mod screen_effects;
 mod serialized_type_storage;
 mod sorting;
 mod sprite_animator;
@@ -29,6 +30,7 @@ pub use component::{
 };
 pub use cursor_interactable::CursorInteractable;
 pub use light::{DirectionalLight, PointLight};
+pub use screen_effects::ScreenEffects;
 pub use mesh_renderer::AlphaMode;
 pub use mesh_renderer::BuiltinMeshPrimitive;
 pub use mesh_renderer::Material;
@@ -78,6 +80,7 @@ impl_component!(
     MeshRenderer,
     ObjectDefinitionInstance,
     PhysicsCollision,
+    ScreenEffects,
     SerializedTypeStorage,
     Sorting,
     SpriteAnimator,

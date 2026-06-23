@@ -26,6 +26,9 @@ pub enum SerializedFieldValue {
     String(String),
     Vec2([f32; 2]),
     Vec3([f32; 3]),
+    /// Reference to another object by name (resolved at load time).
+    /// Similar to Unity's GameObject reference in serialized data.
+    ObjectRef(String),
 }
 
 pub trait SerializedFieldAccess {

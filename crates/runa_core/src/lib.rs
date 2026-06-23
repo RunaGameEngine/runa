@@ -8,7 +8,7 @@ pub mod registry;
 pub mod systems;
 
 pub use components::{SerializedField, SerializedFieldAccess, SerializedFieldValue};
-pub use console::Console;
+pub use console::{Console, ConsoleCommand};
 pub use ocs::World;
 pub use registry::{
     ArchetypeKey, ArchetypeMetadata, ArchetypeRegistry, ObjectDef, ObjectDefKey, ObjectDefMetadata,

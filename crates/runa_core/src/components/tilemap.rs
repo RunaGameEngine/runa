@@ -108,6 +108,9 @@ pub struct Tilemap {
     pub atlas: Option<TilemapAtlas>,
     pub selected_tile: u32,
     pub pixels_per_unit: f32,
+
+    /// Incremented on every tile mutation for dirty tracking.
+    pub generation: u64,
 }
 
 impl Tilemap {
@@ -124,6 +127,7 @@ impl Tilemap {
             atlas: None,
             selected_tile: 0,
             pixels_per_unit: 16.0,
+            generation: 0,
         }
     }
 
@@ -174,6 +178,7 @@ impl Tilemap {
         if let Some(layer) = self.layers.get_mut(layer_index) {
             layer.set_tile(array_x, array_y, tile);
         }
+        self.generation += 1;
     }
 
     pub fn erase_tile(&mut self, layer_index: usize, tile_x: i32, tile_y: i32) {
@@ -189,6 +194,7 @@ impl Tilemap {
         if let Some(layer) = self.layers.get_mut(layer_index) {
             layer.set_tile(array_x, array_y, Tile::empty());
         }
+        self.generation += 1;
     }
 
     fn ensure_tile_position(&mut self, tile_x: i32, tile_y: i32) {
@@ -231,6 +237,7 @@ impl Tilemap {
             layer.height = new_height;
             layer.tiles = resized;
         }
+        self.generation += 1;
     }
 
     /// Sets a tile using world tile coordinates.
@@ -244,6 +251,7 @@ impl Tilemap {
             for layer in &mut self.layers {
                 layer.set_tile(array_x, array_y, tile.clone());
             }
+            self.generation += 1;
         }
     }
 

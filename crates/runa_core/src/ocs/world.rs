@@ -1,11 +1,12 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use super::command::WorldCommand;
 use glam::{Mat4, Vec2, Vec3};
-use runa_render_api::command::{Mesh3dParams, TileParams};
+use runa_asset::TextureAsset;
+use runa_render_api::command::{InstanceData, Mesh3dParams};
 use runa_render_api::RenderQueue;
 
 use crate::systems::event_system::EventBus;
@@ -13,8 +14,8 @@ use crate::{
     audio::{AudioEngine, SoundId},
     components::{
         ActiveCamera, AudioListener, AudioSource, BackgroundMode, Camera, Collider2D,
-        DirectionalLight, MeshRenderer, PointLight, Sorting, SpriteAnimator, SpriteRenderer,
-        Tilemap, Transform, UiRenderer, WorldAtmosphere,
+        DirectionalLight, MeshRenderer, PointLight, ProjectionType, Sorting, SpriteAnimator,
+        SpriteRenderer, Tilemap, Transform, UiRenderer, WorldAtmosphere,
     },
     debug_renderer::DebugRenderer,
     ocs::{Object, ObjectId, Script},
@@ -334,6 +335,40 @@ impl World {
     pub fn render(&self, render_queue: &mut RenderQueue, interpolation_factor: f32) {
         render_queue.set_atmosphere(to_render_atmosphere(self.atmosphere));
 
+        // Culling data from active camera
+        let mut visible_world_rect: Option<(Vec3, Vec3)> = None;
+        let frustum_planes: Option<[glam::Vec4; 6]> =
+            self.objects.iter().find_map(|obj| {
+                let cam = obj.get_component::<Camera>()?;
+                obj.get_component::<ActiveCamera>()?;
+                // Resolve camera with object transform to get world-space camera
+                let world_cam = cam.resolved_with_transform(obj.get_component::<Transform>());
+                let vp = world_cam.matrix();
+
+                // Frustum planes for 3D object culling
+                let r0 = vp.row(0);
+                let r1 = vp.row(1);
+                let r2 = vp.row(2);
+                let r3 = vp.row(3);
+                let planes = [
+                    r3 + r0, r3 - r0, // left, right
+                    r3 + r1, r3 - r1, // bottom, top
+                    r3 + r2, r3 - r2, // near, far
+                ];
+
+                // Visible world rect for tilemap culling (orthographic only)
+                if world_cam.projection == ProjectionType::Orthographic {
+                    let inv = vp.inverse();
+                    let b = inv * glam::Vec4::new(-1.0, -1.0, 0.0, 1.0);
+                    let t = inv * glam::Vec4::new(1.0, 1.0, 0.0, 1.0);
+                    let b = b.truncate() / b.w;
+                    let t = t.truncate() / t.w;
+                    visible_world_rect = Some((b.min(t), b.max(t)));
+                }
+
+                Some(planes)
+            });
+
         for object in &self.objects {
             if let Some(light) = object.get_component::<DirectionalLight>() {
                 render_queue.add_directional_light(
@@ -382,6 +417,35 @@ impl World {
                     });
                 let interpolated_position = model_matrix.transform_point3(Vec3::ZERO);
                 let mesh = mesh_renderer.get_mesh_handle();
+
+                // Frustum culling: skip objects outside the view frustum
+                // Uses bounding sphere radius from mesh AABB to avoid culling partially visible objects
+                if let Some(planes) = frustum_planes {
+                    let center = interpolated_position;
+                    let bounds = &mesh.inner.bounds;
+                    let half_extents = glam::Vec3::new(
+                        (bounds.max[0] - bounds.min[0]) * 0.5,
+                        (bounds.max[1] - bounds.min[1]) * 0.5,
+                        (bounds.max[2] - bounds.min[2]) * 0.5,
+                    );
+                    // Scale affects the bounding radius in world space
+                    let (model_scale, _, _) = model_matrix.to_scale_rotation_translation();
+                    let max_scale = model_scale.x.abs().max(model_scale.y.abs()).max(model_scale.z.abs());
+                    let radius = half_extents.length() * max_scale;
+
+                    let mut visible = true;
+                    for pl in &planes {
+                        if pl.x * center.x + pl.y * center.y + pl.z * center.z + pl.w + radius
+                            <= 0.0
+                        {
+                            visible = false;
+                            break;
+                        }
+                    }
+                    if !visible {
+                        continue;
+                    }
+                }
                 // Convert Mesh vertices to render_api Vertex3D
                 let vertices: Vec<runa_render_api::command::Vertex3D> = mesh
                     .inner
@@ -395,8 +459,10 @@ impl World {
                     })
                     .collect();
                 let material = mesh_renderer.material_for_rendering();
+                let mesh_id = Arc::as_ptr(&mesh.inner) as u64;
 
                 render_queue.draw_mesh_3d(Mesh3dParams {
+                    mesh_id,
                     vertices,
                     indices: mesh.inner.indices.clone(),
                     model_matrix,
@@ -453,56 +519,94 @@ impl World {
                 object.get_component::<Transform>(),
                 object.get_component::<crate::components::TilemapRenderer>(),
             ) {
+                let object_matrix = self
+                    .world_transform_matrix_for_object(object, interpolation_factor)
+                    .unwrap_or_else(|| {
+                        Mat4::from_scale_rotation_translation(
+                            transform.scale,
+                            transform.interpolated_rotation(interpolation_factor),
+                            transform.interpolated_position(interpolation_factor),
+                        )
+                    });
+                let (tile_scale, _, _) =
+                    object_matrix.to_scale_rotation_translation();
+                let tile_world_size = tilemap.world_tile_size()
+                    * Vec2::new(tile_scale.x.abs(), tile_scale.y.abs());
+
                 for layer in &tilemap.layers {
                     if !layer.visible {
                         continue;
                     }
 
-                    for y in tilemap.offset.y..(tilemap.offset.y + tilemap.height as i32) {
-                        for x in tilemap.offset.x..(tilemap.offset.x + tilemap.width as i32) {
+                    // Compute visible tile range for frustum culling
+                    let (y_start, y_end, x_start, x_end) =
+                        if let Some((world_min, world_max)) = visible_world_rect {
+                            let inv_object = object_matrix.inverse();
+                            let local_min = inv_object.transform_point3(world_min);
+                            let local_max = inv_object.transform_point3(world_max);
+                            let (tx_min, ty_min) = tilemap.world_to_tile(local_min);
+                            let (tx_max, ty_max) = tilemap.world_to_tile(local_max);
+                            let ys = (ty_min - 1).max(tilemap.offset.y);
+                            let ye = (ty_max + 2).min(tilemap.offset.y + tilemap.height as i32);
+                            let xs = (tx_min - 1).max(tilemap.offset.x);
+                            let xe = (tx_max + 2).min(tilemap.offset.x + tilemap.width as i32);
+                            (ys, ye, xs, xe)
+                        } else {
+                            (
+                                tilemap.offset.y,
+                                tilemap.offset.y + tilemap.height as i32,
+                                tilemap.offset.x,
+                                tilemap.offset.x + tilemap.width as i32,
+                            )
+                        };
+
+                    if y_start >= y_end || x_start >= x_end {
+                        continue;
+                    }
+
+                    let total_visible = ((y_end - y_start) * (x_end - x_start)) as usize;
+
+                    // Group tiles by texture pointer for batching
+                    let mut texture_groups: HashMap<usize, (Arc<TextureAsset>, Vec<InstanceData>)> =
+                        HashMap::with_capacity(8);
+
+                    for y in y_start..y_end {
+                        for x in x_start..x_end {
                             let array_x = (x - tilemap.offset.x) as u32;
                             let array_y = (y - tilemap.offset.y) as u32;
 
                             if let Some(tile) = layer.get_tile(array_x, array_y) {
-                                if tile.texture.is_none() {
+                                let Some(texture) = &tile.texture else {
                                     continue;
-                                }
+                                };
 
-                                // Tile world position relative to the object
                                 let world_pos = tilemap.tile_to_world(x, y);
-                                let object_matrix = self
-                                    .world_transform_matrix_for_object(object, interpolation_factor)
-                                    .unwrap_or_else(|| {
-                                        Mat4::from_scale_rotation_translation(
-                                            transform.scale,
-                                            transform.interpolated_rotation(interpolation_factor),
-                                            transform.interpolated_position(interpolation_factor),
-                                        )
-                                    });
                                 let final_pos = object_matrix.transform_point3(world_pos);
-                                let (tile_scale, _, _) =
-                                    object_matrix.to_scale_rotation_translation();
 
-                                render_queue.draw_tile(TileParams {
-                                    texture: tile.texture.clone().unwrap(),
-                                    position: final_pos,
-                                    size: tilemap.world_tile_size()
-                                        * Vec2::new(tile_scale.x.abs(), tile_scale.y.abs()),
-                                    uv_rect: [
-                                        tile.uv_rect.x,
-                                        tile.uv_rect.y,
-                                        tile.uv_rect.width,
-                                        tile.uv_rect.height,
-                                    ],
-                                    flip_x: tile.flip_x,
-                                    flip_y: tile.flip_y,
+                                let instance = InstanceData {
+                                    position: [final_pos.x, final_pos.y, final_pos.z],
+                                    rotation: 0.0,
+                                    scale: [tile_world_size.x, tile_world_size.y, 1.0],
                                     color: [1.0, 1.0, 1.0, layer.opacity.clamp(0.0, 1.0)],
-                                    order: layer.self_order,
+                                    uv_offset: [tile.uv_rect.x, tile.uv_rect.y],
+                                    uv_size: [tile.uv_rect.width, tile.uv_rect.height],
+                                    flip: (tile.flip_x as u32) | ((tile.flip_y as u32) << 1),
+                                };
+
+                                let tex_ptr = Arc::as_ptr(texture) as usize;
+                                let entry = texture_groups.entry(tex_ptr).or_insert_with(|| {
+                                    (texture.clone(), Vec::with_capacity(total_visible))
                                 });
+                                entry.1.push(instance);
                             }
                         }
                     }
+
+                    for (_tex_ptr, (texture, instances)) in texture_groups.drain() {
+                        render_queue.draw_tiles_batch(texture, instances, layer.self_order);
+                    }
                 }
+
             }
 
             if let (Some(canvas), Some(_camera), Some(_ac)) = (
@@ -569,6 +673,23 @@ impl World {
 
     pub fn get_mut<T: 'static>(&mut self, id: ObjectId) -> Option<&mut T> {
         self.object_mut(id)?.get_component_mut::<T>()
+    }
+
+    /// Return all object IDs in the world.
+    pub fn all_object_ids(&self) -> Vec<ObjectId> {
+        self.objects.iter().filter_map(Object::id).collect()
+    }
+
+    /// Return all object names sorted alphabetically.
+    pub fn object_names_sorted(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .objects
+            .iter()
+            .filter_map(|obj| obj.id().map(|_| obj.name.clone()))
+            .collect();
+        names.sort();
+        names.dedup();
+        names
     }
 
     pub fn root_object_ids(&self) -> Vec<ObjectId> {
@@ -690,6 +811,48 @@ impl World {
         object.set_parent_id(None);
         object.clear_children();
         Some(object)
+    }
+
+    pub fn find_by_name(&self, name: &str) -> Option<ObjectId> {
+        self.objects
+            .iter()
+            .find(|object| object.name == name)
+            .and_then(|object| object.id())
+    }
+
+    /// Find an object by hierarchical path (e.g. "Player/Camera").
+    /// Traverses the parent-child hierarchy using the '/' separator.
+    pub fn find_by_path(&self, path: &str) -> Option<ObjectId> {
+        let parts: Vec<&str> = path.split('/').collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        let root_name = parts[0];
+        let root_id = self.find_by_name(root_name)?;
+
+        if parts.len() == 1 {
+            return Some(root_id);
+        }
+
+        let mut current_id = root_id;
+        for part in &parts[1..] {
+            let child_id = self
+                .object(current_id)?
+                .children()
+                .iter()
+                .find_map(|child_id| {
+                    let child = self.object(*child_id)?;
+                    if child.name == *part {
+                        child.id()
+                    } else {
+                        None
+                    }
+                })?;
+            current_id = child_id;
+        }
+
+        Some(current_id)
     }
 
     pub fn find_first_with<T: 'static>(&self) -> Option<ObjectId> {

@@ -1,33 +1,19 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, num::NonZero, sync::Arc};
 
 use crate::{
     font::FontManager, pipelines::BackgroundPipeline, pipelines::BackgroundUniforms,
     pipelines::MeshPipeline, pipelines::MeshUniforms, pipelines::PointLightUniform,
-    pipelines::SpritePipeline, pipelines::UIPipeline, pipelines::UITexturedVertex,
-    pipelines::UIUniforms, pipelines::UIVertex, pipelines::MAX_POINT_LIGHTS,
-    resources::texture::GpuTexture,
+    pipelines::PostProcessPipeline, pipelines::PostProcessUniforms, pipelines::SpritePipeline,
+    pipelines::UIPipeline, pipelines::UITexturedVertex, pipelines::UIUniforms,
+    pipelines::UIVertex, pipelines::MAX_POINT_LIGHTS, resources::texture::GpuTexture,
 };
 use glam::Vec2;
 use runa_asset::TextureAsset;
-use runa_render_api::{BackgroundModeData, RenderCommands, RenderQueue};
+use runa_render_api::{BackgroundModeData, InstanceData, RenderCommands, RenderQueue};
 use wgpu::util::DeviceExt;
 use wgpu::{MemoryHints::Performance, Trace};
 use wgpu::{Texture, TextureView};
 use winit::window::Window;
-
-/// Per-instance data for sprite/tile rendering.
-/// Contains transform, UV coordinates, and flip information.
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct InstanceData {
-    pub position: [f32; 3],  // x, y, z
-    pub rotation: f32,       // radians
-    pub scale: [f32; 3],     // x, y, z
-    pub color: [f32; 4],     // rgba tint
-    pub uv_offset: [f32; 2], // left-bottom UV coordinates
-    pub uv_size: [f32; 2],   // UV quad size
-    pub flip: u32,           // bit 0 = flip_x, bit 1 = flip_y
-}
 
 /// Vertex structure for sprite quads.
 #[repr(C)]
@@ -92,6 +78,7 @@ pub struct Renderer<'window> {
 
     textures: HashMap<usize, Arc<GpuTexture>>,
     nearest_sampler: wgpu::Sampler,
+    linear_sampler: wgpu::Sampler,
 
     font_manager: FontManager,
 
@@ -101,12 +88,43 @@ pub struct Renderer<'window> {
     depth_view: TextureView,
     depth_texture: Texture,
 
+    post_process_pipeline: PostProcessPipeline,
+
+    /// Intermediate render target for post-processing
+    intermediate_texture: Option<Texture>,
+    intermediate_view: Option<TextureView>,
+
+    /// Clamp-to-edge sampler for post-process sampling
+    post_sampler: wgpu::Sampler,
+
     /// Base quad vertices (6 vertices, static).
     quad_buffer: wgpu::Buffer,
     /// Dynamic instance buffer - resized as needed.
     instance_buffer: wgpu::Buffer,
     /// Current capacity of instance buffer in number of instances.
     instance_buffer_capacity: usize,
+
+    /// GPU cache for 3D meshes: mesh_id -> (vertex_buffer, index_buffer).
+    mesh_gpu_cache: HashMap<u64, (wgpu::Buffer, wgpu::Buffer)>,
+    /// Persistent uniform buffer for all 3D meshes (written each frame via write_buffer).
+    mesh_uniform_buffer: wgpu::Buffer,
+    /// Current capacity of mesh uniform buffer in bytes.
+    mesh_uniform_capacity: u64,
+    /// Aligned stride per mesh uniform (respects min_uniform_buffer_offset_alignment).
+    uniform_stride: u64,
+
+    /// Persistent uniform buffer for background (reused each frame).
+    background_uniform_buffer: wgpu::Buffer,
+    /// Persistent uniform buffer for post-process (reused each frame).
+    postprocess_uniform_buffer: wgpu::Buffer,
+
+    // Per-frame temp containers — reused to avoid alloc/dealloc churn.
+    all_instances: Vec<InstanceData>,
+    sprite_instances: Vec<(i32, f32, usize, usize, InstanceData)>,
+    mesh_items: Vec<(i32, f32, usize)>,
+    ui_vertices: Vec<UIVertex>,
+    batches: Vec<(i32, f32, usize, usize, usize, usize)>,
+    orders: Vec<i32>,
 }
 
 impl<'window> Renderer<'window> {
@@ -225,6 +243,36 @@ impl<'window> Renderer<'window> {
             ..Default::default()
         });
 
+        let linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Linear Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            ..Default::default()
+        });
+
+        let post_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("PostProcess Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            ..Default::default()
+        });
+
+        let post_process_pipeline = PostProcessPipeline::new(&device, surface_config.format);
+        let intermediate_texture = Self::create_intermediate_texture(
+            &device,
+            (surface_config.width, surface_config.height),
+            surface_config.format,
+        );
+        let intermediate_view = intermediate_texture
+            .as_ref()
+            .map(|tex| tex.create_view(&wgpu::TextureViewDescriptor::default()));
+
         let font_manager = FontManager::new(&device, &queue);
 
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -316,6 +364,30 @@ impl<'window> Renderer<'window> {
             mapped_at_creation: false,
         });
 
+        let uniform_alignment = device.limits().min_uniform_buffer_offset_alignment;
+        let uniform_stride = ((size_of::<MeshUniforms>() as u32 + uniform_alignment - 1) / uniform_alignment * uniform_alignment) as u64;
+        const INITIAL_MESH_UNIFORM_SIZE: u64 = 65536; // 64KB — room for ~40 meshes
+        let mesh_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Mesh Uniform Buffer"),
+            size: INITIAL_MESH_UNIFORM_SIZE,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let background_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Background Uniform Buffer"),
+            size: size_of::<BackgroundUniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let postprocess_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("PostProcess Uniform Buffer"),
+            size: size_of::<PostProcessUniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         Self {
             surface,
             surface_config,
@@ -330,14 +402,31 @@ impl<'window> Renderer<'window> {
             globals_buffer,
             textures: HashMap::new(),
             nearest_sampler,
+            linear_sampler,
             font_manager,
             textures_cache: HashMap::new(),
             bind_group_cache: HashMap::new(),
             depth_view,
             depth_texture,
+            post_process_pipeline,
+            intermediate_texture,
+            intermediate_view,
+            post_sampler,
             quad_buffer,
             instance_buffer,
             instance_buffer_capacity: INITIAL_INSTANCE_CAPACITY,
+            mesh_gpu_cache: HashMap::new(),
+            mesh_uniform_buffer,
+            mesh_uniform_capacity: INITIAL_MESH_UNIFORM_SIZE,
+            uniform_stride,
+            background_uniform_buffer,
+            postprocess_uniform_buffer,
+            all_instances: Vec::new(),
+            sprite_instances: Vec::new(),
+            mesh_items: Vec::new(),
+            ui_vertices: Vec::new(),
+            batches: Vec::new(),
+            orders: Vec::new(),
         }
     }
 
@@ -466,6 +555,17 @@ impl<'window> Renderer<'window> {
         self.depth_texture = depth.0;
         self.depth_view = depth.1;
 
+        // Recreate intermediate texture
+        self.intermediate_texture = Self::create_intermediate_texture(
+            &self.device,
+            (self.surface_config.width, self.surface_config.height),
+            self.surface_config.format,
+        );
+        self.intermediate_view = self
+            .intermediate_texture
+            .as_ref()
+            .map(|tex| tex.create_view(&wgpu::TextureViewDescriptor::default()));
+
         // Update UI uniforms
         let ui_uniforms = UIUniforms {
             screen_width: self.surface_config.width as f32,
@@ -483,29 +583,69 @@ impl<'window> Renderer<'window> {
             _ => return, // Surface lost, timeout, etc.
         };
 
-        let view = surface_texture
+        let surface_view = surface_texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor {
                 label: None,
                 ..Default::default()
             });
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-        let depth_view = self.depth_view.clone();
-        self.encode_render_passes(
-            &mut encoder,
-            &view,
-            &depth_view,
-            (self.surface_config.width, self.surface_config.height),
-            queue,
-            camera_matrix,
-            virtual_size,
-        );
-        self.queue.submit(Some(encoder.finish()));
+        let target_size = (self.surface_config.width, self.surface_config.height);
+        let has_effects = queue.screen_effects.enabled.has_any();
+
+        if has_effects {
+            // Render to intermediate texture first
+            let intermediate_view = self.intermediate_view.clone().expect("Intermediate texture not available");
+            let depth_view = self.depth_view.clone();
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Scene Encoder"),
+                });
+            self.encode_render_passes(
+                &mut encoder,
+                &intermediate_view,
+                &depth_view,
+                target_size,
+                queue,
+                camera_matrix,
+                virtual_size,
+            );
+            self.queue.submit(Some(encoder.finish()));
+
+            // Now do post-process pass: intermediate -> surface
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("PostProcess Encoder"),
+                });
+            self.encode_post_process_pass(
+                &mut encoder,
+                &surface_view,
+                target_size,
+                &queue.screen_effects,
+            );
+            self.queue.submit(Some(encoder.finish()));
+        } else {
+            // Render directly to surface
+            let depth_view = self.depth_view.clone();
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+            self.encode_render_passes(
+                &mut encoder,
+                &surface_view,
+                &depth_view,
+                target_size,
+                queue,
+                camera_matrix,
+                virtual_size,
+            );
+            self.queue.submit(Some(encoder.finish()));
+        }
+
         let _ = self.device.poll(wgpu::PollType::Poll);
         surface_texture.present();
     }
@@ -565,11 +705,13 @@ impl<'window> Renderer<'window> {
 
         self.encode_background_pass(encoder, target_view, &queue.atmosphere, camera_matrix);
 
-        let mut all_instances = Vec::new();
-        let mut sprite_instances: Vec<(i32, f32, usize, usize, InstanceData)> = Vec::new();
-        let mut mesh_items: Vec<(i32, f32, usize)> = Vec::new();
-        let mut ui_vertices = Vec::new();
-        let mut ui_text_vertices_map: std::collections::HashMap<usize, Vec<UITexturedVertex>> =
+        self.all_instances.clear();
+        self.sprite_instances.clear();
+        self.mesh_items.clear();
+        self.ui_vertices.clear();
+        let mut ui_font_vertices_map: std::collections::HashMap<usize, Vec<UITexturedVertex>> =
+            std::collections::HashMap::new();
+        let mut ui_image_vertices_map: std::collections::HashMap<usize, Vec<UITexturedVertex>> =
             std::collections::HashMap::new();
         let has_lighting = !queue.directional_lights.is_empty() || !queue.point_lights.is_empty();
         let directional = queue.directional_lights.first().copied();
@@ -594,7 +736,7 @@ impl<'window> Renderer<'window> {
         for (cmd_index, cmd) in queue.commands.iter().enumerate() {
             match cmd {
                 RenderCommands::Mesh3D(params) => {
-                    mesh_items.push((params.order, params.depth, cmd_index));
+                    self.mesh_items.push((params.order, params.depth, cmd_index));
                 }
                 RenderCommands::Sprite {
                     texture,
@@ -624,7 +766,7 @@ impl<'window> Renderer<'window> {
                     let key = Arc::as_ptr(texture) as usize;
                     self.textures_cache.entry(key).or_insert_with(|| texture.clone());
 
-                    sprite_instances.push((*order, position.z, cmd_index, key, instance));
+                    self.sprite_instances.push((*order, position.z, cmd_index, key, instance));
                 }
                 RenderCommands::Tile(params) => {
                     let instance = InstanceData {
@@ -640,7 +782,19 @@ impl<'window> Renderer<'window> {
                     let key = Arc::as_ptr(&params.texture) as usize;
                     self.textures_cache.entry(key).or_insert_with(|| params.texture.clone());
 
-                    sprite_instances.push((params.order, params.position.z, cmd_index, key, instance));
+                    self.sprite_instances.push((params.order, params.position.z, cmd_index, key, instance));
+                }
+                RenderCommands::TileBatch {
+                    texture,
+                    instances,
+                    order,
+                    depth,
+                } => {
+                    let key = Arc::as_ptr(texture) as usize;
+                    self.textures_cache.entry(key).or_insert_with(|| texture.clone());
+                    for instance in instances {
+                        self.sprite_instances.push((*order, *depth, cmd_index, key, *instance));
+                    }
                 }
                 RenderCommands::DebugRect {
                     position,
@@ -652,7 +806,7 @@ impl<'window> Renderer<'window> {
                     let right = left + size.x;
                     let bottom = top + size.y;
 
-                    ui_vertices.extend_from_slice(&[
+                    self.ui_vertices.extend_from_slice(&[
                         UIVertex {
                             position: [left, top],
                             color: *color,
@@ -684,75 +838,47 @@ impl<'window> Renderer<'window> {
                     position,
                     color,
                     size,
+                    outline,
                 } => {
                     let (char_width, char_height) = self.font_manager.char_size();
                     let scale = *size / self.font_manager.base_font_size();
                     let char_w = char_width as f32 * scale;
                     let char_h = char_height as f32 * scale;
-                    let mut x = position.x;
-                    let y = position.y;
 
-                    for ch in text.chars() {
-                        if ch == ' ' {
-                            x += char_w;
-                            continue;
+                    if let Some(ol) = outline {
+                        // Outline: 4 cardinal offsets in outline color
+                        let offsets = [
+                            (-ol.width, 0.0),
+                            (ol.width, 0.0),
+                            (0.0, -ol.width),
+                            (0.0, ol.width),
+                        ];
+                        for (ox, oy) in offsets {
+                            self.emit_text_vertices(
+                                text,
+                                position.x + ox,
+                                position.y + oy,
+                                &ol.color,
+                                char_w,
+                                char_h,
+                                scale,
+                                char_width as f32,
+                                &mut ui_font_vertices_map,
+                            );
                         }
-
-                        if let Some(char_uv) = self.font_manager.get_char_uv(ch) {
-                            let left = x;
-                            let top = y;
-                            let right = x + char_w;
-                            let bottom = y + char_h;
-
-                            if let Some(atlas_tex) = self.font_manager.get_atlas_texture() {
-                                let atlas_key = Arc::as_ptr(atlas_tex) as usize;
-                                let entry = ui_text_vertices_map
-                                    .entry(atlas_key)
-                                    .or_default();
-                                entry.extend_from_slice(&[
-                                    UITexturedVertex {
-                                        position: [left, top],
-                                        tex_coords: [char_uv.u, char_uv.v],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [right, top],
-                                        tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [left, bottom],
-                                        tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [left, bottom],
-                                        tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [right, top],
-                                        tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [right, bottom],
-                                        tex_coords: [
-                                            char_uv.u + char_uv.u_width,
-                                            char_uv.v + char_uv.v_height,
-                                        ],
-                                        color: *color,
-                                    },
-                                ]);
-                            }
-                        }
-
-                        x += self
-                            .font_manager
-                            .get_char_advance(ch)
-                            .unwrap_or(char_width as f32)
-                            * scale;
                     }
+                    // Main text
+                    self.emit_text_vertices(
+                        text,
+                        position.x,
+                        position.y,
+                        color,
+                        char_w,
+                        char_h,
+                        scale,
+                        char_width as f32,
+                        &mut ui_font_vertices_map,
+                    );
                 }
                 RenderCommands::UiRect {
                     rect,
@@ -764,7 +890,7 @@ impl<'window> Renderer<'window> {
                     let right = left + rect.w;
                     let bottom = top + rect.h;
 
-                    ui_vertices.extend_from_slice(&[
+                    self.ui_vertices.extend_from_slice(&[
                         UIVertex {
                             position: [left, top],
                             color: *color,
@@ -819,7 +945,7 @@ impl<'window> Renderer<'window> {
 
                     // Add textured vertices for this image using normalized UVs
                     // For regular textures (not font atlas) flip V coordinate because texture assets are top-left origin
-                    let entry = ui_text_vertices_map.entry(key).or_insert_with(Vec::new);
+                    let entry = ui_image_vertices_map.entry(key).or_insert_with(Vec::new);
                     let u0 = uv_n[0];
                     let v0 = uv_n[1];
                     let uw = uv_n[2];
@@ -899,7 +1025,7 @@ impl<'window> Renderer<'window> {
 
                             if let Some(atlas_tex) = self.font_manager.get_atlas_texture() {
                                 let atlas_key = Arc::as_ptr(atlas_tex) as usize;
-                                let entry = ui_text_vertices_map
+                                let entry = ui_font_vertices_map
                                     .entry(atlas_key)
                                     .or_default();
                                 entry.extend_from_slice(&[
@@ -946,7 +1072,7 @@ impl<'window> Renderer<'window> {
             }
         }
 
-        sprite_instances.sort_by(|left, right| {
+        self.sprite_instances.sort_by(|left, right| {
             left.0
                 .cmp(&right.0)
                 .then_with(|| {
@@ -956,15 +1082,21 @@ impl<'window> Renderer<'window> {
                 })
                 .then_with(|| left.2.cmp(&right.2))
         });
-        let mut batches: Vec<(i32, f32, usize, usize, usize, usize)> = Vec::new();
-        for (order, depth, sequence, texture_key, instance) in sprite_instances {
-            let offset = all_instances.len();
-            all_instances.push(instance);
-            batches.push((order, depth, sequence, texture_key, offset, 1));
+        self.batches.clear();
+        for (order, depth, sequence, texture_key, instance) in self.sprite_instances.drain(..) {
+            let offset = self.all_instances.len();
+            self.all_instances.push(instance);
+            if let Some(last) = self.batches.last_mut() {
+                if last.0 == order && last.3 == texture_key {
+                    last.5 += 1;
+                    continue;
+                }
+            }
+            self.batches.push((order, depth, sequence, texture_key, offset, 1));
         }
 
-        if all_instances.len() > self.instance_buffer_capacity {
-            let new_capacity = (all_instances.len() * 3 / 2).max(1000);
+        if self.all_instances.len() > self.instance_buffer_capacity {
+            let new_capacity = (self.all_instances.len() * 3 / 2).max(1000);
             self.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Instance Buffer"),
                 size: (size_of::<InstanceData>() * new_capacity) as u64,
@@ -974,11 +1106,11 @@ impl<'window> Renderer<'window> {
             self.instance_buffer_capacity = new_capacity;
         }
 
-        if !all_instances.is_empty() {
+        if !self.all_instances.is_empty() {
             self.queue.write_buffer(
                 &self.instance_buffer,
                 0,
-                bytemuck::cast_slice(&all_instances),
+                bytemuck::cast_slice(&self.all_instances),
             );
         }
 
@@ -1004,27 +1136,27 @@ impl<'window> Renderer<'window> {
             ..Default::default()
         });
 
-        let mut orders: Vec<i32> = mesh_items
-            .iter()
-            .map(|(order, _, _)| *order)
-            .chain(batches.iter().map(|(order, _, _, _, _, _)| *order))
-            .collect();
+        // Single sort for meshes by (order, depth, cmd_index)
+        self.mesh_items.sort_by(|a, b| {
+            a.0.cmp(&b.0)
+                .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| a.2.cmp(&b.2))
+        });
+
+        let orders = &mut self.orders;
+        orders.clear();
+        orders.extend(self.mesh_items.iter().map(|(order, _, _)| *order));
+        orders.extend(self.batches.iter().map(|(order, _, _, _, _, _)| *order));
         orders.sort_unstable();
         orders.dedup();
 
-        for order in orders {
-            let mut order_meshes: Vec<(f32, usize)> = mesh_items
-                .iter()
-                .filter(|(mesh_order, _, _)| *mesh_order == order)
-                .map(|(_, depth, index)| (*depth, *index))
-                .collect();
-            order_meshes.sort_by(|left, right| {
-                left.0
-                    .partial_cmp(&right.0)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+        let mut mesh_uniform_offset: u64 = 0;
 
-            for (_, cmd_index) in order_meshes {
+        for order in orders.iter() {
+            // Draw meshes for this order — they are already sorted globally
+            let order_start = self.mesh_items.partition_point(|(o, _, _)| o < order);
+            let order_end = self.mesh_items.partition_point(|(o, _, _)| o <= order);
+            for cmd_index in self.mesh_items[order_start..order_end].iter().map(|(_, _, i)| *i) {
                 let RenderCommands::Mesh3D(params) = &queue.commands[cmd_index]
                 else {
                     continue;
@@ -1057,40 +1189,69 @@ impl<'window> Renderer<'window> {
                     ],
                     point_lights,
                 };
-                let mesh_uniform_buffer =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Mesh Uniform Buffer"),
-                            contents: bytemuck::bytes_of(&mesh_uniforms),
-                            usage: wgpu::BufferUsages::UNIFORM,
-                        });
+
+                // Grow uniform buffer if needed
+                let needed_size = mesh_uniform_offset + self.uniform_stride;
+                if needed_size > self.mesh_uniform_capacity {
+                    let new_size = (needed_size * 3 / 2).max(65536);
+                    self.mesh_uniform_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("Mesh Uniform Buffer"),
+                        size: new_size,
+                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    });
+                    self.mesh_uniform_capacity = new_size;
+                }
+
+                self.queue.write_buffer(
+                    &self.mesh_uniform_buffer,
+                    mesh_uniform_offset,
+                    bytemuck::bytes_of(&mesh_uniforms),
+                );
 
                 let mesh_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     layout: &self.mesh_pipeline.bind_group_layout,
                     entries: &[wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: mesh_uniform_buffer.as_entire_binding(),
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &self.mesh_uniform_buffer,
+                            offset: mesh_uniform_offset,
+                            size: NonZero::new(self.uniform_stride),
+                        }),
                     }],
                     label: Some("Mesh Bind Group"),
                 });
+                mesh_uniform_offset += self.uniform_stride;
 
-                let vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Mesh Vertex Buffer"),
-                    size: (params.vertices.len() * size_of::<runa_render_api::Vertex3D>()) as u64,
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                self.queue
-                    .write_buffer(&vertex_buffer, 0, bytemuck::cast_slice(&params.vertices));
+                // Cache vertex/index GPU buffers by mesh_id
+                let (vertex_buffer, index_buffer) = if let Some(cached) =
+                    self.mesh_gpu_cache.get(&params.mesh_id)
+                {
+                    (cached.0.clone(), cached.1.clone())
+                } else {
+                    let vb = self.device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("Mesh Vertex Buffer"),
+                        size: (params.vertices.len()
+                            * size_of::<runa_render_api::Vertex3D>())
+                            as u64,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    });
+                    self.queue
+                        .write_buffer(&vb, 0, bytemuck::cast_slice(&params.vertices));
 
-                let index_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Mesh Index Buffer"),
-                    size: (params.indices.len() * 4) as u64,
-                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                self.queue
-                    .write_buffer(&index_buffer, 0, bytemuck::cast_slice(&params.indices));
+                    let ib = self.device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("Mesh Index Buffer"),
+                        size: (params.indices.len() * 4) as u64,
+                        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    });
+                    self.queue
+                        .write_buffer(&ib, 0, bytemuck::cast_slice(&params.indices));
+
+                    self.mesh_gpu_cache.insert(params.mesh_id, (vb, ib));
+                    self.mesh_gpu_cache.get(&params.mesh_id).cloned().unwrap()
+                };
 
                 rpass.set_pipeline(&self.mesh_pipeline.pipeline);
                 rpass.set_bind_group(0, &mesh_bind_group, &[]);
@@ -1099,9 +1260,9 @@ impl<'window> Renderer<'window> {
                 rpass.draw_indexed(0..params.indices.len() as u32, 0, 0..1);
             }
 
-            for (_, _, _, texture_key, instance_offset, instance_count) in batches
+            for (_, _, _, texture_key, instance_offset, instance_count) in self.batches
                 .iter()
-                .filter(|(sprite_order, _, _, _, _, _)| *sprite_order == order)
+                .filter(|(sprite_order, _, _, _, _, _)| *sprite_order == *order)
             {
                 if !self.textures.contains_key(texture_key) {
                     let texture = self.textures_cache.get(texture_key).unwrap();
@@ -1146,55 +1307,57 @@ impl<'window> Renderer<'window> {
             }
         }
 
-        if !ui_vertices.is_empty() {
+        if !self.ui_vertices.is_empty() {
             let ui_vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("UI Vertex Buffer"),
-                size: (size_of::<UIVertex>() * ui_vertices.len()) as u64,
+                size: (size_of::<UIVertex>() * self.ui_vertices.len()) as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
             self.queue
-                .write_buffer(&ui_vertex_buffer, 0, bytemuck::cast_slice(&ui_vertices));
+                .write_buffer(&ui_vertex_buffer, 0, bytemuck::cast_slice(&self.ui_vertices));
 
             rpass.set_pipeline(&self.ui_pipeline.pipeline);
             rpass.set_bind_group(0, self.ui_bind_group.as_ref().unwrap(), &[]);
             rpass.set_vertex_buffer(0, ui_vertex_buffer.slice(..));
-            rpass.draw(0..ui_vertices.len() as u32, 0..1);
+            rpass.draw(0..self.ui_vertices.len() as u32, 0..1);
         }
 
-        if !ui_text_vertices_map.is_empty() {
-            for (tex_key, vertices) in ui_text_vertices_map.drain() {
-                let ui_text_vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("UI Textured Vertex Buffer"),
-                    size: (size_of::<UITexturedVertex>() * vertices.len()) as u64,
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                self.queue
-                    .write_buffer(&ui_text_vertex_buffer, 0, bytemuck::cast_slice(&vertices));
+        // Render font text with nearest sampler (crisp pixel font at any scale)
+        if !ui_font_vertices_map.is_empty() {
+            let sampler = self.nearest_sampler.clone();
+            self.render_textured_ui_batch(&mut rpass, &mut ui_font_vertices_map, &sampler);
+        }
 
-                // Resolve GPU texture for this key (font atlas or regular texture)
-                let gpu_texture: Arc<GpuTexture> = if let Some(atlas_tex) =
-                    self.font_manager.get_atlas_texture()
-                {
-                    if Arc::as_ptr(atlas_tex) as usize == tex_key {
-                        // Use font atlas GPU texture directly
-                        atlas_tex.clone()
-                    } else {
-                        // Regular texture asset
-                        if !self.textures.contains_key(&tex_key) {
-                            let texture_asset = self.textures_cache.get(&tex_key).unwrap().clone();
-                            let gpu_tex = Arc::new(GpuTexture::from_asset(
-                                &self.device,
-                                &self.queue,
-                                &texture_asset,
-                            ));
-                            self.textures.insert(tex_key, gpu_tex);
-                        }
-                        self.textures.get(&tex_key).unwrap().clone()
-                    }
+        // Render UI images with nearest sampler
+        if !ui_image_vertices_map.is_empty() {
+            let sampler = self.nearest_sampler.clone();
+            self.render_textured_ui_batch(&mut rpass, &mut ui_image_vertices_map, &sampler);
+        }
+    }
+
+    fn render_textured_ui_batch(
+        &mut self,
+        rpass: &mut wgpu::RenderPass,
+        vertices_map: &mut std::collections::HashMap<usize, Vec<UITexturedVertex>>,
+        sampler: &wgpu::Sampler,
+    ) {
+        for (tex_key, vertices) in vertices_map.drain() {
+            let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("UI Textured Vertex Buffer"),
+                size: (size_of::<UITexturedVertex>() * vertices.len()) as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            self.queue
+                .write_buffer(&buffer, 0, bytemuck::cast_slice(&vertices));
+
+            let gpu_texture: Arc<GpuTexture> = if let Some(atlas_tex) =
+                self.font_manager.get_atlas_texture()
+            {
+                if Arc::as_ptr(atlas_tex) as usize == tex_key {
+                    atlas_tex.clone()
                 } else {
-                    // No atlas available, must be regular texture
                     if !self.textures.contains_key(&tex_key) {
                         let texture_asset = self.textures_cache.get(&tex_key).unwrap().clone();
                         let gpu_tex = Arc::new(GpuTexture::from_asset(
@@ -1205,32 +1368,115 @@ impl<'window> Renderer<'window> {
                         self.textures.insert(tex_key, gpu_tex);
                     }
                     self.textures.get(&tex_key).unwrap().clone()
-                };
+                }
+            } else {
+                if !self.textures.contains_key(&tex_key) {
+                    let texture_asset = self.textures_cache.get(&tex_key).unwrap().clone();
+                    let gpu_tex = Arc::new(GpuTexture::from_asset(
+                        &self.device,
+                        &self.queue,
+                        &texture_asset,
+                    ));
+                    self.textures.insert(tex_key, gpu_tex);
+                }
+                self.textures.get(&tex_key).unwrap().clone()
+            };
 
-                let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &self.ui_pipeline.textured_bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: self.ui_uniform_buffer.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::TextureView(&gpu_texture.view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::Sampler(&self.nearest_sampler),
-                        },
-                    ],
-                    label: Some("UI Textured Bind Group"),
-                });
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.ui_pipeline.textured_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.ui_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&gpu_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                ],
+                label: Some("UI Textured Bind Group"),
+            });
 
-                rpass.set_pipeline(&self.ui_pipeline.textured_pipeline);
-                rpass.set_bind_group(0, &bind_group, &[]);
-                rpass.set_vertex_buffer(0, ui_text_vertex_buffer.slice(..));
-                rpass.draw(0..vertices.len() as u32, 0..1);
+            rpass.set_pipeline(&self.ui_pipeline.textured_pipeline);
+            rpass.set_bind_group(0, &bind_group, &[]);
+            rpass.set_vertex_buffer(0, buffer.slice(..));
+            rpass.draw(0..vertices.len() as u32, 0..1);
+        }
+    }
+
+    fn emit_text_vertices(
+        &self,
+        text: &str,
+        origin_x: f32,
+        origin_y: f32,
+        color: &[f32; 4],
+        char_w: f32,
+        char_h: f32,
+        scale: f32,
+        char_advance: f32,
+        ui_font_vertices_map: &mut HashMap<usize, Vec<UITexturedVertex>>,
+    ) {
+        let mut x = origin_x;
+        let y = origin_y;
+        for ch in text.chars() {
+            if ch == ' ' {
+                x += char_w;
+                continue;
             }
+            if let Some(char_uv) = self.font_manager.get_char_uv(ch) {
+                let left = x;
+                let top = y;
+                let right = x + char_w;
+                let bottom = y + char_h;
+                if let Some(atlas_tex) = self.font_manager.get_atlas_texture() {
+                    let atlas_key = Arc::as_ptr(atlas_tex) as usize;
+                    let entry = ui_font_vertices_map.entry(atlas_key).or_default();
+                    entry.extend_from_slice(&[
+                        UITexturedVertex {
+                            position: [left, top],
+                            tex_coords: [char_uv.u, char_uv.v],
+                            color: *color,
+                        },
+                        UITexturedVertex {
+                            position: [right, top],
+                            tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
+                            color: *color,
+                        },
+                        UITexturedVertex {
+                            position: [left, bottom],
+                            tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
+                            color: *color,
+                        },
+                        UITexturedVertex {
+                            position: [left, bottom],
+                            tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
+                            color: *color,
+                        },
+                        UITexturedVertex {
+                            position: [right, top],
+                            tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
+                            color: *color,
+                        },
+                        UITexturedVertex {
+                            position: [right, bottom],
+                            tex_coords: [
+                                char_uv.u + char_uv.u_width,
+                                char_uv.v + char_uv.v_height,
+                            ],
+                            color: *color,
+                        },
+                    ]);
+                }
+            }
+            x += self
+                .font_manager
+                .get_char_advance(ch)
+                .unwrap_or(char_advance)
+                * scale;
         }
     }
 
@@ -1242,20 +1488,18 @@ impl<'window> Renderer<'window> {
         camera_matrix: glam::Mat4,
     ) {
         let uniforms = background_uniforms(atmosphere, camera_matrix);
-        let buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Background Uniform Buffer"),
-                contents: bytemuck::bytes_of(&uniforms),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
+        self.queue.write_buffer(
+            &self.background_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&uniforms),
+        );
 
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Background Bind Group"),
             layout: &self.background_pipeline.bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: buffer.as_entire_binding(),
+                resource: self.background_uniform_buffer.as_entire_binding(),
             }],
         });
 
@@ -1328,6 +1572,31 @@ impl<'window> Renderer<'window> {
         }
     }
 
+    fn create_intermediate_texture(
+        device: &wgpu::Device,
+        size: (u32, u32),
+        format: wgpu::TextureFormat,
+    ) -> Option<Texture> {
+        if size.0 == 0 || size.1 == 0 {
+            return None;
+        }
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Intermediate Render Texture"),
+            size: wgpu::Extent3d {
+                width: size.0.max(1),
+                height: size.1.max(1),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        Some(texture)
+    }
+
     fn create_depth_texture(device: &wgpu::Device, size: (u32, u32)) -> (Texture, TextureView) {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
@@ -1345,6 +1614,81 @@ impl<'window> Renderer<'window> {
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         (texture, view)
+    }
+
+    fn encode_post_process_pass(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        target_view: &TextureView,
+        _target_size: (u32, u32),
+        effects: &runa_render_api::ScreenEffectData,
+    ) {
+        let flags = effects.enabled.to_u32();
+        if flags == 0 {
+            return;
+        }
+
+        let uniforms = PostProcessUniforms {
+            fade_color: effects.fade_color,
+            vignette_strength: effects.vignette_strength,
+            vignette_radius: if effects.vignette_radius <= 0.0 { 0.5 } else { effects.vignette_radius },
+            vignette_softness: effects.vignette_softness.max(0.001),
+            rgb_shift: effects.rgb_shift,
+            _pad1: [0.0; 2],
+            tint_color: effects.tint_color,
+            brightness: effects.brightness,
+            contrast: effects.contrast,
+            flags,
+            _pad2: [0u32; 3],
+        };
+
+        let Some(intermediate_view) = self.intermediate_view.as_ref() else {
+            return;
+        };
+
+        self.queue.write_buffer(
+            &self.postprocess_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&uniforms),
+        );
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("PostProcess Bind Group"),
+            layout: &self.post_process_pipeline.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(intermediate_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.post_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.postprocess_uniform_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("PostProcess Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            ..Default::default()
+        });
+
+        rpass.set_pipeline(&self.post_process_pipeline.pipeline);
+        rpass.set_bind_group(0, &bind_group, &[]);
+        rpass.draw(0..6, 0..1);
     }
 }
 
@@ -1397,3 +1741,4 @@ fn background_uniforms(
 
     uniforms
 }
+
