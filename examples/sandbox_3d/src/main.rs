@@ -23,6 +23,7 @@ fn main() {
         let _ = world.spawn_archetype::<camera_controller::CameraControllerArchetype>();
         let _ = world.spawn_archetype::<rotating_cube::RotatingCubeArchetype>();
         let _ = world.spawn_archetype::<rotating_cube2::RotatingCube2Archetype>();
+
     }
 
     let config = RunaWindowConfig {

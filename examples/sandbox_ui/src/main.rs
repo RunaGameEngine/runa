@@ -1,9 +1,6 @@
 use runa_app::RunaWindowConfig;
-use runa_core::components::ui::ImageProps;
 use runa_core::{
-    components::ui::{CanvasSpace, TextAlign, TextProps},
-    components::{ActiveCamera, Camera, UiRenderer},
-    glam,
+    components::{ui::CanvasSpace, ActiveCamera, Camera, UiRenderer},
     ocs::Object,
 };
 use runa_engine::{runa_app::RunaApp, Engine};
@@ -14,57 +11,41 @@ fn main() {
 
     {
         let mut world = world_rc.borrow_mut();
+        let mut ui = UiRenderer::new(CanvasSpace::Camera);
 
-        let mut ui_renderer = UiRenderer::new(CanvasSpace::Screen);
-        let message = "Hello UI yupiiiiii".to_string();
+        // ── egui-style closure API ─────────────────────────────────
+        //
+        // ui.vbox(|ui| { ... }) creates a vertical box, puts it on the parent stack,
+        // calls the closure, then pops back. Inside the closure, ui methods create
+        // children attached to that vbox. Works for any nesting depth.
 
-        // Pick a reasonable default font size (engine will provide viewport via active camera)
-        let font_size: u16 = 48; // sensible default for demo
+        ui.vbox(|ui| {
+            ui.add_text("egui-style UI")
+                .with_font_size(28)
+                .with_text_color(1.0, 1.0, 1.0, 1.0);
 
-        let text_node = ui_renderer.add_text(
-            ui_renderer.root(),
-            TextProps {
-                text: message,
-                font: None,
-                font_size,
-                color: [1.0, 1.0, 1.0, 1.0],
-                line_height: None,
-                align: TextAlign::Center,
-            },
-        );
+            ui.add_text("Nested containers with closures")
+                .with_font_size(16)
+                .with_text_color(0.8, 0.8, 1.0, 1.0);
 
-        // Load image handle (returns Handle<TextureAsset>)
-        let image_handle = runa_asset::load_image!("assets/Charactert.png");
-        // Use full texture UVs by default for visibility testing
-        let uv = [0.0_f32, 0.0_f32, 1.0_f32, 1.0_f32];
+            ui.hbox(|ui| {
+                ui.add_button(Some("Click"), None)
+                    .with_on_click(|| println!("Button clicked!"))
+                    .with_size(54.0, 36.0)
+                    .with_background(0.3, 0.5, 0.7, 1.0);
+            });
 
-        // Place image — do not manually set computed rect. Use layout to position relative to viewport.
-        let image_id = ui_renderer.add_image(
-            ui_renderer.root(),
-            ImageProps {
-                texture: Some(image_handle),
-                tint: [1.0, 1.0, 1.0, 1.0],
-                uv,
-            },
-        );
-
-        // Configure layout: center top for text and below it for image
-        if let Some(node) = ui_renderer.node_mut(text_node) {
-            node.layout.anchor = runa_core::components::ui::Anchor::TopCenter;
-            node.layout.position = glam::Vec2::new(0.0, 20.0); // 20px from top
-                                                               // allow layout to compute size based on font_size
-        }
-
-        if let Some(node) = ui_renderer.node_mut(image_id) {
-            node.layout.anchor = runa_core::components::ui::Anchor::TopCenter;
-            node.layout.position = glam::Vec2::new(0.0, 80.0); // below text
-                                                               // uv already provided; layout will size image based on texture
-        }
+            ui.add_slider()
+                .with_slider_range(0.0, 100.0)
+                .with_slider_value(50.0)
+                .with_size(300.0, 30.0)
+                .with_background(0.15, 0.15, 0.2, 0.8);
+        });
 
         let mut camera_object = Object::new("MainCamera");
         camera_object.add_component(Camera::default());
         camera_object.add_component(ActiveCamera);
-        camera_object.add_component(ui_renderer);
+        camera_object.add_component(ui);
         world.spawn(camera_object);
     }
 

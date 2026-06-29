@@ -5,7 +5,7 @@
 ### Current Scheme
 
 The project uses [Semantic Versioning 2.0](https://semver.org/) with
-a pre-release suffix: `0.5.1-alpha.1`.
+a pre-release suffix: `0.6.0-alpha.1`.
 
 ```
 MAJOR.MINOR.PATCH-PRERELEASE.COUNT
@@ -23,7 +23,7 @@ Version is defined once in root `Cargo.toml` under `[workspace.package]`:
 
 ```toml
 [workspace.package]
-version = "0.5.1-alpha.1"
+version = "0.6.0-alpha.1"
 ```
 
 Each crate inherits it via `version.workspace = true`.
@@ -40,12 +40,12 @@ Each crate inherits it via `version.workspace = true`.
    - Run: cargo check (catches stale version references)
 
 3. Tag and push
-   git commit -am "Release v0.5.1-alpha.2"
-   git tag v0.5.1-alpha.2
-   git push && git push --tags
+    git commit -am "Release v0.6.0-alpha.2"
+    git tag v0.6.0-alpha.2
+    git push && git push --tags
 
 4. Create GitHub Release
-   - Title: v0.5.1-alpha.2
+   - Title: v0.6.0-alpha.2
    - Paste changelog section as release notes
    - Attach the CI-built binaries (see Build section below)
 ```
@@ -252,5 +252,5 @@ tag-message = "{{version}}"
 ```bash
 cargo install cargo-release
 cargo release patch --execute   # bumps 0.5.1 → 0.5.2
-cargo release alpha --execute   # bumps 0.5.1-alpha.1 → 0.5.1-alpha.2
+cargo release alpha --execute   # bumps 0.6.0-alpha.1 → 0.6.0-alpha.2
 ```

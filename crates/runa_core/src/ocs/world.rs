@@ -314,24 +314,37 @@ impl World {
 
         // UI
         for object in &mut self.objects {
-            let viewport_size = if let (Some(camera), Some(_active)) = (
-                object.get_component::<Camera>(),
-                object.get_component::<ActiveCamera>(),
-            ) {
-                Some(Vec2::new(
-                    camera.viewport_size.0 as f32,
-                    camera.viewport_size.1 as f32,
-                ))
-            } else {
-                None
-            };
+            let camera = object.get_component::<Camera>().copied();
+            let viewport_size = camera.and_then(|cam| {
+                object
+                    .get_component::<ActiveCamera>()
+                    .map(|_| Vec2::new(cam.viewport_size.0 as f32, cam.viewport_size.1 as f32))
+            });
 
-            if let (Some(canvas), Some(viewport_size)) =
+            if let (Some(canvas), Some(vp)) =
                 (object.get_component_mut::<UiRenderer>(), viewport_size)
             {
-                if canvas.dirty_layout {
-                    canvas.layout(viewport_size);
-                }
+                canvas.layout(vp, camera.as_ref());
+            }
+        }
+    }
+
+    /// Run UI layout for all UI renderers. Call this each frame right before
+    /// rendering so layout picks up the latest viewport size after resize events.
+    pub fn layout_ui(&mut self) {
+        for object in &mut self.objects {
+            let camera = object.get_component::<Camera>().copied();
+            let viewport_size = camera.and_then(|cam| {
+                object
+                    .get_component::<ActiveCamera>()
+                    .map(|_| Vec2::new(cam.viewport_size.0 as f32, cam.viewport_size.1 as f32))
+            });
+
+            if let (Some(canvas), Some(vp)) =
+                (object.get_component_mut::<UiRenderer>(), viewport_size)
+            {
+                canvas.layout(vp, camera.as_ref());
+                canvas.process_interaction(camera.as_ref());
             }
         }
     }

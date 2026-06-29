@@ -82,7 +82,7 @@ impl ConsoleCommand for VersionCommand {
         "Show engine version info"
     }
     fn execute(&mut self, _args: &[&str], out: &mut dyn FnMut(String)) {
-        out("Runa Engine v0.5.1-alpha.1".to_string());
+        out(format!("Runa Engine v{}", env!("CARGO_PKG_VERSION")));
     }
     fn detailed_help(&self) -> Vec<&str> {
         vec!["version / ver - Show engine version info."]
@@ -99,10 +99,23 @@ pub struct Console {
     history_index: Option<usize>,
     #[allow(dead_code)]
     font_texture: Option<Handle<TextureAsset>>,
-    /// Whether to show the FPS counter overlay (even when console is hidden)
-    pub show_fps: bool,
+
+    /// Whether to show the stats overlay (FPS, frame time, render time, etc.)
+    pub show_stats: bool,
     /// Current FPS value, set externally by the app
     pub current_fps: f32,
+    /// Current frame time in ms, set externally by the app
+    pub current_frame_time_ms: f32,
+    /// Current render time in ms, set externally by the app
+    pub current_render_time_ms: f32,
+    /// Current update time in ms, set externally by the app
+    pub current_update_time_ms: f32,
+    /// Current draw call count, set externally by the app
+    pub draw_call_count: usize,
+    /// Current FPS cap (0 = unlimited)
+    pub fps_max: f32,
+    /// Current time scale (game speed multiplier)
+    pub time_scale: f32,
 
     /// Registered simple commands (message-only)
     commands: HashMap<String, Box<dyn ConsoleCommand>>,
@@ -124,8 +137,14 @@ impl Console {
             history: VecDeque::new(),
             history_index: None,
             font_texture: None,
-            show_fps: false,
+            show_stats: false,
             current_fps: 0.0,
+            current_frame_time_ms: 0.0,
+            current_render_time_ms: 0.0,
+            current_update_time_ms: 0.0,
+            draw_call_count: 0,
+            fps_max: 0.0,
+            time_scale: 1.0,
             commands: HashMap::new(),
             command_order: Vec::new(),
             suggestion_names: Vec::new(),
@@ -242,21 +261,17 @@ impl Console {
             .cloned()
             .collect();
 
-        // Add built-in special commands (help, fps, quit)
-        if "help".starts_with(&prefix) && !results.contains(&"help".to_string()) {
-            results.push("help".to_string());
+        // Add built-in special commands
+        let builtin_commands = [
+            "help", "fps_max", "show_stats", "stats", "bind", "unbind", "binds",
+            "timescale", "quit", "cls",
+        ];
+        for name in &builtin_commands {
+            if name.starts_with(&prefix) && !results.contains(&name.to_string()) {
+                results.push(name.to_string());
+            }
         }
-        if "fps".starts_with(&prefix) && !results.contains(&"fps".to_string()) {
-            results.push("fps".to_string());
-        }
-        if "quit".starts_with(&prefix) && !results.contains(&"quit".to_string()) {
-            results.push("quit".to_string());
-        }
-        // "cls" as alias for "clear"
-        if "cls".starts_with(&prefix) && !results.contains(&"clear".to_string()) {
-            results.push("cls".to_string());
-        }
-        // "editor" as prefix for editor commands
+        // Add aliases
         if "editor".starts_with(&prefix) && !results.contains(&"editor".to_string()) {
             results.push("editor".to_string());
         }
@@ -281,7 +296,13 @@ impl Console {
             })
             .collect();
         result.push(("help".to_string(), "Show help for commands".to_string()));
-        result.push(("fps".to_string(), "Toggle FPS counter overlay".to_string()));
+        result.push(("fps_max [value]".to_string(), "Set FPS cap (0 = unlimited)".to_string()));
+        result.push(("show_stats".to_string(), "Toggle stats overlay (FPS, frame time, etc.)".to_string()));
+        result.push(("stats".to_string(), "Alias for show_stats".to_string()));
+        result.push(("bind <key> <action>".to_string(), "Bind a key to an action".to_string()));
+        result.push(("unbind <action> [key]".to_string(), "Unbind a key from an action".to_string()));
+        result.push(("binds".to_string(), "List all action-key bindings".to_string()));
+        result.push(("timescale [value]".to_string(), "Set/get game speed multiplier".to_string()));
         result.push(("quit".to_string(), "Close the console".to_string()));
         // Add "cls" alias for "clear"
         if let Some(pos) = result.iter().position(|(n, _)| n == "clear") {
@@ -314,38 +335,146 @@ impl Console {
                     }
                 } else {
                     let topic = args[0];
-                    if topic == "help" {
-                        self.add_message("help [cmd] - Show help for a specific command.");
-                    } else if topic == "fps" {
-                        self.add_message("fps - Toggle the FPS counter overlay.");
-                        self.add_message("Shows framerate in the top-left corner.");
-                    } else if topic == "quit" || topic == "exit" {
-                        self.add_message("quit / exit - Close the console.");
-                    } else {
-                        let help_info = self.commands.get(topic).map(|c| {
-                            (c.name().to_string(), c.description().to_string(), c.detailed_help().iter().map(|s| s.to_string()).collect::<Vec<_>>())
-                        });
-                        if let Some((name, desc, help_lines)) = help_info {
-                            if help_lines.is_empty() {
-                                self.add_message(format!("{}: {}", name, desc));
-                            } else {
-                                for line in help_lines {
-                                    self.add_message(line);
+                    match topic {
+                        "help" => {
+                            self.add_message("help [cmd] - Show help for a specific command.");
+                        }
+                        "fps_max" => {
+                            self.add_message("fps_max [value] - Set FPS cap.");
+                            self.add_message("  Without argument, shows current cap.");
+                            self.add_message("  With a number, caps FPS to that value.");
+                            self.add_message("  Use 0 for unlimited FPS.");
+                        }
+                        "show_stats" | "stats" => {
+                            self.add_message("show_stats / stats - Toggle stats overlay.");
+                            self.add_message("  Shows FPS, frame time, render time, update time, and draw calls.");
+                        }
+                        "bind" => {
+                            self.add_message("bind <key> <action> - Bind a key to an action.");
+                            self.add_message("  Example: bind w move_forward");
+                            self.add_message("  Example: bind mouseleft attack");
+                        }
+                        "unbind" => {
+                            self.add_message("unbind <action> [key] - Unbind a key from an action.");
+                            self.add_message("  Without key, unbinds ALL keys from the action.");
+                            self.add_message("  Example: unbind move_forward w");
+                            self.add_message("  Example: unbind move_forward");
+                        }
+                        "binds" => {
+                            self.add_message("binds - List all action-key bindings.");
+                            self.add_message("  Shows all registered actions and their bound keys.");
+                        }
+                        "timescale" => {
+                            self.add_message("timescale [value] - Set/get game speed multiplier.");
+                            self.add_message("  Default: 1.0. Use 0.5 for half speed, 2.0 for double speed.");
+                        }
+                        "quit" | "exit" => {
+                            self.add_message("quit / exit - Close the console.");
+                        }
+                        _ => {
+                            let help_info = self.commands.get(topic).map(|c| {
+                                (c.name().to_string(), c.description().to_string(), c.detailed_help().iter().map(|s| s.to_string()).collect::<Vec<_>>())
+                            });
+                            if let Some((name, desc, help_lines)) = help_info {
+                                if help_lines.is_empty() {
+                                    self.add_message(format!("{}: {}", name, desc));
+                                } else {
+                                    for line in help_lines {
+                                        self.add_message(line);
+                                    }
                                 }
+                            } else {
+                                self.add_message(format!("No help for '{}'.", topic));
                             }
-                        } else {
-                            self.add_message(format!("No help for '{}'.", topic));
                         }
                     }
                 }
                 true
             }
-            "fps" => {
-                self.show_fps = !self.show_fps;
-                if self.show_fps {
-                    self.add_message("FPS counter: ON");
+            "fps_max" => {
+                if args.is_empty() {
+                    if self.fps_max > 0.0 {
+                        self.add_message(format!("FPS cap: {:.0} ({} ms per frame)", self.fps_max, 1000.0 / self.fps_max));
+                    } else {
+                        self.add_message("FPS cap: unlimited");
+                    }
+                } else if let Ok(value) = args[0].parse::<f32>() {
+                    self.fps_max = if value.is_finite() { value.max(0.0) } else { 0.0 };
+                    if self.fps_max > 0.0 {
+                        self.add_message(format!("FPS cap set to {:.0} ({} ms per frame)", self.fps_max, 1000.0 / self.fps_max));
+                    } else {
+                        self.add_message("FPS cap: unlimited");
+                    }
                 } else {
-                    self.add_message("FPS counter: OFF");
+                    self.add_message(format!("Invalid value: '{}'. Use a number or 0 for unlimited.", args[0]));
+                }
+                true
+            }
+            "show_stats" | "stats" => {
+                self.show_stats = !self.show_stats;
+                if self.show_stats {
+                    self.add_message("Stats overlay: ON");
+                } else {
+                    self.add_message("Stats overlay: OFF");
+                }
+                true
+            }
+            "bind" => {
+                if args.len() < 2 {
+                    self.add_message("Usage: bind <key> <action>");
+                    self.add_message("Examples: bind w move_forward, bind mouseleft attack");
+                } else {
+                    let key_str = args[0];
+                    let action = args[1..].join("_");
+                    if let Some(binding) = crate::input::parse_input_binding(key_str) {
+                        crate::input::bind_action(&action, binding);
+                        self.add_message(format!("Bound '{}' to '{}'", key_str, action));
+                    } else {
+                        self.add_message(format!("Unknown key: '{}'", key_str));
+                    }
+                }
+                true
+            }
+            "unbind" => {
+                if args.is_empty() {
+                    self.add_message("Usage: unbind <action> [key]");
+                } else if args.len() == 1 {
+                    let action = args[0];
+                    crate::input::unbind_action_all(action);
+                    self.add_message(format!("Unbound all keys from '{}'", action));
+                } else {
+                    let action = args[0];
+                    let key_str = args[1];
+                    if let Some(binding) = crate::input::parse_input_binding(key_str) {
+                        crate::input::unbind_action(action, &binding);
+                        self.add_message(format!("Unbound '{}' from '{}'", key_str, action));
+                    } else {
+                        self.add_message(format!("Unknown key: '{}'", key_str));
+                    }
+                }
+                true
+            }
+            "binds" => {
+                let bindings = crate::input::list_action_bindings();
+                if bindings.is_empty() {
+                    self.add_message("No actions registered.");
+                } else {
+                    self.add_message("Action bindings:");
+                    for (action, binds) in &bindings {
+                        let keys: Vec<String> = binds.iter().map(|b| format!("{}", b)).collect();
+                        self.add_message(format!("  {:<20} {}", action, keys.join(", ")));
+                    }
+                }
+                true
+            }
+            "timescale" => {
+                if args.is_empty() {
+                    self.add_message(format!("Current timescale: {:.2}", self.time_scale));
+                } else if let Ok(value) = args[0].parse::<f32>() {
+                    self.time_scale = value.max(0.01).min(100.0);
+                    self.add_message(format!("Timescale set to {:.2}", self.time_scale));
+                } else {
+                    self.add_message(format!("Invalid value: '{}'. Use a number (0.01-100.0).", args[0]));
                 }
                 true
             }
@@ -577,22 +706,41 @@ impl Console {
         }
     }
 
-    /// Renders the console overlay and optional FPS counter.
-    /// The FPS counter is shown even when the console is hidden.
+    /// Renders the console overlay and optional stats overlay.
+    /// The stats overlay is shown even when the console is hidden.
     pub fn render(&self, queue: &mut RenderQueue, camera: &Camera) {
-        // FPS counter overlay (always visible if enabled)
-        if self.show_fps {
-            let fps_text = format!("FPS: {:.1}", self.current_fps);
-            queue.commands.push(RenderCommands::Text {
-                text: fps_text,
-                position: glam::Vec2::new(8.0, 8.0),
-                color: [0.0, 1.0, 0.0, 1.0],
-                size: 16.0,
-                outline: Some(TextOutline {
-                    color: [0.0, 0.0, 0.0, 1.0],
-                    width: 1.0,
-                }),
+        // Stats overlay (always visible if enabled)
+        if self.show_stats {
+            let color = [0.0, 1.0, 0.0, 1.0];
+            let outline = Some(TextOutline {
+                color: [0.0, 0.0, 0.0, 1.0],
+                width: 1.0,
             });
+
+            let fps_text = format!("FPS: {:.1}", self.current_fps);
+            let frame_text = format!("Frame: {:.1} ms", self.current_frame_time_ms);
+            let render_text = format!("Render: {:.1} ms", self.current_render_time_ms);
+            let update_text = format!("Update: {:.1} ms", self.current_update_time_ms);
+            let fps_cap = if self.fps_max > 0.0 {
+                format!("FPS Cap: {:.0}", self.fps_max)
+            } else {
+                "FPS Cap: unlimited".to_string()
+            };
+            let draw_text = format!("Draw calls: {}", self.draw_call_count);
+
+            let mut y = 8.0;
+            let line_h = 19.0;
+            let stats_lines = [fps_text, frame_text, render_text, update_text, fps_cap, draw_text];
+            for line in &stats_lines {
+                queue.commands.push(RenderCommands::Text {
+                    text: line.clone(),
+                    position: glam::Vec2::new(8.0, y),
+                    color,
+                    size: 16.0,
+                    outline: outline.clone(),
+                });
+                y += line_h;
+            }
         }
 
         if !self.is_visible {

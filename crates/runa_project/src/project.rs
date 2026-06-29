@@ -227,7 +227,7 @@ mod tests {
         let manifest_content = r#"
 (
     name: "Test Project",
-    engine_version: "0.5.1-alpha.1",
+    engine_version: "0.6.0-alpha.1",
     startup_world: "worlds/main.ron",
     assets_dir: "assets",
     worlds_dir: "worlds",

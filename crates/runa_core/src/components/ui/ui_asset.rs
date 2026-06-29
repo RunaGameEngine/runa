@@ -5,8 +5,8 @@ use runa_asset::{Handle, TextureAsset};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Anchor, CanvasSpace, ContainerKind, EdgeInsets, ImageProps, LayoutProps, StyleProps, TextAlign,
-    TextProps, UiNode, UiNodeId, UiNodeKind, UiRenderer,
+    Anchor, CanvasSpace, ContainerKind, EdgeInsets, ImageProps, LayoutProps, SliderProps,
+    StyleProps, TextAlign, TextProps, UiNode, UiNodeId, UiNodeKind, UiRenderer,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -36,6 +36,27 @@ pub enum UiNodeKindAsset {
     Container(ContainerKindAsset),
     Image(ImagePropsAsset),
     Text(TextPropsAsset),
+    Slider(SliderPropsAsset),
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct SliderPropsAsset {
+    #[serde(default)]
+    pub value: f32,
+    #[serde(default)]
+    pub min: f32,
+    #[serde(default)]
+    pub max: f32,
+}
+
+impl Default for SliderPropsAsset {
+    fn default() -> Self {
+        Self {
+            value: 0.5,
+            min: 0.0,
+            max: 1.0,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default)]
@@ -308,6 +329,11 @@ impl UiNodeKindAsset {
                     align,
                 })
             }
+            UiNodeKind::Slider(props) => UiNodeKindAsset::Slider(SliderPropsAsset {
+                value: props.value,
+                min: props.min,
+                max: props.max,
+            }),
         }
     }
 
@@ -350,6 +376,11 @@ impl UiNodeKindAsset {
                     align,
                 })
             }
+            UiNodeKindAsset::Slider(props) => UiNodeKind::Slider(SliderProps {
+                value: props.value.clamp(props.min, props.max),
+                min: props.min,
+                max: props.max,
+            }),
         }
     }
 }

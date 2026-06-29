@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use runa_core::components::{ActiveCamera, Camera, Transform};
 use runa_core::input::InputState;
@@ -13,7 +13,7 @@ use runa_render_api::RenderQueue;
 
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
-use winit::event_loop::ActiveEventLoop;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
@@ -52,16 +52,23 @@ pub struct App<'window> {
     pub active_camera_set: bool,                    // True if ActiveCamera was manually set
     pub world_rc: Rc<RefCell<World>>,
 
+    // Timing
     pub last_time: Instant,
     pub accumulator: f32,
     pub frame_count: u32,
     pub current_fps: f32,
     pub last_fps_update: Instant,
+    pub last_frame_time: f32,    // Time for the last frame in seconds
+    pub current_frame_time_ms: f32,
+    pub current_render_time_ms: f32,
+    pub current_update_time_ms: f32,
     pub interaction_system: InteractionSystem,
 
     pub console: Console,
 
     pub config: RunaWindowConfig,
+    pub frame_start: Instant,    // Start of current frame for FPS limiting
+
 }
 
 impl<'window> App<'window> {
@@ -143,6 +150,8 @@ impl<'window> App<'window> {
     }
 
     fn render(&mut self) {
+        let render_start = Instant::now();
+
         let interpolation_factor = (self.accumulator / (1.0 / 60.0)).min(1.0);
         let active_camera = if self.active_camera_set {
             self.active_camera_id()
@@ -169,13 +178,21 @@ impl<'window> App<'window> {
             // Clear queue
             self.queue.clear();
 
+            // Run UI layout with latest viewport (resize events update camera
+            // AFTER new_events runs, so layout in update() uses stale sizes).
+            self.world_rc.borrow_mut().layout_ui();
+
             // Compile render commands from world
             self.world_rc
                 .borrow()
                 .render(&mut self.queue, interpolation_factor);
 
-            // Update console's FPS and render on top
+            // Update console stats and render on top
             self.console.current_fps = self.current_fps;
+            self.console.current_frame_time_ms = self.current_frame_time_ms;
+            self.console.current_render_time_ms = self.current_render_time_ms;
+            self.console.current_update_time_ms = self.current_update_time_ms;
+            self.console.draw_call_count = self.queue.commands.len();
             self.console.render(&mut self.queue, &active_camera);
 
             // Apply screen effects from active camera
@@ -183,9 +200,6 @@ impl<'window> App<'window> {
                 self.queue.set_screen_effects(data);
             }
 
-            // Always render through the camera resolved for this exact frame.
-            // Using the last fixed-step camera matrix here causes visible jitter
-            // when the active camera follows an interpolated target.
             let camera_matrix = active_camera.matrix();
 
             let virtual_size = if matches!(
@@ -200,10 +214,12 @@ impl<'window> App<'window> {
                 active_camera.orthographic_size
             };
 
-            // Get ortho_size from active camera if available, otherwise use default camera
             renderer.draw(&self.queue, camera_matrix, virtual_size);
 
-            // Update FPS
+            // Calculate render time
+            self.current_render_time_ms = render_start.elapsed().as_secs_f32() * 1000.0;
+
+            // Update FPS counter
             self.frame_count += 1;
             let now = Instant::now();
             if now.duration_since(self.last_fps_update).as_secs_f32() >= 1.0 {
@@ -332,22 +348,30 @@ impl<'window> ApplicationHandler for App<'window> {
     }
 
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
-        // Clear the "just" input states at the beginning of each event loop cycle
-        // This ensures that "just pressed" events are only valid for one frame
+        // Track when this frame started
+        self.frame_start = Instant::now();
 
-        const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
+        let current_time = self.frame_start;
 
-        let current_time = Instant::now();
+        // Track frame time
         let frame_time = (current_time - self.last_time).as_secs_f32().min(0.1);
+        self.last_frame_time = frame_time;
+        self.current_frame_time_ms = frame_time * 1000.0;
         self.last_time = current_time;
+
+        // Apply timescale to the fixed timestep
+        let base_timestep = 1.0 / 60.0;
+        let scaled_timestep = base_timestep / self.console.time_scale.max(0.01);
 
         self.accumulator += frame_time;
 
+        // Update start time for tracking
+        let update_start = Instant::now();
+
         // Fixed timestep update
-        while self.accumulator >= FIXED_TIMESTEP {
+        while self.accumulator >= scaled_timestep {
             {
                 let mut input_state = InputState::current_mut();
-                // Use active camera from world if available, otherwise use default camera
                 let camera_to_use = if self.active_camera_set {
                     self.active_camera_id()
                         .and_then(|id| self.resolved_camera_for_object(id))
@@ -356,24 +380,23 @@ impl<'window> ApplicationHandler for App<'window> {
                     self.camera
                 };
                 input_state.camera = Some(camera_to_use);
-            } // Release the lock immediately after setting the camera
+            }
             {
-                let mut world = self.world_rc.borrow_mut(); // one borrow_mut per frame
-
-                // Update interaction system BEFORE world update so scripts can use hover state
+                let mut world = self.world_rc.borrow_mut();
                 if !self.console.is_visible() {
                     self.interaction_system.update(&mut world);
                 }
-                world.update(FIXED_TIMESTEP);
+                world.update(scaled_timestep);
             }
 
             InputState::update_frame();
-
-            // Sync camera
             self.sync_camera();
 
-            self.accumulator -= FIXED_TIMESTEP;
+            self.accumulator -= scaled_timestep;
         }
+
+        // Track update time
+        self.current_update_time_ms = update_start.elapsed().as_secs_f32() * 1000.0;
 
         // Request a redraw
         if let Some(window) = &self.window {
@@ -414,6 +437,24 @@ impl<'window> ApplicationHandler for App<'window> {
             }
             WindowEvent::RedrawRequested => {
                 self.render();
+
+                // FPS limiting: calculate how long this frame took and cap if needed
+                let fps_max = self.console.fps_max;
+
+                if fps_max.is_finite() && fps_max > 0.0 {
+                    let min_frame_time = Duration::from_secs_f32(1.0 / fps_max);
+                    let elapsed = self.frame_start.elapsed();
+
+                    if elapsed < min_frame_time {
+                        let remaining = min_frame_time - elapsed;
+                        if remaining > Duration::from_millis(1)  {
+                            std::thread::sleep(remaining - Duration::from_millis(1));
+                        }
+                        while self.frame_start.elapsed() < min_frame_time {
+                            // busy wait
+                        }
+                    }
+                }
             }
             WindowEvent::KeyboardInput {
                 event:

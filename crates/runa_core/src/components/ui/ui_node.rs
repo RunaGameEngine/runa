@@ -33,6 +33,8 @@ pub struct UiNode {
     pub style: StyleProps,
     pub computed: ComputedLayout,
     pub visible: bool,
+    pub interaction: InteractionState,
+    pub interaction_callback: Option<Box<dyn FnMut(InteractionState) + Send>>,
 }
 
 impl UiNode {
@@ -47,6 +49,8 @@ impl UiNode {
             style: StyleProps::default(),
             computed: ComputedLayout::default(),
             visible: true,
+            interaction: InteractionState::None,
+            interaction_callback: None,
         }
     }
 
@@ -93,6 +97,7 @@ pub enum UiNodeKind {
     Container(ContainerKind),
     Image(ImageProps),
     Text(TextProps),
+    Slider(SliderProps),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -211,3 +216,100 @@ impl Default for TextAlign {
 }
 
 pub struct FontId {}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum InteractionState {
+    None,
+    Hovered,
+    Pressed,
+    Dragging,
+    Clicked,
+}
+
+impl Default for InteractionState {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SliderProps {
+    pub value: f32,
+    pub min: f32,
+    pub max: f32,
+}
+
+impl Default for SliderProps {
+    fn default() -> Self {
+        Self {
+            value: 0.5,
+            min: 0.0,
+            max: 1.0,
+        }
+    }
+}
+
+/// Reusable stylesheet that can be applied to nodes
+#[derive(Clone, Debug, Default)]
+pub struct StyleSheet {
+    pub background: Option<[f32; 4]>,
+    pub background_hover: Option<[f32; 4]>,
+    pub opacity: Option<f32>,
+    pub z_index: Option<i16>,
+    pub padding: Option<EdgeInsets>,
+    pub margin: Option<EdgeInsets>,
+}
+
+impl StyleSheet {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_background(mut self, r: f32, g: f32, b: f32, a: f32) -> Self {
+        self.background = Some([r, g, b, a]);
+        self
+    }
+
+    pub fn with_background_hover(mut self, r: f32, g: f32, b: f32, a: f32) -> Self {
+        self.background_hover = Some([r, g, b, a]);
+        self
+    }
+
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = Some(opacity);
+        self
+    }
+
+    pub fn with_z_index(mut self, z: i16) -> Self {
+        self.z_index = Some(z);
+        self
+    }
+
+    pub fn with_padding(mut self, l: f32, t: f32, r: f32, b: f32) -> Self {
+        self.padding = Some(EdgeInsets { left: l, top: t, right: r, bottom: b });
+        self
+    }
+
+    pub fn with_margin(mut self, l: f32, t: f32, r: f32, b: f32) -> Self {
+        self.margin = Some(EdgeInsets { left: l, top: t, right: r, bottom: b });
+        self
+    }
+
+    pub fn apply_to(&self, node: &mut UiNode) {
+        if let Some(bg) = self.background {
+            node.style.background = Some(bg);
+        }
+        if let Some(opacity) = self.opacity {
+            node.style.opacity = opacity;
+        }
+        if let Some(z) = self.z_index {
+            node.style.z_index = z;
+        }
+        if let Some(padding) = &self.padding {
+            node.layout.padding = *padding;
+        }
+        if let Some(margin) = &self.margin {
+            node.layout.margin = *margin;
+        }
+    }
+}

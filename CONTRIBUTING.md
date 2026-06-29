@@ -76,6 +76,7 @@ Types: `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `ci`
 Scope: which crate or area
 
 Examples:
+
 - `feat(runa_core): add EventBus subscribe/unsubscribe`
 - `perf(runa_render): pool mesh GPU buffers`
 - `docs(tutorials): fix Camera::new_perspective signature`
@@ -96,6 +97,7 @@ Check the [ROADMAP.md](ROADMAP.md) for upcoming work. Good first issues
 are tagged `good first issue` on GitHub.
 
 Areas that always need help:
+
 - **Documentation**: writing tutorials, doc comments, fixing drift
 - **Performance profiling**: finding and fixing hot spots
 - **Test coverage**: adding tests for existing features

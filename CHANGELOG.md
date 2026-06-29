@@ -7,13 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.1] - 2026-06-29
+
+### Added
+
+- **UI layout:** margin support for free positioning (inset from anchor edge)
+  and vbox/hbox auto-layout (space reservation + content offset).
+- **UI builder:** `with_fill()` convenience method (sets `Anchor::Stretch`).
+- **UI interaction:** `process_interaction()` called each frame with
+  `left_just_down` detection, fixing click/hover/drag/slider on `CanvasSpace::Camera`.
+- **UI rendering:** `screen_scale` field fixes coordinate mismatch between
+  layout (virtual space) and render (screen pixels).
+- **ECS:** O(1) `ObjectId` lookup and `Vec`-based component storage.
+- **GPU instancing:** instanced sprite/tile rendering with mesh cache and
+  persistent uniform buffers.
+- **Post-processing:** screen effects pipeline (fade, vignette, RGB shift, tint).
+- **Console plugin system:** autocomplete, FPS overlay, world path queries.
+- **User event system:** `emit_event` / `subscribe_to_event` API.
+- **`.runa3d` format:** model format support with mesh loading.
+- **Editor:** UI panels (content browser, inspector, hierarchy), editor
+  commands, viewport object picking, hierarchy drag-and-drop parenting,
+  inline rename, multi-selection.
+
 ### Changed
 
-- **Strategic pivot:** editor feature development frozen. All effort goes into
-  code-first core engine API until v0.10. Editor remains as prototype.
-  See [`docs/architecture/strategic-direction.md`](docs/architecture/strategic-direction.md).
-- ROADMAP.md restructured: editor moved to deferred section, added code-first DX
-  goals and workflow/tooling items.
+- **Strategic pivot:** editor feature development frozen until v0.10.
+  All effort goes into code-first core engine API.
+- **Rendering commands:** refactored `RenderCommands` for cleaner GPU batching.
+- **Script lifecycle:** `&mut World` now passed to `ScriptContext`.
+- **Tilemap:** coordinate conversion, dynamic resize, frustum-culled batch rendering.
+- **Camera:** `orthographic_size` used as virtual layout space for `CanvasSpace::Camera`.
+- ROADMAP.md restructured: editor deferred, added code-first DX goals.
+
+### Fixed
+
+- **UI auto-layout:** containers inside vbox/hbox no longer take full virtual
+  space — uses minimum content-based sizes, fixing off-screen elements.
+- **UI coordinate space:** hit-testing and slider-drag now operate in virtual
+  layout space, matching `computed.rect`.
+- **Editor:** crashes during Play/world save from stale object-to-world pointers.
+- **Editor:** hierarchy traversal hardened against cycles and invalid parent links.
+- **Clippy warnings:** redundant fields, unused vars, `div_ceil`, `map_entry`, various casts.
 
 ## [0.5.1-alpha.1] - 2026-04-26
 
@@ -88,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Camera API**
   - `viewport_size` was removed from public camera constructors
-   - `Camera::new_orthographic(width, height)` now stores world-visible size directly
+  - `Camera::new_orthographic(width, height)` now stores world-visible size directly
   - `viewport_size` is now runtime-owned state updated by the app/editor from the actual render target size
 
 - **Orthographic camera behavior**

@@ -1,6 +1,7 @@
+use core::fmt;
 use glam::Vec3;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{Mutex, OnceLock, Weak},
 };
 use winit::dpi::{PhysicalPosition, PhysicalSize};
@@ -30,6 +31,22 @@ impl Default for WindowState {
     }
 }
 
+/// Represents a physical input that can be bound to an action.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InputBinding {
+    Key(KeyCode),
+    Mouse(MouseButton),
+}
+
+impl fmt::Display for InputBinding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InputBinding::Key(kc) => write!(f, "{:?}", kc),
+            InputBinding::Mouse(mb) => write!(f, "{:?}", mb),
+        }
+    }
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct InputState {
     pub keys_pressed: HashSet<KeyCode>,
@@ -44,6 +61,268 @@ pub struct InputState {
     pub mouse_wheel_delta: f32,
 
     pub camera: Option<Camera>,
+
+    /// Action bindings: action name -> set of bound inputs
+    pub actions: HashMap<String, HashSet<InputBinding>>,
+    /// Track which default action sets have been registered
+    pub default_actions_registered: bool,
+}
+
+// ===== Input Actions System =====
+
+impl InputState {
+    /// Register an action with a default set of bindings.
+    /// If the action already exists, new bindings are added to existing ones.
+    pub fn register_action(name: &str, default_binds: Vec<InputBinding>) {
+        let mut state = Self::current_mut();
+        let entry = state.actions.entry(name.to_string()).or_default();
+        for bind in default_binds {
+            entry.insert(bind);
+        }
+    }
+
+    /// Check if an action is currently pressed (any bound input is held).
+    pub fn is_action_pressed(name: &str) -> bool {
+        let state = Self::current();
+        let Some(binds) = state.actions.get(name) else {
+            return false;
+        };
+        for bind in binds {
+            match bind {
+                InputBinding::Key(kc) => {
+                    if state.keys_pressed.contains(kc) {
+                        return true;
+                    }
+                }
+                InputBinding::Mouse(mb) => {
+                    if state.mouse_buttons_pressed.contains(mb) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if an action was just pressed this frame (any bound input).
+    pub fn is_action_just_pressed(name: &str) -> bool {
+        let state = Self::current();
+        let Some(binds) = state.actions.get(name) else {
+            return false;
+        };
+        for bind in binds {
+            match bind {
+                InputBinding::Key(kc) => {
+                    if state.keys_just_pressed.contains(kc) {
+                        return true;
+                    }
+                }
+                InputBinding::Mouse(mb) => {
+                    if state.mouse_buttons_just_pressed.contains(mb) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Bind an input to an action.
+    pub fn bind_action(action: &str, bind: InputBinding) {
+        let mut state = Self::current_mut();
+        state
+            .actions
+            .entry(action.to_string())
+            .or_default()
+            .insert(bind);
+    }
+
+    /// Unbind a specific input from an action.
+    pub fn unbind_action(action: &str, bind: &InputBinding) {
+        let mut state = Self::current_mut();
+        if let Some(binds) = state.actions.get_mut(action) {
+            binds.remove(bind);
+        }
+    }
+
+    /// Remove all bindings for an action.
+    pub fn unbind_action_all(action: &str) {
+        let mut state = Self::current_mut();
+        state.actions.remove(action);
+    }
+
+    /// Get all registered action names.
+    pub fn list_actions() -> Vec<String> {
+        let state = Self::current();
+        let mut names: Vec<String> = state.actions.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
+    /// Get bindings for an action.
+    pub fn action_bindings(action: &str) -> Option<Vec<InputBinding>> {
+        let state = Self::current();
+        state
+            .actions
+            .get(action)
+            .map(|binds| binds.iter().cloned().collect())
+    }
+}
+
+// ===== Public API for Input Actions =====
+
+/// Register an action with default bindings.
+pub fn register_action(name: &str, default_binds: Vec<InputBinding>) {
+    InputState::register_action(name, default_binds);
+}
+
+/// Check if an action is currently pressed.
+pub fn is_action_pressed(name: &str) -> bool {
+    InputState::is_action_pressed(name)
+}
+
+/// Check if an action was just pressed this frame.
+pub fn is_action_just_pressed(name: &str) -> bool {
+    InputState::is_action_just_pressed(name)
+}
+
+/// Bind an input to an action.
+pub fn bind_action(action: &str, bind: InputBinding) {
+    InputState::bind_action(action, bind);
+}
+
+/// Unbind a specific input from an action.
+pub fn unbind_action(action: &str, bind: &InputBinding) {
+    InputState::unbind_action(action, bind);
+}
+
+/// Remove all bindings for an action.
+pub fn unbind_action_all(action: &str) {
+    InputState::unbind_action_all(action);
+}
+
+/// List all registered actions with their bindings.
+pub fn list_action_bindings() -> Vec<(String, Vec<InputBinding>)> {
+    let mut result = Vec::new();
+    for name in InputState::list_actions() {
+        if let Some(binds) = InputState::action_bindings(&name) {
+            result.push((name, binds));
+        }
+    }
+    result
+}
+
+/// Parse an input binding from a string (e.g. "KeyW", "MouseLeft").
+pub fn parse_input_binding(s: &str) -> Option<InputBinding> {
+    // Mouse buttons
+    let lower = s.to_lowercase();
+    let btn = match lower.as_str() {
+        "mouseleft" | "leftmouse" | "lmb" => Some(MouseButton::Left),
+        "mouseright" | "rightmouse" | "rmb" => Some(MouseButton::Right),
+        "mousemiddle" | "middlemouse" | "mmb" => Some(MouseButton::Middle),
+        "mouseback" | "backmouse" => Some(MouseButton::Back),
+        "mouseforward" | "forwardmouse" => Some(MouseButton::Forward),
+        _ => None,
+    };
+    if let Some(b) = btn {
+        return Some(InputBinding::Mouse(b));
+    }
+
+    // Keyboard keys
+    let key = match lower.as_str() {
+        "keyw" | "w" => Some(KeyCode::KeyW),
+        "keya" | "a" => Some(KeyCode::KeyA),
+        "keys" | "s" => Some(KeyCode::KeyS),
+        "keyd" | "d" => Some(KeyCode::KeyD),
+        "keyq" | "q" => Some(KeyCode::KeyQ),
+        "keye" | "e" => Some(KeyCode::KeyE),
+        "keyr" | "r" => Some(KeyCode::KeyR),
+        "keyt" | "t" => Some(KeyCode::KeyT),
+        "keyy" | "y" => Some(KeyCode::KeyY),
+        "keyu" | "u" => Some(KeyCode::KeyU),
+        "keyi" | "i" => Some(KeyCode::KeyI),
+        "keyo" | "o" => Some(KeyCode::KeyO),
+        "keyp" | "p" => Some(KeyCode::KeyP),
+        "keyf" | "f" => Some(KeyCode::KeyF),
+        "keyg" | "g" => Some(KeyCode::KeyG),
+        "keyh" | "h" => Some(KeyCode::KeyH),
+        "keyj" | "j" => Some(KeyCode::KeyJ),
+        "keyk" | "k" => Some(KeyCode::KeyK),
+        "keyl" | "l" => Some(KeyCode::KeyL),
+        "keyz" | "z" => Some(KeyCode::KeyZ),
+        "keyx" | "x" => Some(KeyCode::KeyX),
+        "keyc" | "c" => Some(KeyCode::KeyC),
+        "keyv" | "v" => Some(KeyCode::KeyV),
+        "keyb" | "b" => Some(KeyCode::KeyB),
+        "keyn" | "n" => Some(KeyCode::KeyN),
+        "keym" | "m" => Some(KeyCode::KeyM),
+        "space" => Some(KeyCode::Space),
+        "shift" | "shiftleft" => Some(KeyCode::ShiftLeft),
+        "shiftright" => Some(KeyCode::ShiftRight),
+        "control" | "ctrl" | "controlleft" => Some(KeyCode::ControlLeft),
+        "controlright" | "ctrlright" => Some(KeyCode::ControlRight),
+        "alt" | "altleft" => Some(KeyCode::AltLeft),
+        "altright" => Some(KeyCode::AltRight),
+        "escape" | "esc" => Some(KeyCode::Escape),
+        "enter" | "return" => Some(KeyCode::Enter),
+        "backspace" => Some(KeyCode::Backspace),
+        "tab" => Some(KeyCode::Tab),
+        "tilde" | "backquote" | "`" => Some(KeyCode::Backquote),
+        "up" | "arrowup" => Some(KeyCode::ArrowUp),
+        "down" | "arrowdown" => Some(KeyCode::ArrowDown),
+        "left" | "arrowleft" => Some(KeyCode::ArrowLeft),
+        "right" | "arrowright" => Some(KeyCode::ArrowRight),
+        "f1" => Some(KeyCode::F1),
+        "f2" => Some(KeyCode::F2),
+        "f3" => Some(KeyCode::F3),
+        "f4" => Some(KeyCode::F4),
+        "f5" => Some(KeyCode::F5),
+        "f6" => Some(KeyCode::F6),
+        "f7" => Some(KeyCode::F7),
+        "f8" => Some(KeyCode::F8),
+        "f9" => Some(KeyCode::F9),
+        "f10" => Some(KeyCode::F10),
+        "f11" => Some(KeyCode::F11),
+        "f12" => Some(KeyCode::F12),
+        "0" => Some(KeyCode::Digit0),
+        "1" => Some(KeyCode::Digit1),
+        "2" => Some(KeyCode::Digit2),
+        "3" => Some(KeyCode::Digit3),
+        "4" => Some(KeyCode::Digit4),
+        "5" => Some(KeyCode::Digit5),
+        "6" => Some(KeyCode::Digit6),
+        "7" => Some(KeyCode::Digit7),
+        "8" => Some(KeyCode::Digit8),
+        "9" => Some(KeyCode::Digit9),
+        _ => None,
+    };
+    key.map(InputBinding::Key)
+}
+
+/// Register default action bindings (WASD + common keys).
+pub fn register_default_actions() {
+    let mut state = InputState::current_mut();
+    if state.default_actions_registered {
+        return;
+    }
+    state.default_actions_registered = true;
+    drop(state);
+
+    register_action("move_forward", vec![InputBinding::Key(KeyCode::KeyW)]);
+    register_action("move_backward", vec![InputBinding::Key(KeyCode::KeyS)]);
+    register_action("move_left", vec![InputBinding::Key(KeyCode::KeyA)]);
+    register_action("move_right", vec![InputBinding::Key(KeyCode::KeyD)]);
+    register_action("move_up", vec![InputBinding::Key(KeyCode::Space)]);
+    register_action("move_down", vec![InputBinding::Key(KeyCode::ShiftLeft)]);
+    register_action("jump", vec![InputBinding::Key(KeyCode::Space)]);
+    register_action("sprint", vec![InputBinding::Key(KeyCode::ShiftLeft)]);
+    register_action("interact", vec![InputBinding::Key(KeyCode::KeyE)]);
+    register_action("attack", vec![InputBinding::Mouse(MouseButton::Left)]);
+    register_action("alt_attack", vec![InputBinding::Mouse(MouseButton::Right)]);
+    register_action("toggle_cursor", vec![InputBinding::Mouse(MouseButton::Right)]);
+    register_action("fullscreen", vec![InputBinding::Key(KeyCode::F11)]);
+    register_action("console", vec![InputBinding::Key(KeyCode::Backquote)]);
+    register_action("menu", vec![InputBinding::Key(KeyCode::Escape)]);
 }
 
 impl InputState {

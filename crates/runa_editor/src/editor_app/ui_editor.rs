@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use egui::{Align2, Color32, Rect, RichText, StrokeKind, Ui};
 use runa_core::components::ui::{
-    AnchorAsset, ContainerKindAsset, ImagePropsAsset, LayoutPropsAsset, StylePropsAsset,
-    TextAlignAsset, TextPropsAsset, UiAssetFile, UiNodeAsset, UiNodeKindAsset,
+    AnchorAsset, ContainerKindAsset, ImagePropsAsset, LayoutPropsAsset, SliderPropsAsset,
+    StylePropsAsset, TextAlignAsset, TextPropsAsset, UiAssetFile, UiNodeAsset, UiNodeKindAsset,
 };
 use runa_project::ui_asset as project_ui_asset;
 use runa_project::ProjectPaths;
@@ -244,6 +244,13 @@ impl UiEditorPanel {
                 self.add_child_node(
                     node_id,
                     UiNodeKindAsset::Image(ImagePropsAsset::default()),
+                );
+                ui.close();
+            }
+            if ui.button("Add Slider Child").clicked() {
+                self.add_child_node(
+                    node_id,
+                    UiNodeKindAsset::Slider(SliderPropsAsset::default()),
                 );
                 ui.close();
             }
@@ -540,6 +547,52 @@ impl UiEditorPanel {
                     }
                 }
             }
+            UiNodeKindAsset::Slider(props) => {
+                let mut props = props.clone();
+                let mut changed = false;
+                let mut value = props.value;
+                if ui
+                    .horizontal(|ui| {
+                        ui.label("Value:");
+                        ui.add(egui::Slider::new(&mut value, props.min..=props.max))
+                            .changed()
+                    })
+                    .inner
+                {
+                    props.value = value;
+                    changed = true;
+                }
+                let mut min = props.min;
+                if ui
+                    .horizontal(|ui| {
+                        ui.label("Min:");
+                        ui.add(egui::DragValue::new(&mut min).speed(0.1).range(-10000.0..=10000.0))
+                            .changed()
+                    })
+                    .inner
+                {
+                    props.min = min;
+                    changed = true;
+                }
+                let mut max = props.max;
+                if ui
+                    .horizontal(|ui| {
+                        ui.label("Max:");
+                        ui.add(egui::DragValue::new(&mut max).speed(0.1).range(-10000.0..=10000.0))
+                            .changed()
+                    })
+                    .inner
+                {
+                    props.max = max;
+                    changed = true;
+                }
+                if changed {
+                    if let Some(n) = self.get_node_mut(node_id) {
+                        n.kind = UiNodeKindAsset::Slider(props);
+                        self.dirty = true;
+                    }
+                }
+            }
             UiNodeKindAsset::Image(props) => {
                 let mut texture_path = props.texture_path.clone().unwrap_or_default();
                 if ui
@@ -697,6 +750,7 @@ fn node_kind_name(kind: &UiNodeKindAsset) -> &'static str {
         },
         UiNodeKindAsset::Image(_) => "Image",
         UiNodeKindAsset::Text(_) => "Text",
+        UiNodeKindAsset::Slider(_) => "Slider",
     }
 }
 
