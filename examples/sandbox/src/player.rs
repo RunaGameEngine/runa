@@ -5,17 +5,18 @@ use runa_core::{
         ui::CanvasSpace, ActiveCamera, Camera, Collider2D, SpriteRenderer, Transform, UiRenderer,
     },
     glam::Vec3,
-    input_system::*,
-    ocs::{Object, Script, ScriptContext, World},
+    input::*,
+    ocs::{Object, Script, ScriptContext},
 };
-use runa_engine::{Engine, RunaArchetype, RunaComponent, RunaScript};
+use runa_engine::Component;
+use winit::keyboard::KeyCode;
 
 // Custom Event
 pub(crate) struct EventChangedDirectionX;
 // Just implement Event for your structure
 impl Event for EventChangedDirectionX {}
 
-#[derive(Default, RunaComponent)]
+#[derive(Component)]
 pub struct Health {
     pub current: i32,
 }
@@ -26,24 +27,17 @@ impl Health {
     }
 }
 
-#[derive(RunaScript)]
 pub struct PlayerController {
     speed: f32,
     direction: Vec3,
 }
 
-impl PlayerController {
-    pub fn new() -> Self {
+impl Default for PlayerController {
+    fn default() -> Self {
         Self {
             speed: 16.0,
             direction: Vec3::ZERO,
         }
-    }
-}
-
-impl Default for PlayerController {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -60,21 +54,21 @@ impl Script for PlayerController {
     fn update(&mut self, ctx: &mut ScriptContext, _dt: f32) {
         self.direction = Vec3::ZERO;
 
-        if Input::is_key_pressed(KeyCode::KeyW) {
+        if InputState::is_key_pressed(KeyCode::KeyW) {
             self.direction.y = 1.0;
         }
-        if Input::is_key_pressed(KeyCode::KeyS) {
+        if InputState::is_key_pressed(KeyCode::KeyS) {
             self.direction.y = -1.0;
         }
-        if Input::is_key_pressed(KeyCode::KeyD) {
+        if InputState::is_key_pressed(KeyCode::KeyD) {
             self.direction.x = 1.0;
         }
-        if Input::is_key_pressed(KeyCode::KeyA) {
+        if InputState::is_key_pressed(KeyCode::KeyA) {
             self.direction.x = -1.0;
         }
 
         // Press E to emit EventChangedDirectionX event
-        if Input::is_key_pressed(KeyCode::KeyE) {
+        if InputState::is_key_pressed(KeyCode::KeyE) {
             ctx.emit_event(EventChangedDirectionX);
         }
 
@@ -94,9 +88,7 @@ impl Script for PlayerController {
     }
 }
 
-#[derive(RunaScript)]
 pub struct PlayerCameraFollow {
-    #[serialize_field]
     lock_z: f32,
 }
 
@@ -145,7 +137,7 @@ pub fn create_player() -> Object {
         ))))
         .with(Collider2D::new(2.0, 2.0))
         .with(Health::new(100))
-        .with(PlayerController::new())
+        .with(PlayerController::default())
 }
 
 pub fn create_player_camera() -> Object {
@@ -156,32 +148,4 @@ pub fn create_player_camera() -> Object {
         .with(ActiveCamera)
         .with(UiRenderer::new(CanvasSpace::Camera))
         .with(PlayerCameraFollow::new())
-}
-
-#[derive(RunaArchetype)]
-#[runa(name = "player")]
-pub struct PlayerArchetype;
-
-impl PlayerArchetype {
-    pub fn create(world: &mut World) -> u64 {
-        world.spawn(create_player())
-    }
-}
-
-#[derive(RunaArchetype)]
-#[runa(name = "player_camera")]
-pub struct PlayerCameraArchetype;
-
-impl PlayerCameraArchetype {
-    pub fn create(world: &mut World) -> u64 {
-        world.spawn(create_player_camera())
-    }
-}
-
-pub fn register_types(engine: &mut Engine) {
-    engine.register::<Health>();
-    engine.register::<PlayerController>();
-    engine.register::<PlayerCameraFollow>();
-    engine.register_archetype::<PlayerArchetype>();
-    engine.register_archetype::<PlayerCameraArchetype>();
 }

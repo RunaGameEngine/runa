@@ -1,10 +1,14 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::OnceLock;
+
 use runa_asset::Handle;
 use runa_asset::TextureAsset;
 
 pub const DEFAULT_SPRITE_PIXELS_PER_UNIT: f32 = 16.0;
 
 pub struct SpriteRenderer {
-    pub texture: Option<Handle<TextureAsset>>,
+    texture: OnceLock<Option<Handle<TextureAsset>>>,
     pub texture_path: Option<String>,
     // Texture size in pixels is converted into world units through this value.
     // Example: a 16px sprite at 16 PPU occupies 1 world unit before object scale.
@@ -14,23 +18,40 @@ pub struct SpriteRenderer {
 }
 
 impl SpriteRenderer {
+    /// Create from a pre-loaded handle. `texture_path` is extracted from the handle's metadata.
     pub fn new(texture: Option<Handle<TextureAsset>>) -> Self {
         let texture_path = texture
             .as_ref()
             .map(|handle| handle.inner.path.to_string_lossy().to_string());
 
+        let lock = OnceLock::new();
+        if let Some(h) = texture {
+            let _ = lock.set(Some(h));
+        }
+
         Self {
-            texture,
+            texture: lock,
             texture_path,
             pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
             uv_rect: Self::FULL_UV_RECT,
         }
     }
 
-    /// texture = None
+    /// Create with a file path. The texture is loaded lazily on first render.
+    ///
+    /// `path` is resolved relative to the process working directory.
+    pub fn from_path(path: impl Into<String>) -> Self {
+        Self {
+            texture: OnceLock::new(),
+            texture_path: Some(path.into()),
+            pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
+            uv_rect: Self::FULL_UV_RECT,
+        }
+    }
+
     pub fn default() -> Self {
         Self {
-            texture: None,
+            texture: OnceLock::new(),
             texture_path: None,
             pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
             uv_rect: Self::FULL_UV_RECT,
@@ -39,16 +60,41 @@ impl SpriteRenderer {
 
     pub const FULL_UV_RECT: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
 
-    pub fn get_texture_handle(&self) -> Handle<TextureAsset> {
-        self.texture.clone().unwrap()
+    /// Get the texture handle, loading from `texture_path` on first access if needed.
+    pub fn texture(&self) -> Option<&Handle<TextureAsset>> {
+        self.texture
+            .get_or_init(|| {
+                let path = self.texture_path.as_ref()?;
+                TextureAsset::load(&PathBuf::from(path))
+                    .ok()
+                    .map(|asset| Handle {
+                        inner: Arc::new(asset),
+                    })
+            })
+            .as_ref()
     }
 
+    /// Consume and return the texture handle, loading if needed.
+    pub fn texture_owned(&self) -> Option<Handle<TextureAsset>> {
+        self.texture().cloned()
+    }
+
+    /// Unwrap the texture handle (panics if missing and cannot be loaded).
+    pub fn get_texture_handle(&self) -> Handle<TextureAsset> {
+        self.texture_owned().unwrap()
+    }
+
+    /// Replace both the texture and its path.
     pub fn set_texture(
         &mut self,
         texture: Option<Handle<TextureAsset>>,
         texture_path: Option<String>,
     ) {
-        self.texture = texture;
+        let lock = OnceLock::new();
+        if let Some(h) = texture {
+            let _ = lock.set(Some(h));
+        }
+        self.texture = lock;
         self.texture_path = texture_path;
     }
 
@@ -66,7 +112,7 @@ impl SpriteRenderer {
     }
 
     pub fn frame_size_pixels(&self) -> Option<[f32; 2]> {
-        let texture = self.texture.as_ref()?;
+        let texture = self.texture()?;
         Some([
             texture.inner.width as f32 * self.uv_rect[2].max(f32::EPSILON),
             texture.inner.height as f32 * self.uv_rect[3].max(f32::EPSILON),

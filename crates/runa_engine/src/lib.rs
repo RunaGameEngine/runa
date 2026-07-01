@@ -1,16 +1,30 @@
 mod engine;
+pub mod prelude;
 
 pub use runa_app;
 pub use runa_asset;
 pub use runa_core;
-pub use runa_project;
 
 pub use engine::Engine;
-pub use engine::RunaTypeRegistration;
-pub use runa_core::registry::{
-    ArchetypeKey, ArchetypeMetadata, ArchetypeRegistry, ObjectDef, ObjectDefKey, ObjectDefMetadata,
-    ObjectDefName, ObjectDefRegistry, RegisteredTypeKind, RegistrationSource, RunaArchetype,
-    RunaComponentType, RunaScriptType, RuntimeRegistry, TypeMetadata, TypeRegistry,
-};
-pub use runa_core::{SerializedField, SerializedFieldAccess, SerializedFieldValue};
-pub use runa_macros::{RunaArchetype, RunaComponent, RunaObjectDef, RunaScript};
+pub use runa_core::codefirst::{Bundle, QueryMut, QueryRef};
+pub use runa_core::Color;
+pub use runa_macros::Component;
+
+/// Create a `SpriteRenderer` from a path relative to the crate root.
+///
+/// Loads the texture at compile time (validates the file exists) and
+/// stores both the handle and the path — no duplicate path strings needed.
+///
+/// ```ignore
+/// use runa_engine::sprite;
+///
+/// let spr = sprite!("assets/art/Tester1.png");
+/// ```
+#[macro_export]
+macro_rules! sprite {
+    ($path:literal) => {
+        $crate::runa_core::components::SpriteRenderer::new(Some(
+            $crate::runa_asset::load_image!($path),
+        ))
+    };
+}

@@ -13,7 +13,7 @@ use runa_render_api::RenderQueue;
 
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow};
+use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
@@ -134,7 +134,7 @@ impl<'window> App<'window> {
         let world = self.world_rc.borrow();
 
         // ищем объект с ActiveCamera и Camera компонентом
-        let id_opt = world.query::<ActiveCamera>().into_iter().find(|id| {
+        let id_opt = world.find_all_with::<ActiveCamera>().into_iter().find(|id| {
             world
                 .object(*id)
                 .and_then(|object| object.get_component::<Camera>())
@@ -145,8 +145,8 @@ impl<'window> App<'window> {
     }
 
     fn toggle_fullscreen(&mut self) {
-        runa_core::input_system::toggle_fullscreen();
-        self.config.fullscreen = runa_core::input_system::is_fullscreen().unwrap_or(false);
+        runa_core::input::toggle_fullscreen();
+        self.config.fullscreen = runa_core::input::is_fullscreen().unwrap_or(false);
     }
 
     fn render(&mut self) {
@@ -227,7 +227,7 @@ impl<'window> App<'window> {
                     / now.duration_since(self.last_fps_update).as_secs_f32();
                 self.frame_count = 0;
                 self.last_fps_update = now;
-                self.config.title = runa_core::input_system::window_title()
+                self.config.title = runa_core::input::window_title()
                     .unwrap_or_else(|| self.config.title.clone());
                 if self.config.show_fps_in_title {
                     window.set_title(&format!(
@@ -327,7 +327,7 @@ impl<'window> ApplicationHandler for App<'window> {
                 }
             }
 
-            runa_core::input_system::initialize_window_state(
+            runa_core::input::initialize_window_state(
                 self.config.title.clone(),
                 self.config.fullscreen,
                 (self.config.width, self.config.height),
@@ -335,9 +335,9 @@ impl<'window> ApplicationHandler for App<'window> {
             self.window = Some(window.clone());
 
             // Set window handle for input system (cursor control)
-            runa_core::input_system::set_window_handle(&window);
-            runa_core::input_system::set_window_size(self.config.width, self.config.height);
-            runa_core::input_system::set_fullscreen(self.config.fullscreen);
+            runa_core::input::set_window_handle(&window);
+            runa_core::input::set_window_size(self.config.width, self.config.height);
+            runa_core::input::set_fullscreen(self.config.fullscreen);
 
             let renderer = Renderer::new(window.clone(), self.config.vsync);
             self.renderer = Some(renderer);
@@ -421,10 +421,10 @@ impl<'window> ApplicationHandler for App<'window> {
                     self.camera.resize(new_size.width, new_size.height);
                     self.config.width = new_size.width;
                     self.config.height = new_size.height;
-                    runa_core::input_system::initialize_window_state(
-                        runa_core::input_system::window_title()
+                    runa_core::input::initialize_window_state(
+                        runa_core::input::window_title()
                             .unwrap_or_else(|| self.config.title.clone()),
-                        runa_core::input_system::is_fullscreen().unwrap_or(self.config.fullscreen),
+                        runa_core::input::is_fullscreen().unwrap_or(self.config.fullscreen),
                         (new_size.width, new_size.height),
                     );
                     self.sync_camera();

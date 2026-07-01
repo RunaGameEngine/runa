@@ -1,6 +1,6 @@
 use crate::{
     components::{CursorInteractable, Transform},
-    input_system::*,
+    input::InputState,
     ocs::{ObjectId, World},
 };
 use glam::Vec3;
@@ -23,8 +23,8 @@ impl InteractionSystem {
     }
 
     pub fn update(&mut self, world: &mut World) {
-        self.mouse_position = Input::get_mouse_world_position().unwrap_or(Vec3::ZERO);
-        let interactable_ids = world.query::<CursorInteractable>();
+        self.mouse_position = InputState::get_mouse_world_position().unwrap_or(Vec3::ZERO);
+        let interactable_ids = world.find_all_with::<CursorInteractable>();
 
         // Reset states
         for object_id in &interactable_ids {
@@ -90,8 +90,10 @@ impl InteractionSystem {
                     if let Some(object) = world.object_mut(closest_id) {
                         if let Some(interactable) = object.get_component_mut::<CursorInteractable>()
                         {
-                            if let Some(ref mut callback) = interactable.on_click {
-                                callback();
+                            if let Some(ref mut callback) = interactable.on_click_mut() {
+                                if let Ok(mut cb) = callback.lock() {
+                                    cb();
+                                }
                             }
                         }
                     }

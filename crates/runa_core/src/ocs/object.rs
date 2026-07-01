@@ -1,11 +1,9 @@
 use crate::components::{Collider2D, Component, Transform};
 use crate::ocs::{ScriptContext, World};
-use crate::registry::RuntimeRegistry;
 use glam::Vec2;
 use std::any::TypeId;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
-use std::sync::Arc;
 
 pub type ObjectId = u64;
 
@@ -29,61 +27,8 @@ pub struct Object {
     pub name: String,
     parent: Option<ObjectId>,
     children: Vec<ObjectId>,
-    components: Vec<(TypeId, Box<dyn Component>)>,
+    pub(crate) components: Vec<(TypeId, Box<dyn Component>)>,
     world: Option<Weak<RefCell<World>>>,
-}
-
-pub struct ObjectBuilder {
-    object: Object,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ObjectComponentInfo {
-    type_id: TypeId,
-    type_name: &'static str,
-    kind: crate::components::ComponentRuntimeKind,
-}
-
-impl ObjectComponentInfo {
-    pub fn type_id(self) -> TypeId {
-        self.type_id
-    }
-
-    pub fn type_name(self) -> &'static str {
-        self.type_name
-    }
-
-    pub fn kind(self) -> crate::components::ComponentRuntimeKind {
-        self.kind
-    }
-}
-
-impl ObjectBuilder {
-    pub fn new() -> Self {
-        Self {
-            object: Object::new(""),
-        }
-    }
-
-    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
-        self.object.name = name.into();
-        self
-    }
-
-    pub fn with<T: Component>(&mut self, component: T) -> &mut Self {
-        self.object.add_component(component);
-        self
-    }
-
-    pub fn build(self) -> Object {
-        self.object
-    }
-}
-
-impl Default for ObjectBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Object {
@@ -165,11 +110,6 @@ impl Object {
         self.get_world()?.borrow().find_by_path(path)
     }
 
-    pub fn runtime_registry(&self) -> Option<Arc<RuntimeRegistry>> {
-        self.get_world()
-            .and_then(|world_rc| world_rc.borrow().runtime_registry_arc())
-    }
-
     pub fn add_component<T: Component>(&mut self, component: T) -> &mut Object {
         let type_id = TypeId::of::<T>();
         if let Some(pos) = self.components.iter().position(|(tid, _)| *tid == type_id) {
@@ -241,27 +181,6 @@ impl Object {
         self.components.iter().any(|(tid, _)| *tid == type_id)
     }
 
-    pub fn with_component_mut_by_type_id<R>(
-        &mut self,
-        type_id: TypeId,
-        apply: impl FnOnce(&mut dyn Component) -> R,
-    ) -> Option<R> {
-        let component = self
-            .components
-            .iter_mut()
-            .find(|(tid, _)| *tid == type_id)?;
-        Some(apply(component.1.as_mut()))
-    }
-
-    pub fn with_component_by_type_id<R>(
-        &self,
-        type_id: TypeId,
-        apply: impl FnOnce(&dyn Component) -> R,
-    ) -> Option<R> {
-        let component = self.components.iter().find(|(tid, _)| *tid == type_id)?;
-        Some(apply(component.1.as_ref()))
-    }
-
     pub fn remove_component_type_id(&mut self, type_id: TypeId) -> bool {
         if type_id == TypeId::of::<Transform>() {
             return false;
@@ -271,17 +190,6 @@ impl Object {
         };
         self.components.swap_remove(pos);
         true
-    }
-
-    pub fn component_infos(&self) -> Vec<ObjectComponentInfo> {
-        self.components
-            .iter()
-            .map(|(type_id, component)| ObjectComponentInfo {
-                type_id: *type_id,
-                type_name: component.runtime_type_name(),
-                kind: component.runtime_kind(),
-            })
-            .collect()
     }
 
     pub(crate) fn run_start(&mut self, world: *mut World) {

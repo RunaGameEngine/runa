@@ -1,4 +1,4 @@
-use crate::components::{Collider2D, Component, ComponentRuntimeKind, SerializedFieldAccess};
+use crate::components::{Collider2D, Component};
 use crate::ocs::{Object, ObjectHandle, ObjectId, ScriptCommands, World};
 use glam::Vec2;
 
@@ -120,72 +120,9 @@ impl<'a> ScriptContext<'a> {
 ///
 /// Scripts are attachable behavior components.
 /// They follow a deterministic lifecycle and operate on an already-composed object.
-///
-/// # Lifecycle
-/// 1. `start()` - Called once after the object enters the world
-/// 2. `update()` - Called every tick while object exists in the world
-/// 3. `late_update()` - Called after all regular updates for the tick
-///
-/// # Example
-/// ```rust,ignore
-/// struct Player {
-///     speed: f32,
-/// }
-///
-/// impl Script for Player {
-///     fn start(&mut self, ctx: &mut ScriptContext) {
-///         // Access components after object is in world
-///         println!("Player spawned at {:?}", ctx.get_component::<Transform>().unwrap().position);
-///     }
-///
-///     fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {
-///         // Game logic runs every tick
-///         if Input::is_key_pressed(KeyCode::W) {
-///             let transform = ctx.get_component_mut::<Transform>().unwrap();
-///             transform.position.y -= self.speed * dt;
-///         }
-///
-///         // Audio playback via AudioSource::play()
-///         if let Some(audio) = ctx.get_component_mut::<AudioSource>() {
-///             audio.play();
-///         }
-///     }
-/// }
-///
-/// // Queue world mutations instead of mutating the world directly.
-/// // if let Some(id) = ctx.id() {
-/// //     ctx.commands().despawn(id);
-/// // }
-/// ```
-pub trait Script: SerializedFieldAccess + 'static {
-    /// Called once on the first tick after the object is added to the world.
-    ///
-    /// Use this method to:
-    /// - Access other objects in the world
-    /// - Query world state (e.g., find nearest enemy)
-    /// - Start coroutines or timed events
-    /// - Initialize physics/collision state
-    ///
-    /// This is the earliest point where the object is fully integrated into the simulation.
+pub trait Script: Send + Sync + 'static {
     fn start(&mut self, _ctx: &mut ScriptContext) {}
-
-    /// Called every tick while the object exists in the world.
-    ///
-    /// Use this method for:
-    /// - Input handling (`Input::is_key_pressed()`)
-    /// - Movement and animation
-    /// - AI behavior and decision-making
-    /// - Physics updates (use fixed timestep for determinism)
-    /// - Audio playback via `AudioSource::play()`
-    ///
-    /// Parameters:
-    /// - `dt`: Delta time in seconds since last frame (use for frame-rate independent movement)
     fn update(&mut self, _ctx: &mut ScriptContext, _dt: f32) {}
-
-    /// Called after all regular `update()` calls for the current tick.
-    ///
-    /// Use this for dependent logic that must observe the final results of gameplay updates,
-    /// such as follows cameras and post-movement alignment.
     fn late_update(&mut self, _ctx: &mut ScriptContext, _dt: f32) {}
 }
 
@@ -196,14 +133,6 @@ impl<T: Script> Component for T {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
-    }
-
-    fn runtime_kind(&self) -> ComponentRuntimeKind {
-        ComponentRuntimeKind::Script
-    }
-
-    fn runtime_type_name(&self) -> &'static str {
-        std::any::type_name::<T>()
     }
 
     fn on_start(&mut self, ctx: &mut ScriptContext) {

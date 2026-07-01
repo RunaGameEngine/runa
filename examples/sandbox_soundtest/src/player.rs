@@ -1,12 +1,10 @@
-use runa_asset::load_image;
 use runa_core::{
-    components::{ActiveCamera, AudioListener, Camera, SpriteRenderer, Transform},
+    components::*,
     glam::Vec3,
-    input_system::*,
-    ocs::{Object, Script, ScriptContext, World},
-    SerializedFieldAccess,
+    input::InputState,
+    ocs::{Object, Script, ScriptContext},
 };
-use runa_engine::RunaArchetype;
+use winit::keyboard::KeyCode;
 
 pub struct Player {
     speed: f32,
@@ -22,23 +20,21 @@ impl Player {
     }
 }
 
-impl SerializedFieldAccess for Player {}
-
 impl Script for Player {
     fn start(&mut self, _ctx: &mut ScriptContext) {}
 
     fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {
         self.direction = Vec3::ZERO;
-        if Input::is_key_pressed(KeyCode::KeyW) {
+        if InputState::is_key_pressed(KeyCode::KeyW) {
             self.direction.y = 1.0;
         }
-        if Input::is_key_pressed(KeyCode::KeyS) {
+        if InputState::is_key_pressed(KeyCode::KeyS) {
             self.direction.y = -1.0;
         }
-        if Input::is_key_pressed(KeyCode::KeyD) {
+        if InputState::is_key_pressed(KeyCode::KeyD) {
             self.direction.x = 1.0;
         }
-        if Input::is_key_pressed(KeyCode::KeyA) {
+        if InputState::is_key_pressed(KeyCode::KeyA) {
             self.direction.x = -1.0;
         }
 
@@ -53,23 +49,6 @@ pub fn create_player() -> Object {
         .with(AudioListener::new())
         .with(Camera::new_orthographic(32.0, 18.0))
         .with(ActiveCamera)
-        .with(SpriteRenderer {
-            texture: Some(load_image!("assets/art/Charactert.png")),
-            texture_path: Some("assets/Charactert.png".to_string()),
-            // Sound-test keeps the default 16 PPU sprite convention used by the
-            // bundled 2D examples.
-            pixels_per_unit: 16.0,
-            uv_rect: SpriteRenderer::FULL_UV_RECT,
-        })
+        .with(SpriteRenderer::from_path("assets/art/Charactert.png"))
         .with(Player::new())
-}
-
-#[derive(RunaArchetype)]
-#[runa(name = "player")]
-pub struct PlayerArchetype;
-
-impl PlayerArchetype {
-    pub fn create(world: &mut World) -> u64 {
-        world.spawn(create_player())
-    }
 }

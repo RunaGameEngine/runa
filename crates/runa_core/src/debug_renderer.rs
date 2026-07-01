@@ -30,7 +30,7 @@ impl DebugRenderer {
             return;
         }
 
-        for object_id in world.query::<PhysicsCollision>() {
+        for object_id in world.find_all_with::<PhysicsCollision>() {
             let Some(object) = world.object(object_id) else {
                 continue;
             };

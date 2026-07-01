@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.2] - 2026-07-02
+
+### Added
+
+- **Code-first API:** `Bundle` trait, `spawn_bundle((A, B, C))`, `query_components::<T>()`
+  — spawn and query entities without registration.
+- **`Color` struct:** RGBA `f32`, HSV/HSL/hex conversions, named constants,
+  linear/gamma, premultiply, blend. Replaces `Vec3` for all color-typed fields.
+- **`math` module:** `lerp`, `smooth_step`, `smooth_damp`, `ease_in/out/*`,
+  `move_towards`, `remap`, `inverse_lerp`, `lerp_angle`, `LerpExt` trait for
+  `f32`/`Vec2`/`Vec3`/`Vec4`.
+- **`SpriteRenderer::from_path(path)`:** lazy texture loading from `texture_path`
+  on first render (via `OnceLock`).
+- **`sprite!("path")` macro:** compile-time validated, returns `SpriteRenderer`
+  with texture loaded — no path duplication.
+- **`runa_engine::prelude`:** glob import for all common types.
+- **`Node` UI helpers:** `with_margin`, `with_padding` builders.
+
+### Changed
+
+- **Registration system removed entirely:**
+  `RunaComponent`, `RunaScript`, `RunaArchetype`, `RunaObjectDef` derives,
+  `TypeRegistry`, `RuntimeRegistry`, `engine.register_*`, `ObjectBuilder`,
+  `WorldSpawnArg` — all deleted. Plain `#[derive(Component)]` + `world.spawn_bundle`
+  is the new standard.
+- **`Component` trait simplified:** no `SerializedFieldAccess` supertrait,
+  no `runtime_kind`/`runtime_type_name`. Requires `Any + Send + Sync + 'static`.
+- **Closures in components** (`CursorInteractable`, `UiNode`) wrapped in `Mutex`
+  for `Sync`.
+- **`runa_project` / `runa_editor` excluded from workspace** — will be
+  refactored for a later editor release.
+- **Examples rewritten:** use `Color::BLACK`, `world.spawn_bundle`,
+  `#[derive(Component)]`, `SpriteRenderer::from_path`.
+- **Docs updated:** README, tutorials, architecture docs reflect new API.
+
+### Removed
+
+- All registration plumbing (`registry.rs`, `Runa*` derives, `register_*` methods).
+- `WorldSpawnArg` trait and all `spawn_archetype`/`spawn_def` methods.
+- `ObjectBuilder`, `ObjectComponentInfo`, `WorldExt` trait.
+- Old test files `typed_archetypes.rs`, `serialized_fields.rs`.
+- `runa_engine` dependency on `runa_project`.
+
 ## [0.6.0-alpha.1] - 2026-06-29
 
 ### Added

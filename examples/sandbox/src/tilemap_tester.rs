@@ -3,9 +3,8 @@ use std::sync::Arc;
 use runa_core::glam::USizeVec2;
 use runa_core::{
     components::{Rect, Tile, Tilemap, TilemapLayer, TilemapRenderer},
-    ocs::{Object, World},
+    ocs::Object,
 };
-use runa_engine::RunaArchetype;
 
 pub fn create_tilemap_tester() -> Object {
     let tilemap = {
@@ -42,14 +41,4 @@ pub fn create_tilemap_tester() -> Object {
     Object::new("Tilemap")
         .with(tilemap)
         .with(TilemapRenderer::new())
-}
-
-#[derive(RunaArchetype)]
-#[runa(name = "tilemap_tester")]
-pub struct TilemapTesterArchetype;
-
-impl TilemapTesterArchetype {
-    pub fn create(world: &mut World) -> u64 {
-        world.spawn(create_tilemap_tester())
-    }
 }

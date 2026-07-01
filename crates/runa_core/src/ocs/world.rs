@@ -19,11 +19,10 @@ use crate::{
     },
     debug_renderer::DebugRenderer,
     ocs::{Object, ObjectId, Script},
-    registry::{ArchetypeKey, ObjectDef, RunaArchetype, RuntimeRegistry},
 };
 
 pub struct World {
-    objects: Vec<Object>,
+    pub(crate) objects: Vec<Object>,
     /// O(1) lookup: ObjectId → index in `objects`.
     object_index: HashMap<ObjectId, usize>,
     debug_renderer: DebugRenderer,
@@ -34,38 +33,7 @@ pub struct World {
     processing_lifecycle: bool,
     started: bool,
     self_handle: Option<Weak<RefCell<World>>>,
-    runtime_registry: Option<Arc<RuntimeRegistry>>,
     atmosphere: WorldAtmosphere,
-}
-
-pub trait WorldSpawnArg {
-    type Output;
-
-    fn spawn_into(self, world: &mut World) -> Self::Output;
-}
-
-impl WorldSpawnArg for Object {
-    type Output = ObjectId;
-
-    fn spawn_into(self, world: &mut World) -> Self::Output {
-        world.spawn_object(self)
-    }
-}
-
-impl WorldSpawnArg for &str {
-    type Output = Option<ObjectId>;
-
-    fn spawn_into(self, world: &mut World) -> Self::Output {
-        world.spawn_def_by_name(self)
-    }
-}
-
-impl WorldSpawnArg for String {
-    type Output = Option<ObjectId>;
-
-    fn spawn_into(self, world: &mut World) -> Self::Output {
-        world.spawn_def_by_name(&self)
-    }
 }
 
 impl World {
@@ -81,7 +49,6 @@ impl World {
             processing_lifecycle: false,
             started: false,
             self_handle: None,
-            runtime_registry: None,
             atmosphere: WorldAtmosphere::default(),
         }
     }
@@ -103,20 +70,12 @@ impl World {
         self.atmosphere = atmosphere;
     }
 
-    pub fn spawn<S: WorldSpawnArg>(&mut self, spawn: S) -> S::Output {
-        spawn.spawn_into(self)
-    }
-
     pub fn spawn_object(&mut self, object: Object) -> ObjectId {
         self.insert_object(object)
     }
 
     pub fn spawn_script<S: Script>(&mut self, script: S) -> ObjectId {
         self.insert_object(Object::empty().with(script))
-    }
-
-    pub fn set_runtime_registry(&mut self, runtime_registry: Arc<RuntimeRegistry>) {
-        self.runtime_registry = Some(runtime_registry);
     }
 
     fn set_self_handle(&mut self, world_rc: Rc<RefCell<World>>) {
@@ -133,42 +92,6 @@ impl World {
                 object.set_world(world_rc.clone());
             }
         }
-    }
-
-    pub fn runtime_registry(&self) -> Option<&RuntimeRegistry> {
-        self.runtime_registry.as_deref()
-    }
-
-    pub fn runtime_registry_arc(&self) -> Option<Arc<RuntimeRegistry>> {
-        self.runtime_registry.clone()
-    }
-
-    pub fn spawn_archetype<T: RunaArchetype>(&mut self) -> ObjectId {
-        T::create(self)
-    }
-
-    pub fn spawn_def<T: ObjectDef>(&mut self) -> ObjectId {
-        self.spawn_object(T::create_object())
-    }
-
-    pub fn spawn_archetype_by_key(&mut self, key: &ArchetypeKey) -> Option<ObjectId> {
-        let registry = self.runtime_registry.clone()?;
-        registry.spawn_archetype_by_key(self, key)
-    }
-
-    pub fn spawn_archetype_by_name(&mut self, name: &str) -> Option<ObjectId> {
-        let registry = self.runtime_registry.clone()?;
-        registry.spawn_archetype_by_name(self, name)
-    }
-
-    pub fn spawn_def_by_key(&mut self, key: &ArchetypeKey) -> Option<ObjectId> {
-        let registry = self.runtime_registry.clone()?;
-        registry.spawn_object_def_by_key(self, key)
-    }
-
-    pub fn spawn_def_by_name(&mut self, name: &str) -> Option<ObjectId> {
-        let registry = self.runtime_registry.clone()?;
-        registry.spawn_object_def_by_name(self, name)
     }
 
     fn insert_object(&mut self, mut object: Object) -> ObjectId {
@@ -220,9 +143,6 @@ impl World {
     }
 
     pub fn update(&mut self, dt: f32) {
-        // println!("Listeners: {}", self.events.borrow().listeners.len());
-        // println!("Queue: {}", self.events.borrow().queue.len());
-
         for object in &mut self.objects {
             if let Some(transform) = object.get_component_mut::<Transform>() {
                 transform.prepare_for_update();
@@ -354,44 +274,46 @@ impl World {
 
         // Culling data from active camera
         let mut visible_world_rect: Option<(Vec3, Vec3)> = None;
-        let frustum_planes: Option<[glam::Vec4; 6]> =
-            self.objects.iter().find_map(|obj| {
-                let cam = obj.get_component::<Camera>()?;
-                obj.get_component::<ActiveCamera>()?;
-                // Resolve camera with object transform to get world-space camera
-                let world_cam = cam.resolved_with_transform(obj.get_component::<Transform>());
-                let vp = world_cam.matrix();
+        let frustum_planes: Option<[glam::Vec4; 6]> = self.objects.iter().find_map(|obj| {
+            let cam = obj.get_component::<Camera>()?;
+            obj.get_component::<ActiveCamera>()?;
+            // Resolve camera with object transform to get world-space camera
+            let world_cam = cam.resolved_with_transform(obj.get_component::<Transform>());
+            let vp = world_cam.matrix();
 
-                // Frustum planes for 3D object culling
-                let r0 = vp.row(0);
-                let r1 = vp.row(1);
-                let r2 = vp.row(2);
-                let r3 = vp.row(3);
-                let planes = [
-                    r3 + r0, r3 - r0, // left, right
-                    r3 + r1, r3 - r1, // bottom, top
-                    r3 + r2, r3 - r2, // near, far
-                ];
+            // Frustum planes for 3D object culling
+            let r0 = vp.row(0);
+            let r1 = vp.row(1);
+            let r2 = vp.row(2);
+            let r3 = vp.row(3);
+            let planes = [
+                r3 + r0,
+                r3 - r0, // left, right
+                r3 + r1,
+                r3 - r1, // bottom, top
+                r3 + r2,
+                r3 - r2, // near, far
+            ];
 
-                // Visible world rect for tilemap culling (orthographic only)
-                if world_cam.projection == ProjectionType::Orthographic {
-                    let inv = vp.inverse();
-                    let b = inv * glam::Vec4::new(-1.0, -1.0, 0.0, 1.0);
-                    let t = inv * glam::Vec4::new(1.0, 1.0, 0.0, 1.0);
-                    let b = b.truncate() / b.w;
-                    let t = t.truncate() / t.w;
-                    visible_world_rect = Some((b.min(t), b.max(t)));
-                }
+            // Visible world rect for tilemap culling (orthographic only)
+            if world_cam.projection == ProjectionType::Orthographic {
+                let inv = vp.inverse();
+                let b = inv * glam::Vec4::new(-1.0, -1.0, 0.0, 1.0);
+                let t = inv * glam::Vec4::new(1.0, 1.0, 0.0, 1.0);
+                let b = b.truncate() / b.w;
+                let t = t.truncate() / t.w;
+                visible_world_rect = Some((b.min(t), b.max(t)));
+            }
 
-                Some(planes)
-            });
+            Some(planes)
+        });
 
         for object in &self.objects {
             if let Some(light) = object.get_component::<DirectionalLight>() {
                 render_queue.add_directional_light(
                     runa_render_api::command::DirectionalLightData {
                         direction: light.direction,
-                        color: light.color,
+                        color: light.color.to_vec3(),
                         intensity: light.intensity,
                     },
                 );
@@ -406,7 +328,7 @@ impl World {
                         .world_transform_matrix_for_object(object, interpolation_factor)
                         .map(|matrix| matrix.transform_point3(Vec3::ZERO))
                         .unwrap_or_else(|| transform.interpolated_position(interpolation_factor)),
-                    color: light.color,
+                    color: light.color.to_vec3(),
                     intensity: light.intensity,
                     radius: light.radius,
                     falloff: light.falloff,
@@ -436,7 +358,6 @@ impl World {
                 let mesh = mesh_renderer.get_mesh_handle();
 
                 // Frustum culling: skip objects outside the view frustum
-                // Uses bounding sphere radius from mesh AABB to avoid culling partially visible objects
                 if let Some(planes) = frustum_planes {
                     let center = interpolated_position;
                     let bounds = &mesh.inner.bounds;
@@ -447,7 +368,11 @@ impl World {
                     );
                     // Scale affects the bounding radius in world space
                     let (model_scale, _, _) = model_matrix.to_scale_rotation_translation();
-                    let max_scale = model_scale.x.abs().max(model_scale.y.abs()).max(model_scale.z.abs());
+                    let max_scale = model_scale
+                        .x
+                        .abs()
+                        .max(model_scale.y.abs())
+                        .max(model_scale.z.abs());
                     let radius = half_extents.length() * max_scale;
 
                     let mut visible = true;
@@ -499,7 +424,7 @@ impl World {
                 object.get_component::<Transform>(),
                 object.get_component::<SpriteRenderer>(),
             ) {
-                let Some(texture) = sprite.texture.clone() else {
+                let Some(texture) = sprite.texture_owned() else {
                     continue;
                 };
 
@@ -545,10 +470,9 @@ impl World {
                             transform.interpolated_position(interpolation_factor),
                         )
                     });
-                let (tile_scale, _, _) =
-                    object_matrix.to_scale_rotation_translation();
-                let tile_world_size = tilemap.world_tile_size()
-                    * Vec2::new(tile_scale.x.abs(), tile_scale.y.abs());
+                let (tile_scale, _, _) = object_matrix.to_scale_rotation_translation();
+                let tile_world_size =
+                    tilemap.world_tile_size() * Vec2::new(tile_scale.x.abs(), tile_scale.y.abs());
 
                 for layer in &tilemap.layers {
                     if !layer.visible {
@@ -623,7 +547,6 @@ impl World {
                         render_queue.draw_tiles_batch(texture, instances, layer.self_order);
                     }
                 }
-
             }
 
             if let (Some(canvas), Some(_camera), Some(_ac)) = (
@@ -890,13 +813,6 @@ impl World {
             .collect()
     }
 
-    /// Query object ids by component type.
-    ///
-    /// Order is intentionally not part of the public contract.
-    pub fn query<T: 'static>(&self) -> Vec<ObjectId> {
-        self.find_all_with::<T>()
-    }
-
     pub(crate) fn queue_command(&mut self, command: WorldCommand) {
         self.command_queue.push(command);
     }
@@ -1063,6 +979,12 @@ impl World {
     }
 }
 
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn local_transform_matrix(transform: &Transform, interpolation_factor: f32) -> Mat4 {
     Mat4::from_scale_rotation_translation(
         transform.scale,
@@ -1071,16 +993,12 @@ fn local_transform_matrix(transform: &Transform, interpolation_factor: f32) -> M
     )
 }
 
-impl Default for World {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 fn to_render_atmosphere(atmosphere: WorldAtmosphere) -> runa_render_api::command::AtmosphereData {
     let background = match atmosphere.background {
         BackgroundMode::SolidColor { color } => {
-            runa_render_api::command::BackgroundModeData::SolidColor { color }
+            runa_render_api::command::BackgroundModeData::SolidColor {
+                color: color.to_vec3(),
+            }
         }
         BackgroundMode::VerticalGradient {
             zenith_color,
@@ -1089,9 +1007,9 @@ fn to_render_atmosphere(atmosphere: WorldAtmosphere) -> runa_render_api::command
             horizon_height,
             smoothness,
         } => runa_render_api::command::BackgroundModeData::VerticalGradient {
-            zenith_color,
-            horizon_color,
-            ground_color,
+            zenith_color: zenith_color.to_vec3(),
+            horizon_color: horizon_color.to_vec3(),
+            ground_color: ground_color.to_vec3(),
             horizon_height,
             smoothness,
         },
@@ -1099,7 +1017,7 @@ fn to_render_atmosphere(atmosphere: WorldAtmosphere) -> runa_render_api::command
     };
 
     runa_render_api::command::AtmosphereData {
-        ambient_color: atmosphere.ambient_color,
+        ambient_color: atmosphere.ambient_color.to_vec3(),
         ambient_intensity: atmosphere.ambient_intensity,
         background_intensity: atmosphere.background_intensity,
         background,
@@ -1113,14 +1031,12 @@ mod tests {
 
     use super::World;
     use crate::{
-        components::{SerializedFieldAccess, Transform},
+        components::Component,
         ocs::{Object, Script, ScriptContext},
     };
 
-    struct DespawnSelf;
-    impl SerializedFieldAccess for DespawnSelf {}
-
-    impl Script for DespawnSelf {
+        struct DespawnSelf;
+        impl Script for DespawnSelf {
         fn update(&mut self, ctx: &mut ScriptContext, _dt: f32) {
             if let Some(id) = ctx.id() {
                 ctx.commands().despawn(id);
@@ -1133,11 +1049,11 @@ mod tests {
         let world_rc = Rc::new(RefCell::new(World::default()));
         world_rc
             .borrow_mut()
-            .spawn(Object::new("Transient").with(DespawnSelf));
+            .spawn_object(Object::new("Transient").with(DespawnSelf));
         world_rc.borrow_mut().start(world_rc.clone());
 
-        assert_eq!(world_rc.borrow().query::<Transform>().len(), 1);
+        assert_eq!(world_rc.borrow().find_all_with::<DespawnSelf>().len(), 1);
         world_rc.borrow_mut().update(1.0 / 60.0);
-        assert!(world_rc.borrow().query::<Transform>().is_empty());
+        assert!(world_rc.borrow().find_all_with::<DespawnSelf>().is_empty());
     }
 }

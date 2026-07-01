@@ -12,21 +12,17 @@ mod tester1;
 mod tilemap_tester;
 
 fn main() {
-    let mut engine = Engine::new();
-    engine.register_archetype::<tilemap_tester::TilemapTesterArchetype>();
-    engine.register_archetype::<tester1::RotatingSpriteArchetype>();
-    engine.register_archetype::<player::PlayerArchetype>();
+    let engine = Engine::new();
     let world_rc = engine.create_world();
 
     {
         let mut world = world_rc.borrow_mut();
-        let _ = world.spawn_archetype::<tilemap_tester::TilemapTesterArchetype>();
-        let _ = world.spawn_archetype::<tester1::RotatingSpriteArchetype>();
-        let _ = world.spawn_archetype::<player::PlayerArchetype>();
+        let _ = world.spawn_object(tilemap_tester::create_tilemap_tester());
+        let _ = world.spawn_object(tester1::create_rotating_sprite());
+        let _ = world.spawn_object(player::create_player());
 
-        // Explicit object composition: data first, behavior attached where needed.
         let test_sound = runa_asset::load_audio!("assets/audio/test.ogg");
-        world.spawn(sound_emitter::create_sound_emitter(
+        let _ = world.spawn_bundle(sound_emitter::create_sound_emitter(
             test_sound.clone(),
             Vec3::new(-5.0, 0.0, 0.0),
             "LEFT EMITTER",

@@ -1,9 +1,5 @@
-use runa_app::RunaWindowConfig;
-use runa_core::{
-    components::{ui::CanvasSpace, ActiveCamera, Camera, UiRenderer},
-    ocs::Object,
-};
-use runa_engine::{runa_app::RunaApp, Engine};
+use runa_core::components::ui::CanvasSpace;
+use runa_engine::prelude::*;
 
 fn main() {
     let engine = Engine::new();
@@ -12,12 +8,6 @@ fn main() {
     {
         let mut world = world_rc.borrow_mut();
         let mut ui = UiRenderer::new(CanvasSpace::Camera);
-
-        // ── egui-style closure API ─────────────────────────────────
-        //
-        // ui.vbox(|ui| { ... }) creates a vertical box, puts it on the parent stack,
-        // calls the closure, then pops back. Inside the closure, ui methods create
-        // children attached to that vbox. Works for any nesting depth.
 
         ui.vbox(|ui| {
             ui.add_text("egui-style UI")
@@ -42,11 +32,11 @@ fn main() {
                 .with_background(0.15, 0.15, 0.2, 0.8);
         });
 
-        let mut camera_object = Object::new("MainCamera");
-        camera_object.add_component(Camera::default());
-        camera_object.add_component(ActiveCamera);
-        camera_object.add_component(ui);
-        world.spawn(camera_object);
+        world.spawn_bundle((
+            Camera::default(),
+            ActiveCamera,
+            ui,
+        ));
     }
 
     let cfg = RunaWindowConfig {

@@ -1,38 +1,38 @@
 // #![windows_subsystem = "windows"]
 
-use runa_core::Vec3;
+use runa_core::{
+    components::{BackgroundMode, WorldAtmosphere},
+    Color,
+};
 use runa_engine::{
     runa_app::{RunaApp, RunaWindowConfig},
     Engine,
 };
-use crate::player::{Health, PlayerController};
 
 mod collider_demo;
 mod player;
 mod tester1;
 mod tilemap_tester;
 
-fn register_game_types(engine: &mut Engine) {
-    player::register_types(engine);
-    engine.register_archetype::<tilemap_tester::TilemapTesterArchetype>();
-    engine.register_archetype::<tester1::RotatingSpriteArchetype>();
-    engine.register_archetype::<collider_demo::ColliderDemoBoxArchetype>();
-}
-
 fn main() {
-    let mut engine = Engine::new();
-    register_game_types(&mut engine);
+    let engine = Engine::new();
     let world_rc = engine.create_world();
 
     {
         let mut world = world_rc.borrow_mut();
-
-        let _ = world.spawn_archetype::<tilemap_tester::TilemapTesterArchetype>();
-        let _ = world.spawn_archetype::<tester1::RotatingSpriteArchetype>();
-        let _ = world.spawn_archetype::<collider_demo::ColliderDemoBoxArchetype>();
-        let _ = world.spawn_archetype::<player::PlayerArchetype>();
-        let _ = world.spawn_archetype::<player::PlayerCameraArchetype>();
-
+        world.set_atmosphere(WorldAtmosphere {
+            ambient_color: Color::BLACK,
+            ambient_intensity: 1.0,
+            background_intensity: 1.0,
+            background: BackgroundMode::SolidColor {
+                color: Color::rgb(0.5, 0.5, 0.5),
+            },
+        });
+        world.spawn_object(tilemap_tester::create_tilemap_tester());
+        world.spawn_object(tester1::create_rotating_sprite());
+        world.spawn_object(collider_demo::create_collider_demo_box());
+        world.spawn_object(player::create_player());
+        world.spawn_object(player::create_player_camera());
     }
 
     let config = RunaWindowConfig {

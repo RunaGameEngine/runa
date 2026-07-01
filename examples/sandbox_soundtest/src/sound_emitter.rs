@@ -1,8 +1,7 @@
 use runa_asset::AudioAsset;
-use runa_core::components::{AudioSource, SpriteRenderer, Transform};
+use runa_core::components::*;
 use runa_core::glam::Vec3;
-use runa_core::ocs::{Object, Script, ScriptContext};
-use runa_core::SerializedFieldAccess;
+use runa_core::ocs::{Script, ScriptContext};
 use std::sync::Arc;
 
 pub struct SoundEmitter {
@@ -14,8 +13,6 @@ impl SoundEmitter {
         Self { label }
     }
 }
-
-impl SerializedFieldAccess for SoundEmitter {}
 
 impl Script for SoundEmitter {
     fn update(&mut self, ctx: &mut ScriptContext, _dt: f32) {
@@ -36,7 +33,7 @@ pub fn create_sound_emitter(
     audio_asset: Arc<AudioAsset>,
     position: Vec3,
     label: &'static str,
-) -> Object {
+) -> (Transform, AudioSource, SpriteRenderer, SoundEmitter) {
     let mut audio = AudioSource::with_asset_3d(audio_asset);
     audio.source_path = Some("assets/audio/test.ogg".to_string());
     audio.looped = true;
@@ -48,14 +45,10 @@ pub fn create_sound_emitter(
     let mut transform = Transform::default();
     transform.position = position;
 
-    Object::new(label)
-        .with(transform)
-        .with(audio)
-        .with(SpriteRenderer {
-            texture: Some(runa_asset::load_image!("assets/art/Tester1.png")),
-            texture_path: Some("assets/art/Tester1.png".to_string()),
-            pixels_per_unit: 16.0,
-            uv_rect: SpriteRenderer::FULL_UV_RECT,
-        })
-        .with(SoundEmitter::new(label))
+    (
+        transform,
+        audio,
+        SpriteRenderer::from_path("assets/art/Tester1.png"),
+        SoundEmitter::new(label),
+    )
 }

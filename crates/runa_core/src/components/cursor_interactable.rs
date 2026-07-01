@@ -1,23 +1,28 @@
 use glam::Vec3;
+use std::sync::Mutex;
 
-#[derive(Default)] // todo: Clone
+#[derive(Default)]
 pub struct CursorInteractable {
     pub is_pressed: bool,
     pub is_hovered: bool,
     pub was_hovered: bool,
-    pub bounds_size: Vec3, // половина размера (extents) для проверки попадания курсора
-    pub on_click: Option<Box<dyn FnMut() + Send>>,
-    pub on_hover_enter: Option<Box<dyn FnMut() + Send>>,
-    pub on_hover_exit: Option<Box<dyn FnMut() + Send>>,
+    pub bounds_size: Vec3,
+    on_click: Option<Mutex<Box<dyn FnMut() + Send>>>,
+    on_hover_enter: Option<Mutex<Box<dyn FnMut() + Send>>>,
+    on_hover_exit: Option<Mutex<Box<dyn FnMut() + Send>>>,
 }
 
 impl CursorInteractable {
+    pub fn on_click_mut(&mut self) -> Option<&mut Mutex<Box<dyn FnMut() + Send>>> {
+        self.on_click.as_mut()
+    }
+
     pub fn new(width: f32, height: f32) -> Self {
         Self {
             is_pressed: false,
             is_hovered: false,
             was_hovered: false,
-            bounds_size: Vec3::new(width * 0.5, height * 0.5, 0.1), // по умолчанию небольшая глубина
+            bounds_size: Vec3::new(width * 0.5, height * 0.5, 0.1),
             on_click: None,
             on_hover_enter: None,
             on_hover_exit: None,
@@ -55,11 +60,15 @@ impl CursorInteractable {
     pub fn update_callbacks(&mut self) {
         if self.is_hovered && !self.was_hovered {
             if let Some(ref mut callback) = self.on_hover_enter {
-                callback();
+                if let Ok(mut cb) = callback.lock() {
+                    cb();
+                }
             }
         } else if !self.is_hovered && self.was_hovered {
             if let Some(ref mut callback) = self.on_hover_exit {
-                callback();
+                if let Ok(mut cb) = callback.lock() {
+                    cb();
+                }
             }
         }
         self.was_hovered = self.is_hovered;
@@ -69,13 +78,35 @@ impl CursorInteractable {
     where
         F: FnMut() + Send + 'static,
     {
-        self.on_hover_enter = Some(Box::new(callback));
+        self.on_hover_enter = Some(Mutex::new(Box::new(callback)));
     }
 
     pub fn set_on_hover_exit<F>(&mut self, callback: F)
     where
         F: FnMut() + Send + 'static,
     {
-        self.on_hover_exit = Some(Box::new(callback));
+        self.on_hover_exit = Some(Mutex::new(Box::new(callback)));
+    }
+
+    pub fn set_on_click<F>(&mut self, callback: F)
+    where
+        F: FnMut() + Send + 'static,
+    {
+        self.on_click = Some(Mutex::new(Box::new(callback)));
+    }
+}
+
+// Manual impl needed because Mutex is not Clone
+impl Clone for CursorInteractable {
+    fn clone(&self) -> Self {
+        Self {
+            is_pressed: self.is_pressed,
+            is_hovered: self.is_hovered,
+            was_hovered: self.was_hovered,
+            bounds_size: self.bounds_size,
+            on_click: None,
+            on_hover_enter: None,
+            on_hover_exit: None,
+        }
     }
 }

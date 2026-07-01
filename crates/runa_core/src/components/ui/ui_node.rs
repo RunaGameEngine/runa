@@ -1,5 +1,6 @@
 use glam::Vec2;
 use runa_asset::{Handle, TextureAsset};
+use std::sync::Mutex;
 
 type UiColor = [f32; 4];
 
@@ -34,7 +35,7 @@ pub struct UiNode {
     pub computed: ComputedLayout,
     pub visible: bool,
     pub interaction: InteractionState,
-    pub interaction_callback: Option<Box<dyn FnMut(InteractionState) + Send>>,
+    pub interaction_callback: Option<Mutex<Box<dyn FnMut(InteractionState) + Send>>>,
 }
 
 impl UiNode {

@@ -1,9 +1,7 @@
 use runa_core::components::{Mesh, MeshRenderer, Transform};
 use runa_core::glam::{Quat, Vec3};
-use runa_core::ocs::{Object, Script, ScriptContext, World};
-use runa_engine::{RunaArchetype, RunaScript};
+use runa_core::ocs::{Object, Script, ScriptContext};
 
-#[derive(RunaScript)]
 pub struct RotatingCube2 {
     rotation_speed: f32,
 }
@@ -42,14 +40,4 @@ pub fn create_rotating_cube2() -> Object {
         })
         .with(MeshRenderer::new(Mesh::cube(1.0)))
         .with(RotatingCube2::new())
-}
-
-#[derive(RunaArchetype)]
-#[runa(name = "rotating_cube_2")]
-pub struct RotatingCube2Archetype;
-
-impl RotatingCube2Archetype {
-    pub fn create(world: &mut World) -> u64 {
-        world.spawn(create_rotating_cube2())
-    }
 }

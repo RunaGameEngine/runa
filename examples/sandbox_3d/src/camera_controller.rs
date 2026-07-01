@@ -1,14 +1,14 @@
 use runa_core::components::{ActiveCamera, Camera};
 use runa_core::glam::Vec3;
-use runa_core::input_system;
-use runa_core::input_system::get_mouse_delta;
-use runa_core::input_system::{Input, KeyCode, MouseButton};
-use runa_core::ocs::{Object, Script, ScriptContext, World};
-use runa_engine::{RunaArchetype, RunaScript};
+use runa_core::input;
+use runa_core::input::get_mouse_delta;
+use runa_core::input::InputState;
+use runa_core::ocs::{Object, Script, ScriptContext};
+use winit::event::MouseButton;
+use winit::keyboard::KeyCode;
 
 static mut CURSOR_LOCKED: bool = false;
 
-#[derive(RunaScript)]
 pub struct CameraController {
     position: Vec3,
     yaw: f32,
@@ -50,11 +50,11 @@ impl Default for CameraController {
 
 impl Script for CameraController {
     fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {
-        if Input::is_mouse_button_just_pressed(MouseButton::Right) {
+        if InputState::is_mouse_button_just_pressed(MouseButton::Right) {
             unsafe {
                 CURSOR_LOCKED = !CURSOR_LOCKED;
-                input_system::show_cursor(!CURSOR_LOCKED);
-                input_system::lock_cursor(CURSOR_LOCKED);
+                input::show_cursor(!CURSOR_LOCKED);
+                input::lock_cursor(CURSOR_LOCKED);
             }
         }
 
@@ -71,23 +71,23 @@ impl Script for CameraController {
         let right = self.get_right();
         let mut movement = Vec3::ZERO;
 
-        if Input::is_key_pressed(KeyCode::KeyW) {
+        if InputState::is_key_pressed(KeyCode::KeyW) {
             movement += forward;
         }
-        if Input::is_key_pressed(KeyCode::KeyS) {
+        if InputState::is_key_pressed(KeyCode::KeyS) {
             movement -= forward;
         }
-        if Input::is_key_pressed(KeyCode::KeyD) {
+        if InputState::is_key_pressed(KeyCode::KeyD) {
             movement += right;
         }
-        if Input::is_key_pressed(KeyCode::KeyA) {
+        if InputState::is_key_pressed(KeyCode::KeyA) {
             movement -= right;
         }
-        if Input::is_key_pressed(KeyCode::Space) {
+        if InputState::is_key_pressed(KeyCode::Space) {
             movement += Vec3::Y;
         }
-        if Input::is_key_pressed(KeyCode::ControlLeft)
-            || Input::is_key_pressed(KeyCode::ControlRight)
+        if InputState::is_key_pressed(KeyCode::ControlLeft)
+            || InputState::is_key_pressed(KeyCode::ControlRight)
         {
             movement -= Vec3::Y;
         }
@@ -123,14 +123,4 @@ pub fn create_camera_controller() -> Object {
         ))
         .with(ActiveCamera)
         .with(CameraController::new())
-}
-
-#[derive(RunaArchetype)]
-#[runa(name = "camera_controller")]
-pub struct CameraControllerArchetype;
-
-impl CameraControllerArchetype {
-    pub fn create(world: &mut World) -> u64 {
-        world.spawn(create_camera_controller())
-    }
 }

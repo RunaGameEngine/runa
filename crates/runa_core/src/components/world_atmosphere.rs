@@ -1,14 +1,14 @@
-use glam::Vec3;
+use crate::Color;
 
 #[derive(Clone, Copy, Debug)]
 pub enum BackgroundMode {
     SolidColor {
-        color: Vec3,
+        color: Color,
     },
     VerticalGradient {
-        zenith_color: Vec3,
-        horizon_color: Vec3,
-        ground_color: Vec3,
+        zenith_color: Color,
+        horizon_color: Color,
+        ground_color: Color,
         horizon_height: f32,
         smoothness: f32,
     },
@@ -19,9 +19,9 @@ pub enum BackgroundMode {
 impl Default for BackgroundMode {
     fn default() -> Self {
         Self::VerticalGradient {
-            zenith_color: Vec3::new(0.2, 0.4, 0.8),
-            horizon_color: Vec3::new(0.8, 0.9, 1.0),
-            ground_color: Vec3::new(0.6, 0.6, 0.7),
+            zenith_color: Color::rgb(0.2, 0.4, 0.8),
+            horizon_color: Color::rgb(0.8, 0.9, 1.0),
+            ground_color: Color::rgb(0.6, 0.6, 0.7),
             horizon_height: 0.5,
             smoothness: 0.25,
         }
@@ -30,7 +30,7 @@ impl Default for BackgroundMode {
 
 #[derive(Clone, Copy, Debug)]
 pub struct WorldAtmosphere {
-    pub ambient_color: Vec3,
+    pub ambient_color: Color,
     pub ambient_intensity: f32,
     pub background_intensity: f32,
     pub background: BackgroundMode,
@@ -39,7 +39,7 @@ pub struct WorldAtmosphere {
 impl Default for WorldAtmosphere {
     fn default() -> Self {
         Self {
-            ambient_color: Vec3::ONE,
+            ambient_color: Color::WHITE,
             ambient_intensity: 0.15,
             background_intensity: 1.0,
             background: BackgroundMode::default(),

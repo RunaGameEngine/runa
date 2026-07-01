@@ -1,17 +1,15 @@
 # Object Model
 
-This note describes the current Runa runtime architecture after the object-first refactor.
+This note describes the current Runa runtime architecture.
 
 ## Runtime Contract
 
-Runa now treats the runtime object graph as the primary model:
+Runa treats the runtime object graph as the primary model:
 
 - `World`
 - `Object`
 - components
 - behavior scripts
-- runtime registry metadata
-- optional archetype catalog
 
 The editor is expected to adapt to this model later. The runtime does not depend on editor-only construction rules.
 
@@ -44,11 +42,25 @@ Examples:
 
 Runa intentionally avoids string-based tag systems as the primary gameplay linking mechanism. Prefer typed marker/data components instead.
 
+Define components with `#[derive(Component)]`:
+
+```rust
+#[derive(Component)]
+struct Health {
+    current: i32,
+}
+
+#[derive(Component)]
+struct PlayerController {
+    speed: f32,
+}
+```
+
+No registration is needed — deriving `Component` is sufficient for the runtime to manage the type.
+
 ## Scripts
 
 Scripts are attachable behavior components.
-
-They do not build objects anymore.
 
 Lifecycle today:
 
@@ -62,23 +74,23 @@ Access happens through `ScriptContext`:
 - read-only world queries
 - deferred commands
 
-That means script code looks like behavior code, not factory code.
+Scripts do not construct objects anymore. Composition happens in factory code; scripts only describe runtime behavior.
 
 ## World Access
 
 `World` no longer exposes its internal object storage directly.
 
-The intended public surface is:
+The public surface is:
 
-- `spawn(...)`
+- `spawn_bundle(...)` — spawn an object with a tuple of components
+- `spawn_object(object)` — spawn a pre-built `Object`
 - `despawn(id)`
 - `object(id)` / `object_mut(id)` — get the whole Object
 - `get::<T>(id)` / `get_mut::<T>(id)` — get a specific component
-- `find_first_with::<T>()`
-- `find_all_with::<T>()`
-- `query::<T>()`
+- `find_first_with::<T>()` — find the first entity with component `T`
+- `find_all_with::<T>()` — find all entities with component `T`
 
-Queries return `ObjectId`s. Order is intentionally not part of the contract.
+`find_all_with::<T>()` replaces the old `query::<T>()` and returns `ObjectId`s. Order is intentionally not part of the contract.
 
 ## Deferred Commands
 
@@ -94,36 +106,41 @@ if let Some(id) = ctx.id() {
 
 Commands are applied after lifecycle/update phases. This avoids invalidating iteration while the world is running behavior.
 
-## Registration
+## How Objects Are Created
 
-Runa now has a runtime-owned metadata registry:
-
-- component registration
-- script registration
-- archetype registration
-
-This registry is currently metadata-only:
-
-- type name
-- `TypeId`
-- kind
-
-That is enough to establish stable bootstrap points for future serialization/editor work without forcing reflection-heavy runtime behavior.
-
-## Archetypes
-
-Archetypes are code-first reusable object factories.
-
-Example:
+### Bundle spawn (recommended for simple cases)
 
 ```rust
-engine.register_archetype::<PlayerArchetype>();
-
-let mut world = engine.create_world();
-let _ = world.spawn_archetype::<PlayerArchetype>();
+world.spawn_bundle((
+    Transform::default(),
+    SpriteRenderer::new(None),
+    PlayerController { speed: 0.25 },
+));
 ```
 
-This gives Runa a prefab-like reuse mechanism without moving composition into editor data or hidden serialized references.
+### Named object spawn
+
+```rust
+world.spawn_object(
+    Object::new("Player")
+        .with(Camera::new_orthographic(320.0, 180.0))
+        .with(ActiveCamera)
+        .with(SpriteRenderer::new(Some(texture)))
+        .with(PlayerController::new()),
+);
+```
+
+## Why Registration Was Removed
+
+Older Runa versions required explicit registration of components, scripts, and archetypes through `Engine::register()`, `RunaComponent`, `RunaScript`, and `RunaArchetype` derives. This was used for:
+
+- editor/tooling metadata
+- serialization bootstrap hooks
+- archetype factories
+
+In practice, the registration step added boilerplate without delivering enough value at the current stage of the engine. The code-first approach lets users define components with a single derive and use them immediately.
+
+Metadata for future editor/tooling integration can be re-added later through a separate, opt-in system without burdening every user with bootstrap code.
 
 ## Why `construct()` Was Removed
 
@@ -141,7 +158,7 @@ That coupling became a bottleneck.
 
 Now:
 
-- composition happens in object factories / archetypes / bootstrap code
+- composition happens in object factories / bootstrap code
 - scripts only describe runtime behavior
 - serialization can target object/component state
 - editor compatibility can be built on the same runtime model

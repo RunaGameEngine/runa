@@ -25,9 +25,7 @@ pub use audio_source::AudioSource;
 pub use camera::Camera;
 pub use camera::ProjectionType;
 pub use collider2d::Collider2D;
-pub use component::{
-    Component, ComponentRuntimeKind, SerializedField, SerializedFieldAccess, SerializedFieldValue,
-};
+pub use component::{Component, SerializedField, SerializedFieldValue};
 pub use cursor_interactable::CursorInteractable;
 pub use light::{DirectionalLight, PointLight};
 pub use screen_effects::ScreenEffects;
@@ -56,8 +54,6 @@ pub use ui::UiRenderer;
 macro_rules! impl_component {
     ($($ty:ty),+ $(,)?) => {
         $(
-        impl SerializedFieldAccess for $ty {}
-
         impl Component for $ty {
             fn as_any(&self) -> &dyn std::any::Any {
                 self

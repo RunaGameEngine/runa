@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use glam::Vec2;
 use runa_render_api::{command::UiRect as RenderUiRect, RenderQueue};
@@ -698,7 +698,9 @@ impl UiRenderer {
             if node.interaction != new {
                 node.interaction = new;
                 if let Some(ref mut cb) = node.interaction_callback {
-                    cb(new);
+                    if let Ok(mut cb) = cb.lock() {
+                        cb(new);
+                    }
                 }
             }
         }
@@ -815,11 +817,11 @@ impl<'a> UiNodeBuilder<'a> {
     ) -> Self {
         if let Some(mut cb) = on_click {
             if let Some(node) = renderer.node_mut(id) {
-                node.interaction_callback = Some(Box::new(move |state| {
+                node.interaction_callback = Some(Mutex::new(Box::new(move |state| {
                     if state == InteractionState::Clicked {
                         cb();
                     }
-                }));
+                })));
             }
         }
         Self { renderer, id }
@@ -993,7 +995,7 @@ impl<'a> UiNodeBuilder<'a> {
         F: FnMut(InteractionState) + Send + 'static,
     {
         if let Some(node) = self.renderer.node_mut(self.id) {
-            node.interaction_callback = Some(Box::new(callback));
+            node.interaction_callback = Some(Mutex::new(Box::new(callback)));
         }
         self
     }
@@ -1004,11 +1006,11 @@ impl<'a> UiNodeBuilder<'a> {
         F: FnMut() + Send + 'static,
     {
         if let Some(node) = self.renderer.node_mut(self.id) {
-            node.interaction_callback = Some(Box::new(move |state| {
+            node.interaction_callback = Some(Mutex::new(Box::new(move |state| {
                 if state == InteractionState::Clicked {
                     callback();
                 }
-            }));
+            })));
         }
         self
     }

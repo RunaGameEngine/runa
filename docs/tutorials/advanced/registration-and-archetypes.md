@@ -1,135 +1,128 @@
-# Registration And Archetypes
+# Why Registration Was Removed
 
-This guide covers the explicit bootstrap layer used for:
+Older versions of Runa required explicit registration of components, scripts, and archetypes through the engine's bootstrap layer. This file explains what registration was, why it existed, and why it is no longer needed.
 
-- component registration
-- script registration
-- archetype registration
+## What Registration Used To Look Like
 
-It is useful for future editor/tooling integration, but it remains optional from the runtime point of view.
+Previously, you had to:
 
-## Why Registration Exists
-
-Runa keeps runtime construction code-first, but some systems still need stable type metadata:
-
-- future generic serialization
-- add-component / add-script tooling
-- archetype browsers
-- editor integration
-
-The runtime registry stores:
-
-- type name
-- `TypeId`
-- kind (`Component` or `Script`)
-- built-in vs user registration origin
-- optional runtime factory information for editor/tooling creation
-- typed archetype factories keyed by `ArchetypeKey`
-
-## Engine Bootstrap
+1. Derive `RunaComponent` or `RunaScript` instead of `Component`
+2. Derive `RunaArchetype` for reusable object factories
+3. Call `engine.register::<T>()`, `engine.register_archetype::<T>()`, etc.
+4. Use `world.spawn_archetype::<T>()` to spawn registered archetypes
 
 ```rust
-use runa_engine::{Engine, RunaArchetype};
-use runa_engine::runa_core::ocs::{Object, World};
-
-#[derive(RunaArchetype)]
-#[runa(name = "player")]
-struct PlayerArchetype;
-
-impl PlayerArchetype {
-    fn create(world: &mut World) -> u64 {
-        world.spawn(Object::new("Player"))
-    }
-}
-
-fn register_game_types(engine: &mut Engine) {
-    engine.register::<PlayerController>();
-    engine.register_archetype::<PlayerArchetype>();
-}
-```
-
-## Using Derives
-
-You can attach metadata helpers to your own types:
-
-```rust
-use runa_engine::{Engine, RunaComponent, RunaScript};
+// OLD approach — no longer valid
+use runa_engine::{Engine, RunaArchetype, RunaComponent, RunaScript};
 
 #[derive(RunaComponent)]
-pub struct Health {
-    pub current: i32,
-}
+struct Health { current: i32 }
 
 #[derive(RunaScript)]
-pub struct PlayerController;
-
-fn register_game_types(engine: &mut Engine) {
-    Health::register(engine);
-    PlayerController::register(engine);
-}
-```
-
-The derive does not auto-register anything globally. Registration still happens explicitly in your bootstrap code.
-
-For editor/tooling-visible fields, `RunaComponent` and `RunaScript` also expose:
-
-- public fields
-- private fields marked with `#[serialize_field]`
-
-## Archetypes
-
-Archetypes are reusable typed object factories:
-
-```rust
-use runa_engine::{Engine, RunaArchetype};
-use runa_engine::runa_core::ocs::{Object, World};
+struct PlayerController;
 
 #[derive(RunaArchetype)]
-#[runa(name = "player")]
 struct PlayerArchetype;
 
-impl PlayerArchetype {
-    fn create(world: &mut World) -> u64 {
-        world.spawn(
-            Object::new("Player")
-                .with(PlayerController)
-        )
-    }
-}
-
-fn register_game_types(engine: &mut Engine) {
+fn main() {
+    let mut engine = Engine::new();
+    engine.register::<Health>();
+    engine.register::<PlayerController>();
     engine.register_archetype::<PlayerArchetype>();
+
+    let world_rc = engine.create_world();
+    world_rc.borrow_mut().spawn_archetype::<PlayerArchetype>();
 }
 ```
 
-Spawn them later through the world:
+## Why Registration Existed
+
+Registration was introduced to support:
+
+- **Editor/tooling metadata** — the engine needed a way to discover all component and script types
+- **Serialization bootstrap** — generic save/load needed type information at runtime
+- **Archetype factories** — reusable named object templates that could be spawned by name
+
+In theory, this kept a stable catalog of types that the editor and serialization layer could introspect without relying on reflection.
+
+## Why It Was Removed
+
+In practice, registration introduced friction without delivering enough value at the current stage:
+
+- Every new component needed a separate registration call, making it easy to forget
+- The `RunaArchetype`/`RunaComponent`/`RunaScript` derives were additional derives beyond `Component`
+- The engine bootstrap layer (`Engine::new()` → `register` → `create_world`) added ceremony to the startup path
+- Archetype registration (`spawn_archetype::<T>()`) duplicated what simple factory functions already provided
+- Editor and serialization metadata were not yet using the registries, so the complexity was premature
+
+## The Code-First Replacement
+
+With the code-first API, registration is completely eliminated:
 
 ```rust
-let mut engine = Engine::new();
-register_game_types(&mut engine);
+// NEW approach
+use runa_engine::prelude::*;
 
-let world_rc = engine.create_world();
-world_rc.borrow_mut().spawn_archetype::<PlayerArchetype>();
+#[derive(Component)]
+struct Health { current: i32 }
+
+#[derive(Component)]
+struct PlayerController;
+
+fn main() {
+    let mut world = World::new();
+    world.spawn_bundle((
+        Transform::default(),
+        SpriteRenderer::new(None),
+        PlayerController,
+    ));
+}
 ```
 
-String lookup still exists as a secondary API for tooling, serialization, and editor flows:
+- Derive `#[derive(Component)]` on any struct — no registration
+- `world.spawn_bundle((...))` creates an object with the given components
+- `world.spawn_object(Object::new("name").with(...))` for named objects
+- Use plain Rust functions instead of archetypes for reusable object factories
+- `world.find_all_with::<T>()` replaces `world.query::<T>()`
+
+## Reusable Object Factories (Alternatives to Archetypes)
+
+Instead of archetypes, use plain functions:
 
 ```rust
-let _ = world.spawn_archetype_by_name("player");
+fn spawn_player(world: &mut World) -> ObjectId {
+    world.spawn_bundle((
+        Transform::default(),
+        SpriteRenderer::new(Some(load_image!("assets/player.png"))),
+        Health { current: 100, max: 100 },
+        PlayerController,
+    ))
+}
+
+fn spawn_enemy(world: &mut World, position: Vec3) -> ObjectId {
+    let id = world.spawn_bundle((
+        Transform::from_position(position),
+        SpriteRenderer::new(Some(load_image!("assets/enemy.png"))),
+        Health { current: 50, max: 50 },
+        EnemyAi,
+    ));
+    id
+}
 ```
 
-## When To Use This
+## For Editor and Tooling Users
 
-Use bootstrap registration when you want:
+Future editor integration will use opt-in metadata annotations rather than a mandatory registration system. The `#[serialize_field]` attribute and `impl Default` conventions still work for marking editor-visible fields.
 
-- one place to describe game runtime types
-- reusable archetypes
-- a future-safe path for editor/tooling
+## Summary
 
-You do not have to use archetypes for every object. Manual `world.spawn(Object::new(...))` is still valid.
-
-## Current Limits
-
-- runtime factories are still required for editor-side creation of live types
-- archetypes are typed code templates, not serialized prefab assets
-- prefab/template unification is still incomplete
+| Old System | New Code-First API |
+|---|---|
+| `#[derive(RunaComponent)]` | `#[derive(Component)]` |
+| `#[derive(RunaScript)]` | `#[derive(Component)]` + `impl Script` |
+| `#[derive(RunaArchetype)]` | Plain Rust functions |
+| `engine.register::<T>()` | Not needed |
+| `engine.register_archetype::<T>()` | Not needed |
+| `world.spawn_archetype::<T>()` | `world.spawn_bundle((...))` or `world.spawn_object(...)` |
+| `world.query::<T>()` | `world.find_all_with::<T>()` |
+| `Engine::new()` → register → create_world | `World::new()` directly |

@@ -33,6 +33,7 @@ The runtime is code-first:
 - `Transform` exists on every object by default
 - scripts are attachable behavior components
 - objects are composed explicitly in Rust code
+- no registration step needed — just derive `Component` and spawn
 
 ## What Works Today
 
@@ -42,9 +43,9 @@ The runtime is code-first:
 - attachable script behaviors with `start()`, `update()`, and `late_update()`
 - `ObjectId`-based lookup and simple queries
 - deferred world commands from scripts
-- archetype registration and spawning
-- type metadata registration for components and scripts
-- serialized field metadata for editor/tooling flows
+- `world.spawn_bundle((...))` for composing components
+- `world.spawn_object(Object::new(...))` for named entities
+- `world.find_all_with::<T>()` and `world.find_first_with::<T>()` for queries
 
 ### Rendering
 
@@ -76,7 +77,7 @@ The runtime is code-first:
 - no full physics engine
 - no mature animation pipeline
 - 3D support is still basic
-- generic registry-driven serialization is not finished yet
+- generic serialization is not finished yet
 - editor is frozen as a prototype (will be rewritten after core stabilises)
 - API stability is not guaranteed between alpha revisions
 
@@ -115,27 +116,18 @@ Minimal startup:
 
 ```rust
 use runa_engine::{
+    prelude::*,
     runa_app::{RunaApp, RunaWindowConfig},
-    Engine, RunaArchetype,
 };
-use runa_engine::runa_core::ocs::{Object, World};
-
-#[derive(RunaArchetype)]
-#[runa(name = "player")]
-struct PlayerArchetype;
-
-impl PlayerArchetype {
-    fn create(world: &mut World) -> u64 {
-        world.spawn(Object::new("Player"))
-    }
-}
 
 fn main() {
-    let mut engine = Engine::new();
-    engine.register_archetype::<PlayerArchetype>();
+    let mut world = World::new();
 
-    let mut world = engine.create_world();
-    let _ = world.spawn_archetype::<PlayerArchetype>();
+    // Spawn an object with a bundle of components
+    world.spawn_bundle((
+        Transform::default(),
+        SpriteRenderer::new(None),
+    ));
 
     let config = RunaWindowConfig {
         title: "My Game".to_string(),
@@ -154,47 +146,42 @@ fn main() {
 Typical gameplay object:
 
 ```rust
-use runa_engine::runa_asset::load_image;
-use runa_engine::runa_core::{
-    components::{ActiveCamera, Camera, SpriteRenderer},
-    ocs::{Object, Script, ScriptContext},
-    Vec3,
-};
+use runa_engine::prelude::*;
+use runa_engine::runa_core::components::*;
 
+#[derive(Component)]
 struct PlayerController {
     speed: f32,
 }
 
-impl PlayerController {
-    fn new() -> Self {
-        Self { speed: 0.25 }
-    }
-}
-
 impl Script for PlayerController {
     fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {
-        if let Some(transform) = ctx.get_component_mut::<runa_engine::runa_core::components::Transform>() {
+        if let Some(transform) = ctx.get_component_mut::<Transform>() {
             transform.position += Vec3::X * self.speed * dt;
         }
     }
 }
 
-fn create_player() -> Object {
-    Object::new("Player")
-        .with(Camera::new_orthographic(320.0, 180.0))
-        .with(ActiveCamera)
-        .with(SpriteRenderer::new(Some(load_image!("assets/art/player.png"))))
-        .with(PlayerController::new())
+fn setup(world: &mut World) {
+    world.spawn_bundle((
+        Transform::default(),
+        Camera::new_orthographic(320.0, 180.0),
+        ActiveCamera,
+        SpriteRenderer::new(Some(load_image!("assets/art/player.png"))),
+        PlayerController { speed: 0.25 },
+    ));
 }
 ```
 
 ## How To Start Making A Game
 
-1. Create an `Engine`.
-2. Register your components/scripts/archetypes in one bootstrap function.
-3. Create a `World` from the engine.
-4. Spawn your archetypes or objects.
+1. Create a `World`.
+2. Define your components with `#[derive(Component)]`.
+3. Implement `Script` for behavior components.
+4. Spawn objects with `world.spawn_bundle((...))` or `world.spawn_object(Object::new("name").with(...))`.
 5. Run the app with `RunaApp::run_with_config(...)`.
+
+No registration step is needed — just derive `Component` and spawn.
 
 Recommended project shape:
 
@@ -209,7 +196,7 @@ assets/
 
 Good practice in Runa:
 
-- keep object composition in typed archetypes or explicit factory functions
+- keep object composition in typed factory functions
 - keep behavior in scripts
 - use typed marker/data components instead of string tags
 - use `ObjectId` and queries for object communication
@@ -232,7 +219,7 @@ Script fields intended for editor/runtime serialization must be marked explicitl
 - [Transform](docs/tutorials/components/transform.md)
 - [Input](docs/tutorials/systems/input.md)
 - [Object Model Notes](docs/architecture/object-model.md)
-- [Registration And Archetypes](docs/tutorials/advanced/registration-and-archetypes.md)
+- [Why Registration Was Removed](docs/tutorials/advanced/registration-and-archetypes.md)
 
 ## Repository
 
