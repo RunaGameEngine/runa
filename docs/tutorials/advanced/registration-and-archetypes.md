@@ -112,7 +112,9 @@ fn spawn_enemy(world: &mut World, position: Vec3) -> ObjectId {
 
 ## For Editor and Tooling Users
 
-Future editor integration will use opt-in metadata annotations rather than a mandatory registration system. The `#[serialize_field]` attribute and `impl Default` conventions still work for marking editor-visible fields.
+> **Editor is frozen.** The `#[serialize_field]` attribute and the registration
+> system described on this page are archived. When editor work resumes, it will
+> use opt-in metadata annotations rather than a mandatory registration system.
 
 ## Summary
 

@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0-alpha.4] - 2026-07-02
+
+### Added
+
+- **Mouse input:** `is_mouse_button_just_released` added.
+
+### Fixed
+
+- **Documentation:** Updated the documentation to align with the latest data.
+  - [Creating a 2d game](docs\tutorials\getting-started\creating-a-2d-game.md)
+  - [Creating a 3d game](docs\tutorials\getting-started\creating-a-3d-game.md)
+
+## [0.6.0-alpha.3] - 2026-07-02
+
+### Added
+
+- **Mouse input:** `is_mouse_button_just_released`, `mouse_position()`, `mouse_delta()`, `mouse_scroll_delta()`
+  — free functions and `InputState` methods. Unity-style `GetMouseButtonUp` support.
+
+### Changed
+
+- `ElementState::Released` no longer removes from `mouse_buttons_just_pressed`.
 
 ## [0.6.0-alpha.2] - 2026-07-02
 

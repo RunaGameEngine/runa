@@ -54,15 +54,11 @@ You can set it explicitly:
 
 ```rust
 let object = Object::new("Sprite")
-    .with(SpriteRenderer {
-        texture: Some(load_image!("assets/player.png")),
-        texture_path: Some("assets/player.png".to_string()),
-        pixels_per_unit: 32.0,
-        uv_rect: SpriteRenderer::FULL_UV_RECT,
-    });
+    .with(sprite!("assets/player.png"))
+    .with(Transform::default());
 ```
 
-The editor inspector exposes the same property, and world serialization stores it in `SpriteRendererAsset`.
+The editor inspector (frozen) exposed the same property through `SpriteRendererAsset`.
 
 ## Sprite Sheets
 
@@ -75,4 +71,4 @@ For animation, prefer adding `SpriteAnimator` to the same object instead of chan
 - PNG is the most practical default format
 - attach `Transform` alongside `SpriteRenderer` for placement
 - keep rendering data in components and behavior in scripts
-- `pixels_per_unit` is part of runtime/editor serialization, so scene saves keep sprite scale intent intact
+- use `sprite!("path")` or `SpriteRenderer::from_path("path")` for convenience

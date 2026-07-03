@@ -5,7 +5,7 @@ Runa currently has simple collision detection, not a full physics engine.
 Relevant components:
 
 - `Collider2D` for simple AABB overlap checks
-- `PhysicsCollision` for older runtime/editor-facing size data that still exists in some paths
+- `PhysicsCollision` for older runtime-facing size data
 
 If you want script-facing 2D overlap checks, use `Collider2D`.
 
@@ -77,4 +77,4 @@ fn create_player() -> Object {
 - `Collider2D` is detection-only
 - it does not push objects apart or solve penetration
 - the current helper methods are intended for simple gameplay movement checks
-- the editor inspector exposes `enabled`, `is_trigger`, `half_size`, and full `size`; `size` is stored internally as half extents
+- `size` is stored internally as half extents

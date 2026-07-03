@@ -57,7 +57,7 @@ pub struct InputState {
     pub mouse_delta: (f32, f32), // Relative mouse movement (for locked cursor)
     pub mouse_buttons_pressed: HashSet<MouseButton>,
     pub mouse_buttons_just_pressed: HashSet<MouseButton>,
-    // pub mouse_buttons_just_released: HashSet<MouseButton>,
+    pub mouse_buttons_just_released: HashSet<MouseButton>,
     pub mouse_wheel_delta: f32,
 
     pub camera: Option<Camera>,
@@ -319,7 +319,10 @@ pub fn register_default_actions() {
     register_action("interact", vec![InputBinding::Key(KeyCode::KeyE)]);
     register_action("attack", vec![InputBinding::Mouse(MouseButton::Left)]);
     register_action("alt_attack", vec![InputBinding::Mouse(MouseButton::Right)]);
-    register_action("toggle_cursor", vec![InputBinding::Mouse(MouseButton::Right)]);
+    register_action(
+        "toggle_cursor",
+        vec![InputBinding::Mouse(MouseButton::Right)],
+    );
     register_action("fullscreen", vec![InputBinding::Key(KeyCode::F11)]);
     register_action("console", vec![InputBinding::Key(KeyCode::Backquote)]);
     register_action("menu", vec![InputBinding::Key(KeyCode::Escape)]);
@@ -356,7 +359,7 @@ impl InputState {
         input_state.keys_just_pressed.clear();
         // input_state.keys_just_released.clear();
         input_state.mouse_buttons_just_pressed.clear();
-        // input_state.mouse_buttons_just_released.clear();
+        input_state.mouse_buttons_just_released.clear();
         input_state.mouse_wheel_delta = 0.0;
 
         // Update mouse previous position
@@ -364,11 +367,6 @@ impl InputState {
 
         // Reset mouse delta (will be set by MouseMoved event)
         input_state.mouse_delta = (0.0, 0.0);
-    }
-
-    pub fn get_mouse_delta() -> (f32, f32) {
-        let input_state = Self::current();
-        input_state.mouse_delta
     }
 
     pub fn is_key_pressed(key: KeyCode) -> bool {
@@ -387,9 +385,23 @@ impl InputState {
         Self::current().mouse_buttons_just_pressed.contains(&button)
     }
 
-    // pub fn is_mouse_button_just_released(&self, button: MouseButton) -> bool {
-    //     Self::current().mouse_buttons_just_released.contains(&button)
-    // }
+    pub fn is_mouse_button_just_released(button: MouseButton) -> bool {
+        Self::current()
+            .mouse_buttons_just_released
+            .contains(&button)
+    }
+
+    pub fn mouse_position() -> (f32, f32) {
+        Self::current().mouse_position
+    }
+
+    pub fn mouse_delta() -> (f32, f32) {
+        Self::current().mouse_delta
+    }
+
+    pub fn mouse_scroll_delta() -> f32 {
+        Self::current().mouse_wheel_delta
+    }
 
     pub fn get_mouse_world_position() -> Option<Vec3> {
         let input_state = INPUT_STATE
@@ -408,7 +420,19 @@ impl InputState {
 
 /// Get mouse movement delta since last frame
 pub fn get_mouse_delta() -> (f32, f32) {
-    InputState::get_mouse_delta()
+    InputState::mouse_delta()
+}
+
+pub fn get_mouse_position() -> (f32, f32) {
+    InputState::mouse_position()
+}
+
+pub fn get_mouse_scroll_delta() -> f32 {
+    InputState::mouse_scroll_delta()
+}
+
+pub fn is_mouse_button_just_released(button: MouseButton) -> bool {
+    InputState::is_mouse_button_just_released(button)
 }
 
 // ===== Cursor Control =====

@@ -36,8 +36,8 @@ dedicated DX budget — it was optimized for "good enough for the editor."
 The editor prototype was invaluable. It revealed:
 
 1. **Reflection needs** — `#[serialize_field]`, `TypeRegistry`, name-based
-   type lookup were all driven by editor requirements and are useful for
-   runtime serialization too.
+   type lookup were all driven by editor requirements. These are now
+   archived; future editor serialization will use a different approach.
 2. **Rc<RefCell<World>> is painful** — shared mutability through the whole
    stack creates borrow-checking headaches. The next editor should work with
    a cleaner separation (e.g., commands → world snapshot).

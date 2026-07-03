@@ -24,6 +24,7 @@ pub use runa_core::input::{
     bind_action, center_window, is_action_just_pressed, is_action_pressed,
     is_fullscreen, register_action, set_cursor_mode, set_fullscreen,
     set_window_size, set_window_title, toggle_fullscreen, window_size, window_title,
-    InputBinding,
+    InputBinding, get_mouse_delta, get_mouse_position, get_mouse_scroll_delta,
+    is_mouse_button_just_released,
 };
 pub use runa_core::KeyCode;

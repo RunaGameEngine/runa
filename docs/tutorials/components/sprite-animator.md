@@ -40,7 +40,9 @@ if let Some(animator) = ctx.get_component_mut::<SpriteAnimator>() {
 The current implementation intentionally does not include a state machine.
 Use explicit clip switching first; a future state machine can be layered on top of clips without changing the render path.
 
-## Editor
+## Editor (Frozen)
+
+> The editor integration is currently frozen. This section is preserved for reference.
 
 The inspector exposes:
 
@@ -50,6 +52,3 @@ The inspector exposes:
 - clip name, start frame, end frame, FPS, and loop flag
 
 When an object has both `SpriteRenderer` and `SpriteAnimator`, the editor previews the current sprite sheet frame instead of the full sheet.
-The recommended default-value path for editor metadata is `Default`: implement `Default` or derive it where possible, then override fields in normal Rust constructors when gameplay needs custom values.
-
-World serialization stores `SpriteAnimator` separately from user scripts and components because it is a built-in runtime component.

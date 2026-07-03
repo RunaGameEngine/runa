@@ -18,16 +18,6 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    pub fn new() -> Self {
-        Self {
-            position: Vec3::new(0.0, 0.0, 5.0),
-            yaw: 0.0,
-            pitch: 0.0,
-            speed: 3.0,
-            sensitivity: 0.001,
-        }
-    }
-
     fn get_forward(&self) -> Vec3 {
         Vec3::new(
             -self.yaw.sin() * self.pitch.cos(),
@@ -44,7 +34,13 @@ impl CameraController {
 
 impl Default for CameraController {
     fn default() -> Self {
-        Self::new()
+        Self {
+            position: Vec3::new(0.0, 0.0, 5.0),
+            yaw: 0.0,
+            pitch: 0.0,
+            speed: 3.0,
+            sensitivity: 0.001,
+        }
     }
 }
 
@@ -117,10 +113,10 @@ pub fn create_camera_controller() -> Object {
             Vec3::new(0.0, 0.0, 5.0),
             Vec3::new(0.0, 0.0, 6.0),
             Vec3::Y,
-            75.0_f32.to_radians(),
+            75.0,
             0.1,
             1000.0,
         ))
         .with(ActiveCamera)
-        .with(CameraController::new())
+        .with(CameraController::default())
 }

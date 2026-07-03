@@ -6,17 +6,11 @@ pub struct RotatingCube {
     rotation_speed: f32,
 }
 
-impl RotatingCube {
-    pub fn new() -> Self {
+impl Default for RotatingCube {
+    fn default() -> Self {
         Self {
             rotation_speed: 0.5,
         }
-    }
-}
-
-impl Default for RotatingCube {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -39,5 +33,5 @@ pub fn create_rotating_cube() -> Object {
             previous_rotation: Quat::IDENTITY,
         })
         .with(MeshRenderer::new(Mesh::cube(1.0)))
-        .with(RotatingCube::new())
+        .with(RotatingCube::default())
 }

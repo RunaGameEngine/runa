@@ -138,34 +138,22 @@ The current model is simpler:
 If you use the umbrella crate, you can mark script types with:
 
 ```rust
-use runa_engine::RunaScript;
+use runa_engine::Script;
 
-#[derive(RunaScript)]
 pub struct EnemyAI;
+impl Script for EnemyAI {
+    ...
+}
 ```
 
-That does not auto-register the script. It only gives you explicit bootstrap helpers like:
+## Serialized Fields (Editor — Frozen)
+
+> **Note:** The editor and `#[serialize_field]` system is currently frozen.
+> This section is preserved for reference. The code-first API only needs `#[derive(Component)]`.
+
+The old derive macros exposed fields marked with `#[serialize_field]`:
 
 ```rust
-EnemyAI::register(&mut engine);
-```
-
-## Serialized Fields
-
-The derive macros expose only fields that are explicitly marked with `#[serialize_field]`.
-
-Recommended pattern:
-
-- mark editor/runtime-visible fields with `#[serialize_field]`
-- implement `Default` for the script type
-- use `Default` as the single source of editor-visible default values
-
-If you already prefer `new()`, keep it and delegate `Default` to it.
-
-```rust
-use runa_engine::RunaScript;
-
-#[derive(RunaScript)]
 pub struct EnemyAI {
     #[serialize_field]
     speed: f32,
@@ -173,34 +161,13 @@ pub struct EnemyAI {
     aggro_radius: f32,
     hidden_runtime_state: bool,
 }
-
-impl EnemyAI {
-    pub fn new() -> Self {
-        Self {
-            speed: 3.0,
-            aggro_radius: 8.0,
-            hidden_runtime_state: false,
-        }
-    }
-}
-
-impl Default for EnemyAI {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 ```
 
-In this example:
+- `speed` and `aggro_radius` were visible to the editor inspector
+- `hidden_runtime_state` stayed runtime-only
+- `impl Default` was the recommended source of editor-visible default values
 
-- `speed` is exposed
-- `aggro_radius` is exposed
-- `hidden_runtime_state` stays runtime-only
-
-The editor currently uses `Default` as the recommended source of script default values for inspector metadata and creation flows.
-
-In the editor, `Content Browser -> Live Rust -> New Rust Script` now generates a pure script file.
-Archetypes are created separately through `New Rust Archetype`, which keeps behavior code and object/template code split cleanly.
+When the editor is unfrozen, editor-visible fields will use opt-in metadata annotations rather than a mandatory registration system.
 
 ## Migration Summary
 

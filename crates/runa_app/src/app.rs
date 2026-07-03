@@ -506,7 +506,7 @@ impl<'window> ApplicationHandler for App<'window> {
                     input_state.mouse_buttons_just_pressed.insert(button);
                 } else {
                     input_state.mouse_buttons_pressed.remove(&button);
-                    input_state.mouse_buttons_just_pressed.remove(&button);
+                    input_state.mouse_buttons_just_released.insert(button);
                 }
             }
             _ => (),

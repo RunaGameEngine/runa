@@ -1,5 +1,6 @@
 use runa_asset::load_image;
 use runa_core::systems::event_system::Event;
+use runa_core::KeyCode;
 use runa_core::{
     components::{
         ui::CanvasSpace, ActiveCamera, Camera, Collider2D, SpriteRenderer, Transform, UiRenderer,
@@ -9,7 +10,6 @@ use runa_core::{
     ocs::{Object, Script, ScriptContext},
 };
 use runa_engine::Component;
-use winit::keyboard::KeyCode;
 
 // Custom Event
 pub(crate) struct EventChangedDirectionX;

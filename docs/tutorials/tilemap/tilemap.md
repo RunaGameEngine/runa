@@ -1,6 +1,6 @@
 # Tilemap System
 
-Tilemaps are runtime data components used to build 2D levels. The editor is only an authoring tool: painted tiles are stored on the same `Tilemap` component that the runtime renderer reads.
+Tilemaps are runtime data components used to build 2D levels. Tiles are painted programmatically through the `Tilemap` API.
 
 ## Runtime Composition
 

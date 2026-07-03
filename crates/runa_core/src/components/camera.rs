@@ -85,7 +85,7 @@ impl Camera {
             orthographic_size: Vec2::new(320.0, 180.0), // Useful fallback when switching to ortho in tools
             near,
             far,
-            fov,
+            fov: fov.to_radians(),
             viewport_size: (1, 1),
         }
     }

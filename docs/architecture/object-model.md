@@ -160,7 +160,7 @@ Now:
 
 - composition happens in object factories / bootstrap code
 - scripts only describe runtime behavior
-- serialization can target object/component state
+- serialization (frozen — will be re-added later for editor) can target object/component state
 - editor compatibility can be built on the same runtime model
 
 ## Current Limits

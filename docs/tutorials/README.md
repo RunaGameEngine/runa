@@ -7,7 +7,7 @@ These guides assume the current runtime model:
 - scripts are behavior attachments
 - world mutations from scripts use deferred commands
 - code-first bootstrap stays first-class
-- registration and archetypes are runtime-owned, not editor-owned
+- registration is no longer needed — use `#[derive(Component)]` directly
 
 ## Getting Started
 
@@ -15,7 +15,7 @@ These guides assume the current runtime model:
 2. [Creating a 2D Game](getting-started/creating-a-2d-game.md)
 3. [Creating a 3D Game](getting-started/creating-a-3d-game.md)
 4. [Creating Scripts](scripts/creating-scripts.md)
-5. [Registration And Archetypes](advanced/registration-and-archetypes.md)
+5. [Registration And Archetypes (archived)](advanced/registration-and-archetypes.md)
 
 ## Core Concepts
 
@@ -23,7 +23,7 @@ These guides assume the current runtime model:
 - [Transform](components/transform.md)
 - [Input](systems/input.md)
 - [Object Model Notes](../architecture/object-model.md)
-- [Registration And Archetypes](advanced/registration-and-archetypes.md)
+- [Registration And Archetypes (archived)](advanced/registration-and-archetypes.md)
 
 ## Components and Systems
 
@@ -35,17 +35,16 @@ These guides assume the current runtime model:
 - [Audio](systems/audio.md)
 - [Tilemap](tilemap/tilemap.md)
 
-## Shared Pattern
+## Getting Started Example
 
 ```rust
-use runa_engine::{
-    runa_app::{RunaApp, RunaWindowConfig},
-    Engine, RunaArchetype,
-};
-use runa_engine::runa_core::{
-    ocs::{Object, Script, ScriptContext, World},
-    components::SpriteRenderer,
-};
+use runa_engine::prelude::*;
+
+#[derive(Component)]
+struct Health {
+    current: i32,
+    max: i32,
+}
 
 struct MyBehavior;
 
@@ -55,43 +54,20 @@ impl Script for MyBehavior {
     }
 }
 
-#[derive(RunaArchetype)]
-#[runa(name = "player")]
-struct PlayerArchetype;
-
-impl PlayerArchetype {
-    fn create(world: &mut World) -> u64 {
-        world.spawn(
-            Object::new("Player")
-                .with(SpriteRenderer::default())
-                .with(MyBehavior)
-        )
-    }
-}
-
-fn register_game_types(engine: &mut Engine) {
-    engine.register_script::<MyBehavior>();
-    engine.register_archetype::<PlayerArchetype>();
-}
-
 fn main() {
-    let mut engine = Engine::new();
-    register_game_types(&mut engine);
-
+    let engine = Engine::new();
     let world_rc = engine.create_world();
-    world_rc.borrow_mut().spawn_archetype::<PlayerArchetype>();
+
+    world_rc.borrow_mut().spawn_bundle((
+        Transform::default(),
+        SpriteRenderer::default(),
+        Health { current: 100, max: 100 },
+        MyBehavior,
+    ));
 
     let _ = RunaApp::run_with_config(
         world_rc,
-        RunaWindowConfig {
-            title: "Tutorial".to_string(),
-            width: 1280,
-            height: 720,
-            fullscreen: false,
-            vsync: true,
-            show_fps_in_title: true,
-            window_icon: None,
-        },
+        RunaWindowConfig::default(),
     );
 }
 ```
@@ -101,8 +77,7 @@ fn main() {
 This style keeps:
 
 - composition explicit
-- bootstrap explicit
 - behavior local to scripts
 - editor dependency out of runtime code
 
-It also gives Runa a future path for editor tools, archetype browsers, and serialization without moving the source of truth away from the runtime object model.
+It also gives Runa a future path for editor tools without moving the source of truth away from the runtime object model.
