@@ -1,0 +1,33 @@
+[changelog]
+header = "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n"
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+{% if commit.scope -%}
+- **{{ commit.scope | upper_first }}**: {{ commit.message }}{% else %}
+- {{ commit.message }}{% endif %}
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+postprocess = "cat -s"
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+
+[git.conventional_commits]
+# Map conventional commit types to changelog sections
+types = [
+  { type = "feat",     group = "Added" },
+  { type = "fix",      group = "Fixed" },
+  { type = "perf",     group = "Changed" },
+  { type = "refactor", group = "Changed" },
+  { type = "revert",   group = "Fixed" },
+  { type = "remove",   group = "Removed" },
+  { type = "deprecate",group = "Deprecated" },
+  { type = "security", group = "Security" },
+  # Everything else (docs, ci, test, chore, style) → hidden
+]

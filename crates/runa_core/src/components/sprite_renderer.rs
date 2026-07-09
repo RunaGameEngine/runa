@@ -85,11 +85,11 @@ impl SpriteRenderer {
     }
 
     /// Replace both the texture and its path.
-    pub fn set_texture(
-        &mut self,
-        texture: Option<Handle<TextureAsset>>,
-        texture_path: Option<String>,
-    ) {
+    pub fn set_texture(&mut self, texture: Option<Handle<TextureAsset>>) {
+        let texture_path = texture
+            .as_ref()
+            .map(|handle| handle.inner.path.to_string_lossy().to_string());
+
         let lock = OnceLock::new();
         if let Some(h) = texture {
             let _ = lock.set(Some(h));

@@ -14,7 +14,7 @@ pub use crate::{
 
 pub use runa_core::components::{
     ActiveCamera, AlphaMode, AudioListener, AudioSource, Camera, Collider2D,
-    CursorInteractable, DirectionalLight, Material, Mesh, MeshRenderer, PointLight,
+    CursorInteractable, DirectionalLight, FontId, Material, Mesh, MeshRenderer, PointLight,
     ProjectionType, Sorting, SpriteAnimator, SpriteRenderer, Tilemap, TilemapLayer,
     TilemapRenderer, Transform, UiRenderer, Vertex3D,
 };

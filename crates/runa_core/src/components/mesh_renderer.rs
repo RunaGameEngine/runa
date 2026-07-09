@@ -66,17 +66,17 @@ pub enum AlphaMode {
     Blend,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ColorSpace {
-    Srgb,
-    Linear,
-}
+// #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// pub enum ColorSpace {
+//     Srgb,
+//     Linear,
+// }
 
-#[derive(Clone, Debug)]
-pub struct Texture {
-    pub path: String,
-    pub color_space: ColorSpace,
-}
+// #[derive(Clone, Debug)]
+// pub struct Texture {
+//     pub path: String,
+//     pub color_space: ColorSpace,
+// }
 
 impl Default for Material {
     fn default() -> Self {

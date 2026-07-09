@@ -199,6 +199,21 @@ impl Camera {
         self.viewport_size = (width.max(1), height.max(1));
     }
 
+    /// Converts world coordinates to screen pixel coordinates for orthographic cameras.
+    pub fn world_to_screen(&self, world_pos: Vec2) -> Vec2 {
+        let visible_size = self.ortho_visible_size();
+        let half_width = visible_size.x * 0.5;
+        let half_height = visible_size.y * 0.5;
+
+        let ndc_x = (world_pos.x - self.position.x) / half_width;
+        let ndc_y = (world_pos.y - self.position.y) / half_height;
+
+        let screen_x = (ndc_x + 1.0) * 0.5 * self.viewport_size.0 as f32;
+        let screen_y = (1.0 - ndc_y) * 0.5 * self.viewport_size.1 as f32;
+
+        Vec2::new(screen_x, screen_y)
+    }
+
     /// Converts screen coordinates to world coordinates for orthographic cameras.
     pub fn screen_to_world(&self, screen_pos: (f32, f32)) -> Vec2 {
         let (screen_x, screen_y) = screen_pos;

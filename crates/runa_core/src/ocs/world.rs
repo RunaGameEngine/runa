@@ -102,6 +102,19 @@ impl World {
         self.next_object_id += 1;
         object.set_id(id);
 
+        // Spawn pending children recursively.
+        let children: Vec<ObjectId> = {
+            let pending = object.drain_pending_children();
+            pending.into_iter().map(|child| self.insert_object(child)).collect()
+        };
+
+        for child_id in &children {
+            object.add_child_id(*child_id);
+            if let Some(child) = self.object_mut(*child_id) {
+                child.set_parent_id(Some(id));
+            }
+        }
+
         self.objects.push(object);
         self.object_index.insert(id, self.objects.len() - 1);
         let object = self.objects.last_mut().unwrap();
@@ -110,7 +123,6 @@ impl World {
             object.set_world(world_rc.clone());
         }
 
-        // если мир уже стартовал и lifecycle не обрабатывается
         if self.started && !self.processing_lifecycle {
             Self::start_object_lifecycle(object, world_ptr);
         }
@@ -233,18 +245,18 @@ impl World {
         self.audio_engine.cleanup();
 
         // UI
-        for object in &mut self.objects {
-            let camera = object.get_component::<Camera>().copied();
-            let viewport_size = camera.and_then(|cam| {
-                object
-                    .get_component::<ActiveCamera>()
-                    .map(|_| Vec2::new(cam.viewport_size.0 as f32, cam.viewport_size.1 as f32))
-            });
+        let active_camera = self.objects.iter().find_map(|obj| {
+            let cam = obj.get_component::<Camera>()?;
+            obj.get_component::<ActiveCamera>()?;
+            Some(*cam)
+        });
 
-            if let (Some(canvas), Some(vp)) =
-                (object.get_component_mut::<UiRenderer>(), viewport_size)
-            {
-                canvas.layout(vp, camera.as_ref());
+        if let Some(cam) = &active_camera {
+            let vp = Vec2::new(cam.viewport_size.0 as f32, cam.viewport_size.1 as f32);
+            for object in &mut self.objects {
+                if let Some(canvas) = object.get_component_mut::<UiRenderer>() {
+                    canvas.layout(vp, Some(cam));
+                }
             }
         }
     }
@@ -252,19 +264,19 @@ impl World {
     /// Run UI layout for all UI renderers. Call this each frame right before
     /// rendering so layout picks up the latest viewport size after resize events.
     pub fn layout_ui(&mut self) {
-        for object in &mut self.objects {
-            let camera = object.get_component::<Camera>().copied();
-            let viewport_size = camera.and_then(|cam| {
-                object
-                    .get_component::<ActiveCamera>()
-                    .map(|_| Vec2::new(cam.viewport_size.0 as f32, cam.viewport_size.1 as f32))
-            });
+        let active_camera = self.objects.iter().find_map(|obj| {
+            let cam = obj.get_component::<Camera>()?;
+            obj.get_component::<ActiveCamera>()?;
+            Some(*cam)
+        });
 
-            if let (Some(canvas), Some(vp)) =
-                (object.get_component_mut::<UiRenderer>(), viewport_size)
-            {
-                canvas.layout(vp, camera.as_ref());
-                canvas.process_interaction(camera.as_ref());
+        if let Some(cam) = &active_camera {
+            let vp = Vec2::new(cam.viewport_size.0 as f32, cam.viewport_size.1 as f32);
+            for object in &mut self.objects {
+                if let Some(canvas) = object.get_component_mut::<UiRenderer>() {
+                    canvas.layout(vp, Some(cam));
+                    canvas.process_interaction(Some(cam));
+                }
             }
         }
     }
@@ -306,6 +318,12 @@ impl World {
             }
 
             Some(planes)
+        });
+
+        let active_camera: Option<Camera> = self.objects.iter().find_map(|obj| {
+            let cam = obj.get_component::<Camera>()?;
+            obj.get_component::<ActiveCamera>()?;
+            Some(cam.resolved_with_transform(obj.get_component::<Transform>()))
         });
 
         for object in &self.objects {
@@ -549,12 +567,11 @@ impl World {
                 }
             }
 
-            if let (Some(canvas), Some(_camera), Some(_ac)) = (
-                &mut object.get_component::<UiRenderer>(),
-                object.get_component::<Camera>(),
-                object.get_component::<ActiveCamera>(),
-            ) {
-                canvas.build_render_commands(render_queue);
+            if active_camera.is_some() {
+                if let Some(canvas) = object.get_component::<UiRenderer>() {
+                    let transform = object.get_component::<Transform>();
+                    canvas.build_render_commands(render_queue, active_camera.as_ref(), transform);
+                }
             }
         }
 
@@ -564,6 +581,16 @@ impl World {
 
     pub fn set_debug_draw_collisions(&mut self, enabled: bool) {
         self.debug_renderer.set_debug_draw_collisions(enabled);
+    }
+
+    pub fn sync_debug_flags(&mut self, show_ui_bounds: bool, show_cursor_bounds: bool, draw_collisions: bool) {
+        self.debug_renderer.debug_show_cursor_bounds = show_cursor_bounds;
+        self.debug_renderer.set_debug_draw_collisions(draw_collisions);
+        for object in &mut self.objects {
+            if let Some(canvas) = object.get_component_mut::<UiRenderer>() {
+                canvas.debug_show_bounds = show_ui_bounds;
+            }
+        }
     }
 
     fn update_sprite_animators(&mut self, dt: f32) {
@@ -1030,13 +1057,10 @@ mod tests {
     use std::rc::Rc;
 
     use super::World;
-    use crate::{
-        components::Component,
-        ocs::{Object, Script, ScriptContext},
-    };
+    use crate::ocs::{Object, Script, ScriptContext};
 
-        struct DespawnSelf;
-        impl Script for DespawnSelf {
+    struct DespawnSelf;
+    impl Script for DespawnSelf {
         fn update(&mut self, ctx: &mut ScriptContext, _dt: f32) {
             if let Some(id) = ctx.id() {
                 ctx.commands().despawn(id);

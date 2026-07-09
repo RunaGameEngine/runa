@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::command::{AtmosphereData, DirectionalLightData, InstanceData, Mesh3dParams, PointLightData, ScreenEffectData, TextOutline, TileParams, UiRect};
+use crate::command::{AtmosphereData, DirectionalLightData, FontId, InstanceData, Mesh3dParams, PointLightData, ScreenEffectData, TextOutline, TileParams, UiRect};
 use crate::RenderCommands;
 use glam::{Quat, Vec2, Vec3};
 use runa_asset::TextureAsset;
@@ -80,6 +80,15 @@ impl RenderQueue {
         });
     }
 
+    pub fn draw_debug_line(&mut self, start: Vec2, end: Vec2, color: [f32; 4], width: f32) {
+        self.commands.push(RenderCommands::DebugLine {
+            start,
+            end,
+            color,
+            width,
+        });
+    }
+
     pub fn draw_tile(&mut self, params: TileParams) {
         self.commands.push(RenderCommands::Tile(params));
     }
@@ -138,6 +147,7 @@ impl RenderQueue {
         color: [f32; 4],
         font_size: u16,
         z_index: i16,
+        font_id: Option<FontId>,
     ) {
         self.commands.push(RenderCommands::UiText {
             text,
@@ -145,6 +155,7 @@ impl RenderQueue {
             color,
             font_size,
             z_index,
+            font_id,
         });
     }
 

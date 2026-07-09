@@ -164,6 +164,15 @@ pub struct TextOutline {
     pub width: f32,
 }
 
+/// Font identifier for selecting among loaded fonts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FontId(pub usize);
+
+impl FontId {
+    /// Always the first font loaded (built-in pixel font).
+    pub const DEFAULT: FontId = FontId(0);
+}
+
 pub enum RenderCommands {
     Sprite {
         texture: std::sync::Arc<TextureAsset>,
@@ -185,6 +194,12 @@ pub enum RenderCommands {
         position: Vec3,
         size: Vec2,
         color: [f32; 4],
+    },
+    DebugLine {
+        start: Vec2,
+        end: Vec2,
+        color: [f32; 4],
+        width: f32,
     },
     Tile(TileParams),
     TileBatch {
@@ -213,5 +228,6 @@ pub enum RenderCommands {
         color: [f32; 4],
         font_size: u16,
         z_index: i16,
+        font_id: Option<FontId>,
     },
 }

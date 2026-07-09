@@ -49,7 +49,7 @@ pub use tilemap::TilemapRenderer;
 pub use transform::Transform;
 pub use world_atmosphere::{BackgroundMode, WorldAtmosphere};
 
-pub use ui::UiRenderer;
+pub use ui::{FontId, UiRenderer};
 
 macro_rules! impl_component {
     ($($ty:ty),+ $(,)?) => {

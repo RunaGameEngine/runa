@@ -4,12 +4,12 @@ use crate::{
     font::FontManager, pipelines::BackgroundPipeline, pipelines::BackgroundUniforms,
     pipelines::MeshPipeline, pipelines::MeshUniforms, pipelines::PointLightUniform,
     pipelines::PostProcessPipeline, pipelines::PostProcessUniforms, pipelines::SpritePipeline,
-    pipelines::UIPipeline, pipelines::UITexturedVertex, pipelines::UIUniforms,
-    pipelines::UIVertex, pipelines::MAX_POINT_LIGHTS, resources::texture::GpuTexture,
+    pipelines::UIPipeline, pipelines::UITexturedVertex, pipelines::UIUniforms, pipelines::UIVertex,
+    pipelines::MAX_POINT_LIGHTS, resources::texture::GpuTexture,
 };
 use glam::Vec2;
 use runa_asset::TextureAsset;
-use runa_render_api::{BackgroundModeData, InstanceData, RenderCommands, RenderQueue};
+use runa_render_api::{BackgroundModeData, FontId, InstanceData, RenderCommands, RenderQueue};
 use wgpu::util::DeviceExt;
 use wgpu::{MemoryHints::Performance, Trace};
 use wgpu::{Texture, TextureView};
@@ -365,7 +365,9 @@ impl<'window> Renderer<'window> {
         });
 
         let uniform_alignment = device.limits().min_uniform_buffer_offset_alignment;
-        let uniform_stride = ((size_of::<MeshUniforms>() as u32 + uniform_alignment - 1) / uniform_alignment * uniform_alignment) as u64;
+        let uniform_stride = ((size_of::<MeshUniforms>() as u32 + uniform_alignment - 1)
+            / uniform_alignment
+            * uniform_alignment) as u64;
         const INITIAL_MESH_UNIFORM_SIZE: u64 = 65536; // 64KB — room for ~40 meshes
         let mesh_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Mesh Uniform Buffer"),
@@ -595,7 +597,10 @@ impl<'window> Renderer<'window> {
 
         if has_effects {
             // Render to intermediate texture first
-            let intermediate_view = self.intermediate_view.clone().expect("Intermediate texture not available");
+            let intermediate_view = self
+                .intermediate_view
+                .clone()
+                .expect("Intermediate texture not available");
             let depth_view = self.depth_view.clone();
             let mut encoder = self
                 .device
@@ -736,7 +741,8 @@ impl<'window> Renderer<'window> {
         for (cmd_index, cmd) in queue.commands.iter().enumerate() {
             match cmd {
                 RenderCommands::Mesh3D(params) => {
-                    self.mesh_items.push((params.order, params.depth, cmd_index));
+                    self.mesh_items
+                        .push((params.order, params.depth, cmd_index));
                 }
                 RenderCommands::Sprite {
                     texture,
@@ -764,9 +770,12 @@ impl<'window> Renderer<'window> {
                     };
 
                     let key = Arc::as_ptr(texture) as usize;
-                    self.textures_cache.entry(key).or_insert_with(|| texture.clone());
+                    self.textures_cache
+                        .entry(key)
+                        .or_insert_with(|| texture.clone());
 
-                    self.sprite_instances.push((*order, position.z, cmd_index, key, instance));
+                    self.sprite_instances
+                        .push((*order, position.z, cmd_index, key, instance));
                 }
                 RenderCommands::Tile(params) => {
                     let instance = InstanceData {
@@ -780,9 +789,17 @@ impl<'window> Renderer<'window> {
                     };
 
                     let key = Arc::as_ptr(&params.texture) as usize;
-                    self.textures_cache.entry(key).or_insert_with(|| params.texture.clone());
+                    self.textures_cache
+                        .entry(key)
+                        .or_insert_with(|| params.texture.clone());
 
-                    self.sprite_instances.push((params.order, params.position.z, cmd_index, key, instance));
+                    self.sprite_instances.push((
+                        params.order,
+                        params.position.z,
+                        cmd_index,
+                        key,
+                        instance,
+                    ));
                 }
                 RenderCommands::TileBatch {
                     texture,
@@ -791,9 +808,12 @@ impl<'window> Renderer<'window> {
                     depth,
                 } => {
                     let key = Arc::as_ptr(texture) as usize;
-                    self.textures_cache.entry(key).or_insert_with(|| texture.clone());
+                    self.textures_cache
+                        .entry(key)
+                        .or_insert_with(|| texture.clone());
                     for instance in instances {
-                        self.sprite_instances.push((*order, *depth, cmd_index, key, *instance));
+                        self.sprite_instances
+                            .push((*order, *depth, cmd_index, key, *instance));
                     }
                 }
                 RenderCommands::DebugRect {
@@ -832,6 +852,28 @@ impl<'window> Renderer<'window> {
                             color: *color,
                         },
                     ]);
+                }
+                RenderCommands::DebugLine {
+                    start,
+                    end,
+                    color,
+                    width,
+                } => {
+                    let dx = end.x - start.x;
+                    let dy = end.y - start.y;
+                    let len = (dx * dx + dy * dy).sqrt();
+                    if len > f32::EPSILON {
+                        let nx = -dy / len * width * 0.5;
+                        let ny = dx / len * width * 0.5;
+                        self.ui_vertices.extend_from_slice(&[
+                            UIVertex { position: [start.x + nx, start.y + ny], color: *color },
+                            UIVertex { position: [end.x + nx, end.y + ny], color: *color },
+                            UIVertex { position: [start.x - nx, start.y - ny], color: *color },
+                            UIVertex { position: [start.x - nx, start.y - ny], color: *color },
+                            UIVertex { position: [end.x + nx, end.y + ny], color: *color },
+                            UIVertex { position: [end.x - nx, end.y - ny], color: *color },
+                        ]);
+                    }
                 }
                 RenderCommands::Text {
                     text,
@@ -925,7 +967,9 @@ impl<'window> Renderer<'window> {
                     z_index: _,
                 } => {
                     let key = Arc::as_ptr(texture) as usize;
-                    self.textures_cache.entry(key).or_insert_with(|| texture.clone());
+                    self.textures_cache
+                        .entry(key)
+                        .or_insert_with(|| texture.clone());
 
                     // Normalize UVs if caller supplied pixel-based UVs (>1.0)
                     let mut uv_n = *uv_rect;
@@ -993,11 +1037,13 @@ impl<'window> Renderer<'window> {
                     color,
                     font_size,
                     z_index: _,
+                    font_id,
                 } => {
-                    let scale = *font_size as f32 / self.font_manager.base_font_size();
-                    let (char_width, _) = self.font_manager.char_size();
-                    let char_h = self.font_manager.line_height() * scale;
-                    let mut x = rect.x;
+                    let fid = font_id.unwrap_or(FontId::DEFAULT);
+                    let scale = *font_size as f32 / self.font_manager.base_font_size_for(fid);
+                    let (char_width, _) = self.font_manager.char_size_for(fid);
+                    let char_h = self.font_manager.line_height_for(fid) * scale;
+                    let mut x = rect.x - rect.w * 0.5;
                     let y = if rect.h > char_h {
                         rect.y + (rect.h - char_h) * 0.5
                     } else {
@@ -1007,7 +1053,7 @@ impl<'window> Renderer<'window> {
                     for ch in text.chars() {
                         let char_w = self
                             .font_manager
-                            .get_char_advance(ch)
+                            .get_char_advance_for(fid, ch)
                             .unwrap_or(char_width as f32)
                             * scale;
 
@@ -1016,18 +1062,16 @@ impl<'window> Renderer<'window> {
                             continue;
                         }
 
-                        if let Some(glyph_info) = self.font_manager.get_glyph_info(ch) {
+                        if let Some(glyph_info) = self.font_manager.get_glyph_info_for(fid, ch) {
                             let char_uv = glyph_info.uv;
                             let left = x + char_uv.bearing_x * scale;
                             let top = y + char_uv.bearing_y * scale;
                             let right = left + char_uv.width * scale;
                             let bottom = top + char_uv.height * scale;
 
-                            if let Some(atlas_tex) = self.font_manager.get_atlas_texture() {
+                            if let Some(atlas_tex) = self.font_manager.get_atlas_texture_for(fid) {
                                 let atlas_key = Arc::as_ptr(atlas_tex) as usize;
-                                let entry = ui_font_vertices_map
-                                    .entry(atlas_key)
-                                    .or_default();
+                                let entry = ui_font_vertices_map.entry(atlas_key).or_default();
                                 entry.extend_from_slice(&[
                                     UITexturedVertex {
                                         position: [left, top],
@@ -1092,7 +1136,8 @@ impl<'window> Renderer<'window> {
                     continue;
                 }
             }
-            self.batches.push((order, depth, sequence, texture_key, offset, 1));
+            self.batches
+                .push((order, depth, sequence, texture_key, offset, 1));
         }
 
         if self.all_instances.len() > self.instance_buffer_capacity {
@@ -1156,9 +1201,11 @@ impl<'window> Renderer<'window> {
             // Draw meshes for this order — they are already sorted globally
             let order_start = self.mesh_items.partition_point(|(o, _, _)| o < order);
             let order_end = self.mesh_items.partition_point(|(o, _, _)| o <= order);
-            for cmd_index in self.mesh_items[order_start..order_end].iter().map(|(_, _, i)| *i) {
-                let RenderCommands::Mesh3D(params) = &queue.commands[cmd_index]
-                else {
+            for cmd_index in self.mesh_items[order_start..order_end]
+                .iter()
+                .map(|(_, _, i)| *i)
+            {
+                let RenderCommands::Mesh3D(params) = &queue.commands[cmd_index] else {
                     continue;
                 };
 
@@ -1172,7 +1219,12 @@ impl<'window> Renderer<'window> {
                     view_proj: camera_matrix.to_cols_array_2d(),
                     model: params.model_matrix.to_cols_array_2d(),
                     base_color: params.color,
-                    emission: [params.emission[0], params.emission[1], params.emission[2], 0.0],
+                    emission: [
+                        params.emission[0],
+                        params.emission[1],
+                        params.emission[2],
+                        0.0,
+                    ],
                     directional_direction,
                     directional_color_intensity,
                     ambient_color_intensity: [
@@ -1224,34 +1276,32 @@ impl<'window> Renderer<'window> {
                 mesh_uniform_offset += self.uniform_stride;
 
                 // Cache vertex/index GPU buffers by mesh_id
-                let (vertex_buffer, index_buffer) = if let Some(cached) =
-                    self.mesh_gpu_cache.get(&params.mesh_id)
-                {
-                    (cached.0.clone(), cached.1.clone())
-                } else {
-                    let vb = self.device.create_buffer(&wgpu::BufferDescriptor {
-                        label: Some("Mesh Vertex Buffer"),
-                        size: (params.vertices.len()
-                            * size_of::<runa_render_api::Vertex3D>())
-                            as u64,
-                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                        mapped_at_creation: false,
-                    });
-                    self.queue
-                        .write_buffer(&vb, 0, bytemuck::cast_slice(&params.vertices));
+                let (vertex_buffer, index_buffer) =
+                    if let Some(cached) = self.mesh_gpu_cache.get(&params.mesh_id) {
+                        (cached.0.clone(), cached.1.clone())
+                    } else {
+                        let vb = self.device.create_buffer(&wgpu::BufferDescriptor {
+                            label: Some("Mesh Vertex Buffer"),
+                            size: (params.vertices.len() * size_of::<runa_render_api::Vertex3D>())
+                                as u64,
+                            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                            mapped_at_creation: false,
+                        });
+                        self.queue
+                            .write_buffer(&vb, 0, bytemuck::cast_slice(&params.vertices));
 
-                    let ib = self.device.create_buffer(&wgpu::BufferDescriptor {
-                        label: Some("Mesh Index Buffer"),
-                        size: (params.indices.len() * 4) as u64,
-                        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-                        mapped_at_creation: false,
-                    });
-                    self.queue
-                        .write_buffer(&ib, 0, bytemuck::cast_slice(&params.indices));
+                        let ib = self.device.create_buffer(&wgpu::BufferDescriptor {
+                            label: Some("Mesh Index Buffer"),
+                            size: (params.indices.len() * 4) as u64,
+                            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                            mapped_at_creation: false,
+                        });
+                        self.queue
+                            .write_buffer(&ib, 0, bytemuck::cast_slice(&params.indices));
 
-                    self.mesh_gpu_cache.insert(params.mesh_id, (vb, ib));
-                    self.mesh_gpu_cache.get(&params.mesh_id).cloned().unwrap()
-                };
+                        self.mesh_gpu_cache.insert(params.mesh_id, (vb, ib));
+                        self.mesh_gpu_cache.get(&params.mesh_id).cloned().unwrap()
+                    };
 
                 rpass.set_pipeline(&self.mesh_pipeline.pipeline);
                 rpass.set_bind_group(0, &mesh_bind_group, &[]);
@@ -1260,7 +1310,8 @@ impl<'window> Renderer<'window> {
                 rpass.draw_indexed(0..params.indices.len() as u32, 0, 0..1);
             }
 
-            for (_, _, _, texture_key, instance_offset, instance_count) in self.batches
+            for (_, _, _, texture_key, instance_offset, instance_count) in self
+                .batches
                 .iter()
                 .filter(|(sprite_order, _, _, _, _, _)| *sprite_order == *order)
             {
@@ -1314,8 +1365,11 @@ impl<'window> Renderer<'window> {
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
-            self.queue
-                .write_buffer(&ui_vertex_buffer, 0, bytemuck::cast_slice(&self.ui_vertices));
+            self.queue.write_buffer(
+                &ui_vertex_buffer,
+                0,
+                bytemuck::cast_slice(&self.ui_vertices),
+            );
 
             rpass.set_pipeline(&self.ui_pipeline.pipeline);
             rpass.set_bind_group(0, self.ui_bind_group.as_ref().unwrap(), &[]);
@@ -1352,11 +1406,22 @@ impl<'window> Renderer<'window> {
             self.queue
                 .write_buffer(&buffer, 0, bytemuck::cast_slice(&vertices));
 
-            let gpu_texture: Arc<GpuTexture> = if let Some(atlas_tex) =
-                self.font_manager.get_atlas_texture()
-            {
-                if Arc::as_ptr(atlas_tex) as usize == tex_key {
-                    atlas_tex.clone()
+            let gpu_texture: Arc<GpuTexture> =
+                if let Some(atlas_tex) = self.font_manager.get_atlas_texture() {
+                    if Arc::as_ptr(atlas_tex) as usize == tex_key {
+                        atlas_tex.clone()
+                    } else {
+                        if !self.textures.contains_key(&tex_key) {
+                            let texture_asset = self.textures_cache.get(&tex_key).unwrap().clone();
+                            let gpu_tex = Arc::new(GpuTexture::from_asset(
+                                &self.device,
+                                &self.queue,
+                                &texture_asset,
+                            ));
+                            self.textures.insert(tex_key, gpu_tex);
+                        }
+                        self.textures.get(&tex_key).unwrap().clone()
+                    }
                 } else {
                     if !self.textures.contains_key(&tex_key) {
                         let texture_asset = self.textures_cache.get(&tex_key).unwrap().clone();
@@ -1368,19 +1433,7 @@ impl<'window> Renderer<'window> {
                         self.textures.insert(tex_key, gpu_tex);
                     }
                     self.textures.get(&tex_key).unwrap().clone()
-                }
-            } else {
-                if !self.textures.contains_key(&tex_key) {
-                    let texture_asset = self.textures_cache.get(&tex_key).unwrap().clone();
-                    let gpu_tex = Arc::new(GpuTexture::from_asset(
-                        &self.device,
-                        &self.queue,
-                        &texture_asset,
-                    ));
-                    self.textures.insert(tex_key, gpu_tex);
-                }
-                self.textures.get(&tex_key).unwrap().clone()
-            };
+                };
 
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &self.ui_pipeline.textured_bind_group_layout,
@@ -1463,10 +1516,7 @@ impl<'window> Renderer<'window> {
                         },
                         UITexturedVertex {
                             position: [right, bottom],
-                            tex_coords: [
-                                char_uv.u + char_uv.u_width,
-                                char_uv.v + char_uv.v_height,
-                            ],
+                            tex_coords: [char_uv.u + char_uv.u_width, char_uv.v + char_uv.v_height],
                             color: *color,
                         },
                     ]);
@@ -1631,7 +1681,11 @@ impl<'window> Renderer<'window> {
         let uniforms = PostProcessUniforms {
             fade_color: effects.fade_color,
             vignette_strength: effects.vignette_strength,
-            vignette_radius: if effects.vignette_radius <= 0.0 { 0.5 } else { effects.vignette_radius },
+            vignette_radius: if effects.vignette_radius <= 0.0 {
+                0.5
+            } else {
+                effects.vignette_radius
+            },
             vignette_softness: effects.vignette_softness.max(0.001),
             rgb_shift: effects.rgb_shift,
             _pad1: [0.0; 2],
@@ -1741,4 +1795,3 @@ fn background_uniforms(
 
     uniforms
 }
-

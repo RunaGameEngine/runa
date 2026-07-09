@@ -27,6 +27,7 @@ pub struct Object {
     pub name: String,
     parent: Option<ObjectId>,
     children: Vec<ObjectId>,
+    pending_children: Vec<Object>,
     pub(crate) components: Vec<(TypeId, Box<dyn Component>)>,
     world: Option<Weak<RefCell<World>>>,
 }
@@ -38,6 +39,7 @@ impl Object {
             name: name.into(),
             parent: None,
             children: Vec::new(),
+            pending_children: Vec::new(),
             components: vec![(TypeId::of::<Transform>(), Box::new(Transform::default()))],
             world: None,
         }
@@ -85,6 +87,10 @@ impl Object {
         self.children.clear();
     }
 
+    pub(crate) fn drain_pending_children(&mut self) -> Vec<Object> {
+        std::mem::take(&mut self.pending_children)
+    }
+
     pub fn set_world(&mut self, world: Rc<RefCell<World>>) {
         self.world = Some(Rc::downgrade(&world));
     }
@@ -100,6 +106,15 @@ impl Object {
     pub fn with<T: Component>(mut self, part: T) -> Self {
         self.add_component(part);
         self
+    }
+
+    pub fn with_child(mut self, child: Object) -> Self {
+        self.pending_children.push(child);
+        self
+    }
+
+    pub fn add_child(&mut self, child: Object) {
+        self.pending_children.push(child);
     }
 
     pub fn find_in_world_by_name(&self, name: &str) -> Option<ObjectId> {
@@ -138,10 +153,7 @@ impl Object {
 
     /// Recursively search this object and its children for a component of type T.
     /// Uses an explicit world reference to avoid RefCell double-borrow.
-    pub fn get_component_in_children<'a, T: 'static>(
-        &'a self,
-        world: &'a World,
-    ) -> Option<&'a T> {
+    pub fn get_component_in_children<'a, T: 'static>(&'a self, world: &'a World) -> Option<&'a T> {
         if let Some(component) = self.get_component::<T>() {
             return Some(component);
         }
@@ -157,10 +169,7 @@ impl Object {
 
     /// Recursively search this object and its parents for a component of type T.
     /// Uses an explicit world reference to avoid RefCell double-borrow.
-    pub fn get_component_in_parent<'a, T: 'static>(
-        &'a self,
-        world: &'a World,
-    ) -> Option<&'a T> {
+    pub fn get_component_in_parent<'a, T: 'static>(&'a self, world: &'a World) -> Option<&'a T> {
         if let Some(component) = self.get_component::<T>() {
             return Some(component);
         }

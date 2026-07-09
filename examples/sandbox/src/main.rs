@@ -15,8 +15,7 @@ mod tester1;
 mod tilemap_tester;
 
 fn main() {
-    let engine = Engine::new();
-    let world_rc = engine.create_world();
+    let world_rc = Engine::create_world();
 
     {
         let mut world = world_rc.borrow_mut();

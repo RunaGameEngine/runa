@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::resources::texture::GpuTexture;
 use runa_asset::TextureAsset;
+use runa_render_api::FontId;
 use rusttype::{point, Font, Scale};
 use wgpu::{Device, Queue};
 
@@ -23,14 +24,6 @@ pub struct CharUV {
 pub struct GlyphInfo {
     pub uv: CharUV,
     pub advance: f32,
-}
-
-/// Font identifier for selecting among loaded fonts
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FontId(pub usize);
-
-impl FontId {
-    pub const DEFAULT: FontId = FontId(0);
 }
 
 pub struct FontManager {
@@ -462,9 +455,23 @@ impl FontManager {
             .unwrap_or((8, 16))
     }
 
+    pub fn char_size_for(&self, font_id: FontId) -> (u32, u32) {
+        self.fonts
+            .get(font_id.0)
+            .map(|f| (f.cell_width as u32, f.cell_height as u32))
+            .unwrap_or((8, 16))
+    }
+
     pub fn line_height(&self) -> f32 {
         self.fonts
             .first()
+            .map(|f| f.line_height)
+            .unwrap_or(16.0)
+    }
+
+    pub fn line_height_for(&self, font_id: FontId) -> f32 {
+        self.fonts
+            .get(font_id.0)
             .map(|f| f.line_height)
             .unwrap_or(16.0)
     }
@@ -486,6 +493,13 @@ impl FontManager {
     pub fn base_font_size(&self) -> f32 {
         self.fonts
             .first()
+            .map(|f| f.base_font_size)
+            .unwrap_or(16.0)
+    }
+
+    pub fn base_font_size_for(&self, font_id: FontId) -> f32 {
+        self.fonts
+            .get(font_id.0)
             .map(|f| f.base_font_size)
             .unwrap_or(16.0)
     }

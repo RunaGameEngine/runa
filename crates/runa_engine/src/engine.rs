@@ -10,7 +10,7 @@ impl Engine {
         Self
     }
 
-    pub fn create_world(&self) -> Rc<RefCell<World>> {
+    pub fn create_world() -> Rc<RefCell<World>> {
         let world = World::default();
         Rc::new(RefCell::new(world))
     }

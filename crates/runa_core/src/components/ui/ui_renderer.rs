@@ -4,10 +4,10 @@ use glam::Vec2;
 use runa_render_api::{command::UiRect as RenderUiRect, RenderQueue};
 
 use crate::components::ui::{
-    Anchor, ContainerKind, EdgeInsets, ImageProps, InteractionState, LayoutProps, SliderProps,
-    StyleProps, TextProps, UiNode, UiNodeId, UiNodeKind,
+    Anchor, ContainerKind, EdgeInsets, FontId, ImageProps, InteractionState, LayoutProps,
+    SliderProps, StyleProps, TextProps, UiNode, UiNodeId, UiNodeKind,
 };
-use crate::components::Camera;
+use crate::components::{Camera, Transform};
 use crate::input::InputState;
 
 pub struct UiRenderer {
@@ -17,6 +17,7 @@ pub struct UiRenderer {
     pub nodes: Vec<UiNode>,
     pub root: UiNodeId,
     pub dirty_layout: bool,
+    pub debug_show_bounds: bool,
     parent_stack: Vec<UiNodeId>,
     interaction_pressed_node: Option<UiNodeId>,
     interaction_was_pressed: bool,
@@ -36,6 +37,7 @@ impl UiRenderer {
             nodes: vec![root_node],
             root,
             dirty_layout: true,
+            debug_show_bounds: false,
             parent_stack: Vec::new(),
             interaction_pressed_node: None,
             interaction_was_pressed: false,
@@ -95,6 +97,18 @@ impl UiRenderer {
         UiNodeBuilder::new(self, id)
     }
 
+    pub fn add_hbox(&mut self) -> UiNodeBuilder<'_> {
+        let parent = self.current_parent();
+        let id = self.add_node(parent, UiNodeKind::Container(ContainerKind::HorizontalBox));
+        UiNodeBuilder::new(self, id)
+    }
+
+    pub fn add_vbox(&mut self) -> UiNodeBuilder<'_> {
+        let parent = self.current_parent();
+        let id = self.add_node(parent, UiNodeKind::Container(ContainerKind::VerticalBox));
+        UiNodeBuilder::new(self, id)
+    }
+
     pub fn add_text(&mut self, content: impl Into<String>) -> UiNodeBuilder<'_> {
         let parent = self.current_parent();
         self.text(parent, content)
@@ -130,31 +144,31 @@ impl UiRenderer {
     //       ui.hbox(|ui| { ui.text("A"); ui.text("B"); });
     //   });
 
-    pub fn vbox<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+    pub fn vbox(&mut self, f: impl FnOnce(&mut Self)) -> UiNodeBuilder<'_> {
         let parent = self.current_parent();
         let id = self.add_node(parent, UiNodeKind::Container(ContainerKind::VerticalBox));
         self.push_parent(id);
-        let result = f(self);
+        f(self);
         self.pop_parent();
-        result
+        UiNodeBuilder::new(self, id)
     }
 
-    pub fn hbox<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+    pub fn hbox(&mut self, f: impl FnOnce(&mut Self)) -> UiNodeBuilder<'_> {
         let parent = self.current_parent();
         let id = self.add_node(parent, UiNodeKind::Container(ContainerKind::HorizontalBox));
         self.push_parent(id);
-        let result = f(self);
+        f(self);
         self.pop_parent();
-        result
+        UiNodeBuilder::new(self, id)
     }
 
-    pub fn container<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+    pub fn container(&mut self, f: impl FnOnce(&mut Self)) -> UiNodeBuilder<'_> {
         let parent = self.current_parent();
         let id = self.add_node(parent, UiNodeKind::Container(ContainerKind::Free));
         self.push_parent(id);
-        let result = f(self);
+        f(self);
         self.pop_parent();
-        result
+        UiNodeBuilder::new(self, id)
     }
 
     // ── Builder API (explicit parent, low-level) ─────────────────
@@ -335,6 +349,17 @@ impl UiRenderer {
             }
         };
 
+        let font_scale: f32 = match self.space {
+            CanvasSpace::Screen => 1.0,
+            CanvasSpace::Camera => 1.0 / scale.y,
+            CanvasSpace::World => camera
+                .map(|cam| {
+                    let visible = cam.ortho_visible_size();
+                    visible.y / cam.viewport_size.1 as f32
+                })
+                .unwrap_or(1.0),
+        };
+
         // Step 1: collect parent-child relationships and compute sizes (immutable read)
         let node_count = self.nodes.len();
         let mut sizes: Vec<(f32, f32)> = vec![(virtual_size.x, virtual_size.y); node_count];
@@ -374,8 +399,8 @@ impl UiRenderer {
                     }
                 }
                 UiNodeKind::Text(props) => {
-                    h = props.font_size as f32;
-                    let char_est = props.font_size as f32 * 0.5;
+                    h = props.font_size as f32 * font_scale;
+                    let char_est = props.font_size as f32 * font_scale * 0.5;
                     w = (props.text.len() as f32) * char_est;
                 }
                 UiNodeKind::Slider(_) => {
@@ -392,8 +417,10 @@ impl UiRenderer {
 
             let min = node.layout.min_size;
             let max = node.layout.max_size;
-            w = w.clamp(min.x, max.x.min(virtual_size.x));
-            h = h.clamp(min.y, max.y.min(virtual_size.y));
+            let max_w = max.x.min(virtual_size.x).max(min.x);
+            let max_h = max.y.min(virtual_size.y).max(min.y);
+            w = w.clamp(min.x, max_w);
+            h = h.clamp(min.y, max_h);
 
             sizes[i] = (w, h);
             parent_ids[i] = node.parent.map(|pid| pid.0 as usize).filter(|&p| p != 0);
@@ -505,11 +532,14 @@ impl UiRenderer {
                             let (min_val, mgn) = if let Some(child) = self.node(UiNodeId(ci as u32)) {
                                 let base = match &child.kind {
                                     UiNodeKind::Text(props) => {
-                                        if is_horizontal {
-                                            (props.text.len() as f32) * props.font_size as f32 * 0.5
+                                        let raw = if is_horizontal {
+                                            (props.text.len() as f32) * props.font_size as f32 * 0.5 * font_scale
                                         } else {
-                                            props.font_size as f32
-                                        }
+                                            props.font_size as f32 * font_scale
+                                        };
+                                        raw
+                                            .max(if is_horizontal { child.layout.min_size.x } else { child.layout.min_size.y })
+                                            .min(if is_horizontal { child.layout.max_size.x } else { child.layout.max_size.y })
                                     }
                                     UiNodeKind::Slider(_) => {
                                         if is_horizontal { child.layout.min_size.x.max(100.0) } else { 30.0 }
@@ -518,7 +548,11 @@ impl UiRenderer {
                                         if is_horizontal { child.computed.rect.w.max(1.0) } else { child.computed.rect.h.max(1.0) }
                                     }
                                     UiNodeKind::Container(_) => {
-                                        if is_horizontal { child.layout.min_size.x } else { child.layout.min_size.y }
+                                        if is_horizontal {
+                                            child.computed.rect.w.max(child.layout.min_size.x).max(1.0)
+                                        } else {
+                                            child.computed.rect.h.max(child.layout.min_size.y).max(1.0)
+                                        }
                                     }
                                 };
                                 let m = child.layout.margin;
@@ -553,6 +587,11 @@ impl UiRenderer {
                             let effective = if is_horizontal { base + mgn.left + mgn.right } else { base + mgn.top + mgn.bottom };
                             let final_effective = effective + extra;
                             let content_size = (final_effective - (if is_horizontal { mgn.left + mgn.right } else { mgn.top + mgn.bottom })).max(0.0);
+                            let content_size = self.node(UiNodeId(ci as u32)).map(|n| {
+                                let main_min = if is_horizontal { n.layout.min_size.x } else { n.layout.min_size.y };
+                                let main_max = if is_horizontal { n.layout.max_size.x } else { n.layout.max_size.y };
+                                content_size.max(main_min).min(main_max)
+                            }).unwrap_or(content_size);
                             let content_half = content_size * 0.5;
 
                             if is_horizontal {
@@ -731,21 +770,67 @@ impl UiRenderer {
         }
     }
 
-    pub fn build_render_commands(&self, render_queue: &mut RenderQueue) {
+    fn world_rect_to_screen(
+        &self,
+        world_rect: crate::components::ui::UiRect,
+        camera: &Camera,
+        transform: Option<&Transform>,
+    ) -> RenderUiRect {
+        let vs = camera.orthographic_size;
+        let mut wcx = (world_rect.x - vs.x * 0.5) + camera.position.x;
+        let mut wcy = -(world_rect.y - vs.y * 0.5) + camera.position.y;
+
+        if let Some(t) = transform {
+            wcx += t.position.x;
+            wcy += t.position.y;
+        }
+
+        let screen_center = camera.world_to_screen(Vec2::new(wcx, wcy));
+        let visible = camera.ortho_visible_size();
+        let scale_x = camera.viewport_size.0 as f32 / visible.x;
+        let scale_y = camera.viewport_size.1 as f32 / visible.y;
+
+        RenderUiRect {
+            x: screen_center.x,
+            y: screen_center.y,
+            w: world_rect.w * scale_x,
+            h: world_rect.h * scale_y,
+        }
+    }
+
+    pub fn build_render_commands(
+        &self,
+        render_queue: &mut RenderQueue,
+        camera: Option<&Camera>,
+        transform: Option<&Transform>,
+    ) {
+        let screen_of = |rect: crate::components::ui::UiRect| -> RenderUiRect {
+            match self.space {
+                CanvasSpace::World => {
+                    if let Some(cam) = camera {
+                        self.world_rect_to_screen(rect, cam, transform)
+                    } else {
+                        self.to_screen_rect(rect)
+                    }
+                }
+                _ => self.to_screen_rect(rect),
+            }
+        };
+
         for node in &self.nodes {
             if !node.visible {
                 continue;
             }
 
             if let Some(background) = node.style.background {
-                let rect = self.to_screen_rect(node.computed.rect);
+                let rect = screen_of(node.computed.rect);
                 render_queue.draw_ui_rect(rect, background, node.style.z_index);
             }
             match &node.kind {
                 UiNodeKind::Container(_) => {}
                 UiNodeKind::Image(props) => {
                     if let Some(texture) = &props.texture {
-                        let rect = self.to_screen_rect(node.computed.rect);
+                        let rect = screen_of(node.computed.rect);
                         render_queue.draw_ui_image(
                             Arc::from(texture.clone()),
                             rect,
@@ -756,17 +841,18 @@ impl UiRenderer {
                     }
                 }
                 UiNodeKind::Text(props) => {
-                    let rect = self.to_screen_rect(node.computed.rect);
+                    let rect = screen_of(node.computed.rect);
                     render_queue.draw_ui_text(
                         props.text.clone(),
                         rect,
                         props.color,
                         props.font_size,
                         node.style.z_index,
+                        props.font,
                     );
                 }
                 UiNodeKind::Slider(props) => {
-                    let rect = self.to_screen_rect(node.computed.rect);
+                    let rect = screen_of(node.computed.rect);
                     let track_color = if node.interaction == InteractionState::Hovered
                         || node.interaction == InteractionState::Dragging
                     {
@@ -787,6 +873,22 @@ impl UiRenderer {
                         node.style.z_index,
                     );
                 }
+            }
+        }
+
+        if self.debug_show_bounds {
+            let outline_color = [0.0, 1.0, 0.0, 0.8];
+            for node in &self.nodes {
+                if !node.visible { continue; }
+                let rect = screen_of(node.computed.rect);
+                let l = rect.x - rect.w * 0.5;
+                let t = rect.y - rect.h * 0.5;
+                let r = rect.x + rect.w * 0.5;
+                let b = rect.y + rect.h * 0.5;
+                render_queue.draw_debug_line(Vec2::new(l, t), Vec2::new(r, t), outline_color, 1.5);
+                render_queue.draw_debug_line(Vec2::new(r, t), Vec2::new(r, b), outline_color, 1.5);
+                render_queue.draw_debug_line(Vec2::new(r, b), Vec2::new(l, b), outline_color, 1.5);
+                render_queue.draw_debug_line(Vec2::new(l, b), Vec2::new(l, t), outline_color, 1.5);
             }
         }
     }
@@ -952,6 +1054,16 @@ impl<'a> UiNodeBuilder<'a> {
         if let Some(node) = self.renderer.node_mut(self.id) {
             if let UiNodeKind::Text(ref mut props) = node.kind {
                 props.font_size = size;
+            }
+        }
+        self
+    }
+
+    /// For text nodes: set custom font
+    pub fn with_font(self, font: FontId) -> Self {
+        if let Some(node) = self.renderer.node_mut(self.id) {
+            if let UiNodeKind::Text(ref mut props) = node.kind {
+                props.font = Some(font);
             }
         }
         self

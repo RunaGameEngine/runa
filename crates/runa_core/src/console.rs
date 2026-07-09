@@ -117,6 +117,10 @@ pub struct Console {
     /// Current time scale (game speed multiplier)
     pub time_scale: f32,
 
+    pub debug_show_ui_bounds: bool,
+    pub debug_show_cursor_bounds: bool,
+    pub debug_draw_collisions: bool,
+
     /// Registered simple commands (message-only)
     commands: HashMap<String, Box<dyn ConsoleCommand>>,
     /// Ordered command names for consistent display
@@ -145,6 +149,9 @@ impl Console {
             draw_call_count: 0,
             fps_max: 0.0,
             time_scale: 1.0,
+            debug_show_ui_bounds: false,
+            debug_show_cursor_bounds: false,
+            debug_draw_collisions: false,
             commands: HashMap::new(),
             command_order: Vec::new(),
             suggestion_names: Vec::new(),
@@ -265,6 +272,8 @@ impl Console {
         let builtin_commands = [
             "help", "fps_max", "show_stats", "stats", "bind", "unbind", "binds",
             "timescale", "quit", "cls",
+            "show_ui_bounds", "ui_bounds", "show_cursor", "cursor_bounds",
+            "show_collision", "collision_bounds",
         ];
         for name in &builtin_commands {
             if name.starts_with(&prefix) && !results.contains(&name.to_string()) {
@@ -303,6 +312,9 @@ impl Console {
         result.push(("unbind <action> [key]".to_string(), "Unbind a key from an action".to_string()));
         result.push(("binds".to_string(), "List all action-key bindings".to_string()));
         result.push(("timescale [value]".to_string(), "Set/get game speed multiplier".to_string()));
+        result.push(("show_ui_bounds".to_string(), "Toggle UI boundary overlay".to_string()));
+        result.push(("show_cursor".to_string(), "Toggle CursorInteractable bounds overlay".to_string()));
+        result.push(("show_collision".to_string(), "Toggle collision bounds overlay".to_string()));
         result.push(("quit".to_string(), "Close the console".to_string()));
         // Add "cls" alias for "clear"
         if let Some(pos) = result.iter().position(|(n, _)| n == "clear") {
@@ -367,6 +379,18 @@ impl Console {
                         "timescale" => {
                             self.add_message("timescale [value] - Set/get game speed multiplier.");
                             self.add_message("  Default: 1.0. Use 0.5 for half speed, 2.0 for double speed.");
+                        }
+                        "show_ui_bounds" | "ui_bounds" => {
+                            self.add_message("show_ui_bounds / ui_bounds - Toggle UI node boundary overlay.");
+                            self.add_message("  Draws green outlines around all visible UI elements.");
+                        }
+                        "show_cursor" | "cursor_bounds" => {
+                            self.add_message("show_cursor / cursor_bounds - Toggle CursorInteractable bounds overlay.");
+                            self.add_message("  Draws cyan outlines around interactive objects.");
+                        }
+                        "show_collision" | "collision_bounds" => {
+                            self.add_message("show_collision / collision_bounds - Toggle collision bounds overlay.");
+                            self.add_message("  Draws orange outlines around PhysicsCollision objects.");
                         }
                         "quit" | "exit" => {
                             self.add_message("quit / exit - Close the console.");
@@ -476,6 +500,21 @@ impl Console {
                 } else {
                     self.add_message(format!("Invalid value: '{}'. Use a number (0.01-100.0).", args[0]));
                 }
+                true
+            }
+            "show_ui_bounds" | "ui_bounds" => {
+                self.debug_show_ui_bounds = !self.debug_show_ui_bounds;
+                self.add_message(format!("UI bounds: {}", if self.debug_show_ui_bounds { "ON" } else { "OFF" }));
+                true
+            }
+            "show_cursor" | "cursor_bounds" => {
+                self.debug_show_cursor_bounds = !self.debug_show_cursor_bounds;
+                self.add_message(format!("Cursor bounds: {}", if self.debug_show_cursor_bounds { "ON" } else { "OFF" }));
+                true
+            }
+            "show_collision" | "collision_bounds" => {
+                self.debug_draw_collisions = !self.debug_draw_collisions;
+                self.add_message(format!("Collision bounds: {}", if self.debug_draw_collisions { "ON" } else { "OFF" }));
                 true
             }
             "quit" | "exit" => {

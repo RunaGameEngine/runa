@@ -8,7 +8,8 @@ pub use ui_asset::{
     UiNodeKindAsset,
 };
 pub use ui_node::{
-    Anchor, ContainerKind, EdgeInsets, ImageProps, InteractionState, LayoutProps, SliderProps,
-    StyleProps, StyleSheet, TextAlign, TextProps, UiNode, UiNodeId, UiNodeKind, UiRect,
+    Anchor, ContainerKind, EdgeInsets, FontId, ImageProps, InteractionState, LayoutProps,
+    SliderProps, StyleProps, StyleSheet, TextAlign, TextProps, UiNode, UiNodeId, UiNodeKind,
+    UiRect,
 };
 pub use ui_renderer::{CanvasSpace, UiNodeBuilder, UiRenderer};

@@ -216,7 +216,7 @@ impl Default for TextAlign {
     }
 }
 
-pub struct FontId {}
+pub use runa_render_api::FontId;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InteractionState {

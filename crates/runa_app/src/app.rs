@@ -180,7 +180,15 @@ impl<'window> App<'window> {
 
             // Run UI layout with latest viewport (resize events update camera
             // AFTER new_events runs, so layout in update() uses stale sizes).
-            self.world_rc.borrow_mut().layout_ui();
+            {
+                let mut world = self.world_rc.borrow_mut();
+                world.layout_ui();
+                world.sync_debug_flags(
+                    self.console.debug_show_ui_bounds,
+                    self.console.debug_show_cursor_bounds,
+                    self.console.debug_draw_collisions,
+                );
+            }
 
             // Compile render commands from world
             self.world_rc

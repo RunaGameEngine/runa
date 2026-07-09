@@ -1,9 +1,9 @@
+use runa_asset::load_image;
 use runa_core::components::ui::CanvasSpace;
 use runa_engine::prelude::*;
 
 fn main() {
-    let engine = Engine::new();
-    let world_rc = engine.create_world();
+    let world_rc = Engine::create_world();
 
     {
         let mut world = world_rc.borrow_mut();
@@ -32,15 +32,15 @@ fn main() {
                 .with_background(0.15, 0.15, 0.2, 0.8);
         });
 
-        world.spawn_bundle((
-            Camera::default(),
-            ActiveCamera,
-            ui,
-        ));
+        ui.add_image()
+            .with_texture(load_image!("assets/Charactert.png"))
+            .with_size(32., 32.);
+
+        world.spawn_bundle((Camera::default(), ActiveCamera, ui));
     }
 
     let cfg = RunaWindowConfig {
-        title: "".to_string(),
+        title: "Runa UI Test".to_string(),
         width: 1280,
         height: 720,
         fullscreen: false,

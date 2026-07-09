@@ -3,6 +3,7 @@ mod queue;
 
 pub use command::AtmosphereData;
 pub use command::BackgroundModeData;
+pub use command::FontId;
 pub use command::InstanceData;
 pub use command::Mesh3dParams;
 pub use command::RenderCommands;
