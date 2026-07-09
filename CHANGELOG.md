@@ -1,3 +1,8 @@
+## [0.6.1-alpha.1] - 2026-07-09
+
+### 🚀 Features
+
+- Ui debug overlays, font_scale fix, world-to-screen y-axis fix, with_size for auto-layout, DebugLine primitive
 # Changelog
 
 All notable changes to this project will be documented in this file.
