@@ -1,8 +1,3 @@
-## [0.6.1-alpha.1] - 2026-07-09
-
-### 🚀 Features
-
-- Ui debug overlays, font_scale fix, world-to-screen y-axis fix, with_size for auto-layout, DebugLine primitive
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -10,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.1-alpha.1] - ......
+## [0.6.1-alpha.1] - 2026-07-09
 
 ### Added
 
@@ -21,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`SpriteRenderer::new(texture)`:** Remove previously required parameter `texture_path`:
   `SpriteRenderer::new(texture, texture_path)` -> `SpriteRenderer::new(texture)`.  
   `texture_path` is extracted from the handle's metadata.
+
+### Features
+
+- Ui debug overlays, font_scale fix, world-to-screen y-axis fix, with_size for auto-layout, DebugLine primitive
 
 ## [0.6.0-alpha.4] - 2026-07-02
 
