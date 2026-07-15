@@ -68,12 +68,7 @@ impl BlobVec {
     }
 
     pub fn len(&self) -> usize {
-        let size = self.info.layout.size();
-        if size == 0 {
-            self.data.len()
-        } else {
-            self.data.len() / size
-        }
+        self.data.len().checked_div(self.info.layout.size()).unwrap_or(self.data.len())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -132,10 +127,9 @@ impl BlobVec {
     }
 
     pub fn clear(&mut self) {
-        let size = self.info.layout.size();
-        if size > 0 {
-            if let Some(drop) = self.info.drop_fn {
-                let len = self.data.len() / size;
+        if let Some(drop) = self.info.drop_fn {
+            let size = self.info.layout.size();
+            if let Some(len) = self.data.len().checked_div(size) {
                 for i in 0..len {
                     unsafe { drop(self.data.as_mut_ptr().add(i * size)) }
                 }
