@@ -96,7 +96,7 @@ Current latest public tag: [`v0.7.0-alpha.1`](https://github.com/RunaGameEngine/
 
 ```toml
 [dependencies]
-runa_engine = { git = "https://github.com/RunaGameEngine/runa.git", tag = "v0.7.0-alpha.1" }
+runa_engine = { git = "https://github.com/RunaGameEngine/runa.git", tag = "v0.7.0-alpha.2" }
 ```
 
 If you want to track the repository head instead of a tag:

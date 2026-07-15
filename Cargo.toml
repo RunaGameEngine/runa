@@ -19,7 +19,7 @@ exclude = ["templates"]
 resolver = "2"
 
 [workspace.package]
-version = "0.7.0-alpha.1"
+version = "0.7.0-alpha.2"
 authors = ["Nik Neza <nik.n.neza@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
