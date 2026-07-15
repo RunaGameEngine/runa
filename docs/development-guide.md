@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Development Guide
 
 ## Versioning & Releases
@@ -254,3 +262,4 @@ cargo install cargo-release
 cargo release patch --execute   # bumps 0.5.1 → 0.5.2
 cargo release alpha --execute   # bumps 0.6.0-alpha.1 → 0.6.0-alpha.2
 ```
+

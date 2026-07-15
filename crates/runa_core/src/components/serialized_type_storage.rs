@@ -1,9 +1,13 @@
-use super::SerializedField;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SerializedTypeKind {
     Component,
     Script,
+}
+
+#[derive(Debug, Clone)]
+pub struct SerializedField {
+    pub name: String,
+    pub type_name: String,
 }
 
 #[derive(Debug, Clone)]

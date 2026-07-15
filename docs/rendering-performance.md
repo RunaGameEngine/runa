@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Rendering Performance Optimizations
 
 ## Overview
@@ -109,3 +117,4 @@ is outside the frustum.
 - 100x100 tilemap: ~200 FPS → ~4000 FPS (20x improvement)
 - 3D scenes: frustum culling eliminates off-screen objects
 - Memory: ~2MB less alloc/dealloc churn per frame from Vec reuse
+

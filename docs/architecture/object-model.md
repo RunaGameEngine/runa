@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Object Model
 
 This note describes the current Runa runtime architecture.
@@ -173,3 +181,4 @@ The new core model is much cleaner, but not everything is finished:
 - fixed update / events are not implemented yet
 
 So the architectural direction is in place, but some lower-level runtime cleanup is still ahead.
+

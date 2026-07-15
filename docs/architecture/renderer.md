@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Renderer Architecture
 
 Runa currently uses a small forward renderer. The runtime world owns objects and
@@ -117,3 +125,4 @@ final_color = surface_color * lighting + emission
   with metallic, roughness, normal, occlusion, and emissive texture slots.
 - `.runa3d`: import mesh vertex colors, material parameters, textures, and
   optional light nodes into the same runtime components and material structure.
+

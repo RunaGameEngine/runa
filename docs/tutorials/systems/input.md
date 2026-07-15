@@ -1,4 +1,12 @@
-﻿# Input System
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
+# Input System
 
 The input system handles keyboard and mouse input. In the current runtime it also exposes control over the main game window.
 
@@ -91,3 +99,4 @@ fn create_player() -> Object {
 - mouse world position requires a valid camera
 - window-control functions affect the main runtime window only
 - multi-window runtime support is not implemented
+

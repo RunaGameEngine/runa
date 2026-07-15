@@ -1,4 +1,12 @@
-﻿# CursorInteractable Component
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
+# CursorInteractable Component
 
 `CursorInteractable` makes an object respond to hover and click state.
 
@@ -56,3 +64,4 @@ fn create_button() -> Object {
 - `CursorInteractable` defines bounds and hover state
 - click handling usually lives in a script
 - callbacks are best used for lightweight state transitions or debug feedback
+

@@ -1,7 +1,5 @@
-use glam::Vec3;
-
-use super::Component;
 use crate::Color;
+use glam::Vec3;
 
 #[derive(Clone, Copy, Debug)]
 pub struct DirectionalLight {
@@ -17,16 +15,6 @@ impl Default for DirectionalLight {
             color: Color::WHITE,
             intensity: 1.0,
         }
-    }
-}
-
-impl Component for DirectionalLight {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
     }
 }
 
@@ -46,15 +34,5 @@ impl Default for PointLight {
             radius: 6.0,
             falloff: 1.0,
         }
-    }
-}
-
-impl Component for PointLight {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
     }
 }

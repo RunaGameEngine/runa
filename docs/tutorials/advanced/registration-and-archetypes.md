@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Why Registration Was Removed
 
 Older versions of Runa required explicit registration of components, scripts, and archetypes through the engine's bootstrap layer. This file explains what registration was, why it existed, and why it is no longer needed.
@@ -128,3 +136,4 @@ fn spawn_enemy(world: &mut World, position: Vec3) -> ObjectId {
 | `world.spawn_archetype::<T>()` | `world.spawn_bundle((...))` or `world.spawn_object(...)` |
 | `world.query::<T>()` | `world.find_all_with::<T>()` |
 | `Engine::new()` → register → create_world | `World::new()` directly |
+

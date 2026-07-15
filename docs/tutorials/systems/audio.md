@@ -1,4 +1,12 @@
-﻿# Audio System
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
+# Audio System
 
 Runa supports simple 2D and spatial audio through `AudioSource` and `AudioListener`.
 
@@ -88,3 +96,4 @@ fn create_emitter() -> Object {
 - `AudioListener` represents the active listening point
 - one active listener is used at a time
 - attach audio data during composition, trigger playback from behavior
+

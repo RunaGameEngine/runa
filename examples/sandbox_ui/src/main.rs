@@ -1,53 +1,15 @@
-use runa_asset::load_image;
-use runa_core::components::ui::CanvasSpace;
-use runa_engine::prelude::*;
+use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
 
 fn main() {
-    let world_rc = Engine::create_world();
-
-    {
-        let mut world = world_rc.borrow_mut();
-        let mut ui = UiRenderer::new(CanvasSpace::Camera);
-
-        ui.vbox(|ui| {
-            ui.add_text("egui-style UI")
-                .with_font_size(28)
-                .with_text_color(1.0, 1.0, 1.0, 1.0);
-
-            ui.add_text("Nested containers with closures")
-                .with_font_size(16)
-                .with_text_color(0.8, 0.8, 1.0, 1.0);
-
-            ui.hbox(|ui| {
-                ui.add_button(Some("Click"), None)
-                    .with_on_click(|| println!("Button clicked!"))
-                    .with_size(54.0, 36.0)
-                    .with_background(0.3, 0.5, 0.7, 1.0);
-            });
-
-            ui.add_slider()
-                .with_slider_range(0.0, 100.0)
-                .with_slider_value(50.0)
-                .with_size(300.0, 30.0)
-                .with_background(0.15, 0.15, 0.2, 0.8);
-        });
-
-        ui.add_image()
-            .with_texture(load_image!("assets/Charactert.png"))
-            .with_size(32., 32.);
-
-        world.spawn_bundle((Camera::default(), ActiveCamera, ui));
-    }
-
     let cfg = RunaWindowConfig {
         title: "Runa UI Test".to_string(),
         width: 1280,
         height: 720,
         fullscreen: false,
         vsync: false,
-        show_fps_in_title: false,
+        show_fps_in_title: true,
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world_rc, cfg);
+    let _ = RunaApp::run_with_config(cfg);
 }

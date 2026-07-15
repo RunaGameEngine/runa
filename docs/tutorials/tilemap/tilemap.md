@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Tilemap System
 
 Tilemaps are runtime data components used to build 2D levels. Tiles are painted programmatically through the `Tilemap` API.
@@ -56,3 +64,4 @@ Painting writes directly into the selected object's runtime `Tilemap` component.
 - Use layers for visual organization; layers render back-to-front.
 - Keep tile painting on objects that have both `Tilemap` and `TilemapRenderer`.
 - For large maps, prefer atlas-based tiles over separate textures per cell.
+

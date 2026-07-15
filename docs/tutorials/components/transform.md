@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Transform Component
 
 `Transform` stores an object's position, rotation, and scale.
@@ -78,3 +86,4 @@ fn create_mover() -> Object {
 - use `dt` for frame-rate independent movement
 - for 2D games, keep Z near zero and rotate around Z
 - `Transform` is data; movement logic belongs in scripts or systems
+

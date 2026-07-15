@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Renderer Audit Notes
 
 Current renderer risks and optimization targets for the next pass:
@@ -11,3 +19,4 @@ Current renderer risks and optimization targets for the next pass:
 - World transform matrices are computed recursively during render. Cache dirty world matrices in `World` once hierarchy editing and runtime parenting become more common.
 - Sprite and tile paths are still unlit. Decide deliberately whether 2D should stay unlit by default or receive a separate 2D lighting model.
 - Several renderer match arms intentionally ignore UI/debug fields and currently produce warnings. Clean these up before enforcing warning-free CI.
+

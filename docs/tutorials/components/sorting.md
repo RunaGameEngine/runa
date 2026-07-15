@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Sorting Component
 
 `Sorting` controls 2D render order independently from spawn order.
@@ -24,3 +32,4 @@ Lower `order` values render earlier. Higher `order` values render later and appe
 ## Editor
 
 The inspector exposes `order` directly. The component picker and component card use the `c-Sorting` icon.
+

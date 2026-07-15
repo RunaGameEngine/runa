@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0-alpha.1] - 2026-07-15
+
+### Added
+
+- **ECS camera integration:** `Camera` is now an ECS component — spawn it with `world.spawn((Camera::new_orthographic(...),))`.
+- **`RunaApp::run_with_world(config, world)`:** third `camera` parameter removed; camera lives in the ECS world.
+
+### Changed
+
+- **OCS completely deleted:** `World`, `Object`, `Script`, `ScriptContext`, `Component` trait, `codefirst`, `InteractionSystem` — all removed.
+- **`App` struct simplified:** no more `world_rc`, `camera`, `active_camera_set`, `camera_matrix_override`.
+- **Rendering now queries ECS directly:** `render_ecs_sprites()` and `render_ecs_meshes()` iterate `ecs_world.query::<(R<Transform>, R<SpriteRenderer>)>()`.
+- **`#[system]` API:** takes `&mut runa_ecs::World` directly — no `Script` / `ScriptContext`.
+- **`#[derive(Component)]` removed from `runa_macros`:** only `#[system]` remains.
+- **Examples rewritten:** sandbox (sprite + WASD movement), sandbox_3d (rotating cubes), sandbox_soundtest, sandbox_ui — all use new ECS-only API.
+- **`AGENTS.md` deleted:** cross-references replaced with "See ROADMAP.md".
+- **README.md updated:** quick start, API references, and crate list reflect new ECS-only world.
+
+### Removed
+
+- Entire `runa_core::ocs` module (world, object, script, commands).
+- `runa_core::codefirst`, `runa_core::components::component` (old `Component` trait).
+- `runa_core::systems::interaction_system`.
+- `runa_engine::sprite!` macro, old ECS re-exports from `runa_engine`.
+- `Engine::create_world()` — `engine.rs` is now a no-op struct.
+
 ## [0.6.1-alpha.1] - 2026-07-09
 
 ### Added

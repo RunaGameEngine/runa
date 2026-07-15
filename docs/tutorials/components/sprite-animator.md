@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # SpriteAnimator Component
 
 `SpriteAnimator` plays grid-based sprite sheet animations by updating the `SpriteRenderer` on the same object.
@@ -52,3 +60,4 @@ The inspector exposes:
 - clip name, start frame, end frame, FPS, and loop flag
 
 When an object has both `SpriteRenderer` and `SpriteAnimator`, the editor previews the current sprite sheet frame instead of the full sheet.
+

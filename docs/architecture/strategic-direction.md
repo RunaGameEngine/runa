@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Strategic Direction: Code-First Engine
 
 | Status   | Last updated |
@@ -277,3 +285,4 @@ lessons from the prototype.
 - [Runtime And Editor Update Notes](runtime-and-editor-update.md) —
   retrospective on the editor prototype
 - [Object Model Notes](object-model.md) — how World/ECS works today
+

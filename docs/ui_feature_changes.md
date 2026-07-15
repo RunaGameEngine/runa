@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 UI Feature Changes
 ===================
 
@@ -40,3 +48,4 @@ If you need to revert the functional changes, revert the files listed above. If 
                    examples/sandbox_ui/src/main.rs
 
 Alternatively, review the docs in this folder for details before rolling back.
+

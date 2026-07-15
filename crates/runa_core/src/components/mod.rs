@@ -3,7 +3,6 @@ pub mod audio_listener;
 pub mod audio_source;
 mod camera;
 mod collider2d;
-mod component;
 mod cursor_interactable;
 mod light;
 mod mesh_renderer;
@@ -25,7 +24,6 @@ pub use audio_source::AudioSource;
 pub use camera::Camera;
 pub use camera::ProjectionType;
 pub use collider2d::Collider2D;
-pub use component::{Component, SerializedField, SerializedFieldValue};
 pub use cursor_interactable::CursorInteractable;
 pub use light::{DirectionalLight, PointLight};
 pub use screen_effects::ScreenEffects;
@@ -50,39 +48,3 @@ pub use transform::Transform;
 pub use world_atmosphere::{BackgroundMode, WorldAtmosphere};
 
 pub use ui::{FontId, UiRenderer};
-
-macro_rules! impl_component {
-    ($($ty:ty),+ $(,)?) => {
-        $(
-        impl Component for $ty {
-            fn as_any(&self) -> &dyn std::any::Any {
-                self
-            }
-
-            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-                self
-            }
-        })+
-    };
-}
-
-impl_component!(
-    ActiveCamera,
-    AudioListener,
-    AudioSource,
-    Camera,
-    Collider2D,
-    CursorInteractable,
-    MeshRenderer,
-    ObjectDefinitionInstance,
-    PhysicsCollision,
-    ScreenEffects,
-    SerializedTypeStorage,
-    Sorting,
-    SpriteAnimator,
-    SpriteRenderer,
-    Tilemap,
-    TilemapRenderer,
-    Transform,
-    UiRenderer,
-);

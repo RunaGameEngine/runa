@@ -6,4 +6,4 @@ pub use winit;
 mod app;
 mod runa_app;
 pub use app::RunaWindowConfig;
-pub use runa_app::{GameState, RunaApp};
+pub use runa_app::RunaApp;

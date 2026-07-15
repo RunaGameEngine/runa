@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 UI Feature Implementation Notes
 ================================
 
@@ -31,3 +39,4 @@ Known limitations and next steps
 - The shader heuristic (alpha check) is pragmatic but not perfect; explicit metadata for texture type (font atlas vs image) would be cleaner.
 
 (This document captures implementation details for the current UI feature set. A more complete layout system or egui_dock integration may be explored separately.)
+

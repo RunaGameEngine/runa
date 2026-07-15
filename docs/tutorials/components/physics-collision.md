@@ -1,4 +1,12 @@
-﻿# Collision Components
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
+# Collision Components
 
 Runa currently has simple collision detection, not a full physics engine.
 
@@ -78,3 +86,4 @@ fn create_player() -> Object {
 - it does not push objects apart or solve penetration
 - the current helper methods are intended for simple gameplay movement checks
 - `size` is stored internally as half extents
+

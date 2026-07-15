@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Creating Scripts
 
 Scripts are attachable behavior components in Runa.
@@ -177,3 +185,4 @@ When the editor is unfrozen, editor-visible fields will use opt-in metadata anno
 - use `ctx.commands()` for world mutations
 - use `ctx.world()` / `ctx.find_first_with::<T>()` for simple queries
 - use `late_update()` for follow/attachment behavior that depends on final per-tick positions
+

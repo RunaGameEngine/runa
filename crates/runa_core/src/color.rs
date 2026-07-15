@@ -386,9 +386,4 @@ fn hue_to_0_360(hue: f32) -> f32 {
     if h < 0.0 { h + 360.0 } else { h }
 }
 
-// ─── Implement Component for code-first usage ────────────────
-// Color can be used as an entity-level tint component.
-impl crate::components::Component for Color {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-}
+

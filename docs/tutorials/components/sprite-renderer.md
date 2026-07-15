@@ -1,4 +1,12 @@
-﻿# SpriteRenderer Component
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
+# SpriteRenderer Component
 
 `SpriteRenderer` displays a 2D texture.
 
@@ -72,3 +80,4 @@ For animation, prefer adding `SpriteAnimator` to the same object instead of chan
 - attach `Transform` alongside `SpriteRenderer` for placement
 - keep rendering data in components and behavior in scripts
 - use `sprite!("path")` or `SpriteRenderer::from_path("path")` for convenience
+

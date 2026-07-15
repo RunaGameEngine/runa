@@ -7,6 +7,7 @@ authors.workspace = true
 
 [dependencies]
 runa_core = { path = "../runa_core" }
+runa_ecs = { path = "../runa_ecs" }
 runa_render = { path = "../runa_render" }
 runa_render_api = { path = "../runa_render_api" }
 runa_asset = { path = "../runa_asset" }

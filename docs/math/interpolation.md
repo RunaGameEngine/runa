@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Interpolation & Smoothing
 
 Runa provides a set of interpolation, easing, and smoothing utilities modelled after Unity's `Mathf`.
@@ -152,3 +160,4 @@ let v = 5.0_f32.move_towards(10.0, 2.0); // 7.0
 | `a.lerp_unclamped(b, t)` | Unclamped linear interpolation |
 | `a.smooth_step(b, t)` | Hermite interpolation |
 | `a.move_towards(b, max_delta)` | Step towards by max_delta |
+

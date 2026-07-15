@@ -1,38 +1,47 @@
-// #![windows_subsystem = "windows"]
+use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
+use runa_engine::runa_core::components::{Camera, SpriteRenderer, Transform};
+use runa_engine::runa_core::glam::Vec3;
+use runa_engine::runa_core::input::InputState;
+use runa_engine::runa_ecs;
+use runa_engine::system;
+use winit::keyboard::KeyCode;
 
-use runa_core::{
-    components::{BackgroundMode, WorldAtmosphere},
-    Color,
-};
-use runa_engine::{
-    runa_app::{RunaApp, RunaWindowConfig},
-    Engine,
-};
+#[system]
+fn player_movement(world: &mut runa_ecs::World) {
+    let speed = 8.0;
+    let dt = 1.0 / 60.0;
 
-mod collider_demo;
-mod player;
-mod tester1;
-mod tilemap_tester;
+    for (_, transform) in world.query_mut::<runa_ecs::W<Transform>>() {
+        let mut dir = Vec3::ZERO;
+        if InputState::is_key_pressed(KeyCode::KeyW) {
+            dir.y += 1.0;
+        }
+        if InputState::is_key_pressed(KeyCode::KeyS) {
+            dir.y -= 1.0;
+        }
+        if InputState::is_key_pressed(KeyCode::KeyD) {
+            dir.x += 1.0;
+        }
+        if InputState::is_key_pressed(KeyCode::KeyA) {
+            dir.x -= 1.0;
+        }
+        transform.position += dir.normalize_or_zero() * speed * dt;
+    }
+}
 
 fn main() {
-    let world_rc = Engine::create_world();
+    let mut world = runa_ecs::World::new();
 
-    {
-        let mut world = world_rc.borrow_mut();
-        world.set_atmosphere(WorldAtmosphere {
-            ambient_color: Color::BLACK,
-            ambient_intensity: 1.0,
-            background_intensity: 1.0,
-            background: BackgroundMode::SolidColor {
-                color: Color::rgb(0.5, 0.5, 0.5),
-            },
-        });
-        world.spawn_object(tilemap_tester::create_tilemap_tester());
-        world.spawn_object(tester1::create_rotating_sprite());
-        world.spawn_object(collider_demo::create_collider_demo_box());
-        world.spawn_object(player::create_player());
-        world.spawn_object(player::create_player_camera());
-    }
+    let texture = runa_asset::load_image!("assets/art/Charactert.png");
+    world.spawn((
+        Transform {
+            position: Vec3::new(0.0, 0.0, 0.0),
+            ..Transform::default()
+        },
+        SpriteRenderer::new(Some(texture)),
+    ));
+
+    world.spawn((Camera::new_orthographic(320.0, 180.0),));
 
     let config = RunaWindowConfig {
         title: "Runa Sandbox".to_string(),
@@ -44,5 +53,5 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world_rc, config);
+    let _ = RunaApp::run_with_world(config, world);
 }

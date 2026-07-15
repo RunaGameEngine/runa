@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Creating Your First App
 
 This tutorial shows the smallest useful Runa application using the code-first API.
@@ -215,3 +223,4 @@ fn main() {
 - [Creating Scripts](../scripts/creating-scripts.md)
 - [Creating a 2D Game](creating-a-2d-game.md)
 - [Creating a 3D Game](creating-a-3d-game.md)
+

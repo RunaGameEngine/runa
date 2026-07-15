@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Runa Engine Tutorials
 
 These guides assume the current runtime model:
@@ -81,3 +89,4 @@ This style keeps:
 - editor dependency out of runtime code
 
 It also gives Runa a future path for editor tools without moving the source of truth away from the runtime object model.
+

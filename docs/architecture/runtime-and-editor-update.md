@@ -1,3 +1,11 @@
+<!--
+?? DEPRECATED � ECS Migration in Progress
+
+This documentation refers to the old OCS (runa_core::ocs) system.
+The engine is migrating to a new archetype-based ECS (runa_ecs crate).
+
+See ROADMAP.md for the current migration track.
+-->
 # Runtime And Editor Update Notes (Archived)
 
 > **This document is archived.** The editor, registry, and serialization system
@@ -53,3 +61,4 @@ This document summarizes the larger runtime/editor changes that landed in `0.6.0
 - Runtime pixel snapping is not implemented yet
 - Some warnings remain in `runa_render` and `runa_editor`
 - Prefab/template unification is still incomplete
+

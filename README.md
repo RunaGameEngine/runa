@@ -1,3 +1,9 @@
+<!--
+⚠️ README IS BEING REWRITTEN
+
+The old OCS was removed in favor of `runa_ecs`. See ROADMAP.md.
+-->
+
 # Runa Engine
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
@@ -18,34 +24,30 @@ Runa Engine is an experimental **code-first** Rust game engine. The primary way 
 
 Runa is a workspace, not just one crate. It currently includes:
 
-- `runa_core`: world, objects, components, scripts, input, audio
+- `runa_ecs`: archetype-based ECS (BlobVec storage, Fetch GAT queries, `#[system]` auto-registration)
+- `runa_core`: components, input, audio, console
 - `runa_app`: runtime app loop and window bootstrap
 - `runa_render`: `wgpu` renderer
 - `runa_asset`: asset loading helpers
-- `runa_project`: project and world serialization/scaffolding
-- `runa_editor`: optional editor (frozen — see [strategic direction](docs/architecture/strategic-direction.md))
 - `runa_engine`: umbrella crate for normal game-side usage
 
 The runtime is code-first:
 
-- `World` owns `Object`s
-- `Object` is a component container with `ObjectId`
-- `Transform` exists on every object by default
-- scripts are attachable behavior components
-- objects are composed explicitly in Rust code
-- no registration step needed — just derive `Component` and spawn
+- `runa_ecs::World` stores entities in archetypes
+- components are plain Rust structs
+- behavior is written with `#[system]` functions
+- entities are composed explicitly in Rust code
+- no registration step needed — just `world.spawn((components))`
 
 ## What Works Today
 
 ### Runtime
 
-- object/component world model
-- attachable script behaviors with `start()`, `update()`, and `late_update()`
-- `ObjectId`-based lookup and simple queries
-- deferred world commands from scripts
-- `world.spawn_bundle((...))` for composing components
-- `world.spawn_object(Object::new(...))` for named entities
-- `world.find_all_with::<T>()` and `world.find_first_with::<T>()` for queries
+- archetype-based ECS with `runa_ecs::World`
+- `#[system]` auto-registration via `inventory`
+- `world.spawn((...))` for composing components
+- typed queries with `world.query::<(R<A>, R<B>)>()` and `world.query_mut::<W<A>>()`
+- fixed-timestep scheduler in the app loop
 
 ### Rendering
 
@@ -63,20 +65,14 @@ The runtime is code-first:
 - simple 2D AABB collision detection with `Collider2D`
 - cursor interaction
 
-### Tooling
-
-- `.runaproj` project manifest
-- world save/load in RON
-- project scaffolding
-- experimental editor (frozen — strategic pause)
-- editor-side build flow with project/build settings
-
 ## Current Limits
 
 - single runtime window only
 - no full physics engine
 - no mature animation pipeline
 - 3D support is still basic
+- ECS resources (`Time`, etc.) not yet implemented
+- no command queue for deferred spawn/despawn
 - generic serialization is not finished yet
 - editor is frozen as a prototype (will be rewritten after core stabilises)
 - API stability is not guaranteed between alpha revisions
@@ -96,11 +92,11 @@ cargo run -p sandbox
 
 ### Add Runa to a new project
 
-Current latest public tag: [`v0.6.0-alpha.4`](https://github.com/RunaGameEngine/runa/releases/tag/v0.6.0-alpha.4)
+Current latest public tag: [`v0.7.0-alpha.1`](https://github.com/RunaGameEngine/runa/releases/tag/v0.7.0-alpha.1)
 
 ```toml
 [dependencies]
-runa_engine = { git = "https://github.com/RunaGameEngine/runa.git", tag = "v0.6.0-alpha.4" }
+runa_engine = { git = "https://github.com/RunaGameEngine/runa.git", tag = "v0.7.0-alpha.1" }
 ```
 
 If you want to track the repository head instead of a tag:
@@ -121,12 +117,12 @@ use runa_engine::{
 };
 
 fn main() {
-    let mut world = World::new();
+    let mut world = runa_engine::runa_ecs::World::new();
 
-    // Spawn an object with a bundle of components
-    world.spawn_bundle((
+    world.spawn((
         Transform::default(),
         SpriteRenderer::new(None),
+        Camera::new_orthographic(320.0, 180.0),
     ));
 
     let config = RunaWindowConfig {
@@ -139,7 +135,7 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_config(world, config);
+    let _ = RunaApp::run_with_world(config, world);
 }
 ```
 
@@ -148,27 +144,25 @@ Typical gameplay object:
 ```rust
 use runa_engine::prelude::*;
 use runa_engine::runa_core::components::*;
+use runa_engine::system;
 
-#[derive(Component)]
 struct PlayerController {
     speed: f32,
 }
 
-impl Script for PlayerController {
-    fn update(&mut self, ctx: &mut ScriptContext, dt: f32) {
-        if let Some(transform) = ctx.get_component_mut::<Transform>() {
-            transform.position += Vec3::X * self.speed * dt;
-        }
+#[system]
+fn player_update(world: &mut runa_ecs::World) {
+    let dt = 1.0 / 60.0;
+    for (_, (transform,)) in world.query_mut::<runa_ecs::W<Transform>>() {
+        transform.position += runa_engine::runa_core::glam::Vec3::X * 0.25 * dt;
     }
 }
 
-fn setup(world: &mut World) {
-    world.spawn_bundle((
+fn setup(world: &mut runa_ecs::World) {
+    world.spawn((
         Transform::default(),
         Camera::new_orthographic(320.0, 180.0),
-        ActiveCamera,
-        SpriteRenderer::new(Some(load_image!("assets/art/player.png"))),
-        PlayerController { speed: 0.25 },
+        SpriteRenderer::new(Some(runa_asset::load_image!("assets/art/player.png"))),
     ));
 }
 ```
@@ -176,12 +170,12 @@ fn setup(world: &mut World) {
 ## How To Start Making A Game
 
 1. Create a `World`.
-2. Define your components with `#[derive(Component)]`.
-3. Implement `Script` for behavior components.
-4. Spawn objects with `world.spawn_bundle((...))` or `world.spawn_object(Object::new("name").with(...))`.
-5. Run the app with `RunaApp::run_with_config(...)`.
+2. Define your components as plain structs.
+3. Write behavior with `#[system] fn my_system(world: &mut World)`.
+4. Spawn entities with `world.spawn((...))`.
+5. Run the app with `RunaApp::run_with_world(config, world)`.
 
-No registration step is needed — just derive `Component` and spawn.
+No registration step is needed — just `world.spawn((components))`.
 
 Recommended project shape:
 
@@ -196,12 +190,9 @@ assets/
 
 Good practice in Runa:
 
-- keep object composition in typed factory functions
-- keep behavior in scripts
+- keep entity composition in typed factory functions
+- keep behavior in `#[system]` functions
 - use typed marker/data components instead of string tags
-- use `ObjectId` and queries for object communication
-
-Script fields intended for editor/runtime serialization must be marked explicitly with `#[serialize_field]` when using the derive macros. For script/component default values visible to the editor, the recommended path is `impl Default` on the type.
 
 > **Editor note:** The editor is currently frozen as a prototype (see
 > [`strategic-direction.md`](docs/architecture/strategic-direction.md)).
