@@ -40,6 +40,10 @@ pub struct BlobVec {
 }
 
 impl BlobVec {
+    /// # Safety
+    ///
+    /// `T` must match the component type that was originally stored in this column.
+    /// Misusing the type parameter leads to undefined behavior.
     pub unsafe fn new<T: 'static>() -> Self {
         Self {
             info: ComponentInfo::of::<T>(),
@@ -48,23 +52,32 @@ impl BlobVec {
     }
 
     pub fn new_with_info(info: ComponentInfo) -> Self {
-        Self {
-            info,
-            data: Vec::new(),
-        }
+        Self { info, data: Vec::new() }
     }
 
     pub fn info(&self) -> &ComponentInfo {
         &self.info
     }
 
-    pub fn get(&self, index: usize) -> *mut u8 {
-        unsafe { self.data.as_ptr().add(index * self.info.layout.size()) as *mut u8 }
+    pub fn get(&self, index: usize) -> Option<*mut u8> {
+        let size = self.info.layout.size();
+        if index >= self.len() {
+            return None;
+        }
+        unsafe { Some(self.data.as_ptr().add(index * size) as *mut u8) }
     }
 
     pub fn len(&self) -> usize {
         let size = self.info.layout.size();
-        if size == 0 { self.data.len() } else { self.data.len() / size }
+        if size == 0 {
+            self.data.len()
+        } else {
+            self.data.len() / size
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn as_ptr(&self) -> *const u8 {
@@ -75,6 +88,10 @@ impl BlobVec {
         self.data.as_mut_ptr()
     }
 
+    /// # Safety
+    ///
+    /// `value` must point to a valid initialised value of the component type
+    /// stored in this column. The value is copied (not moved) into storage.
     pub unsafe fn push(&mut self, value: *mut u8) {
         let size = self.info.layout.size();
         if size == 0 {
@@ -82,13 +99,17 @@ impl BlobVec {
             return;
         }
         let offset = self.data.len();
-        self.data.reserve(size);
+        let new_len = offset + size;
+        self.data.resize(new_len, 0);
         unsafe {
-            self.data.set_len(offset + size);
             std::ptr::copy_nonoverlapping(value, self.data.as_mut_ptr().add(offset), size);
         }
     }
 
+    /// # Safety
+    ///
+    /// `index` must be in-bounds. After removal the last element is moved into
+    /// `index`'s slot, so any existing reference into slot `index` is invalidated.
     pub unsafe fn swap_remove(&mut self, index: usize) {
         let size = self.info.layout.size();
         if size == 0 {

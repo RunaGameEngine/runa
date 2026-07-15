@@ -737,7 +737,7 @@ impl UiRenderer {
             if node.interaction != new {
                 node.interaction = new;
                 if let Some(ref mut cb) = node.interaction_callback {
-                    if let Ok(mut cb) = cb.lock() {
+                    if let Ok(cb) = cb.get_mut() {
                         cb(new);
                     }
                 }

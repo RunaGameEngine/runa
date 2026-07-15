@@ -78,6 +78,7 @@ pub struct Renderer<'window> {
 
     textures: HashMap<usize, Arc<GpuTexture>>,
     nearest_sampler: wgpu::Sampler,
+    #[allow(dead_code)]
     linear_sampler: wgpu::Sampler,
 
     font_manager: FontManager,
@@ -365,9 +366,11 @@ impl<'window> Renderer<'window> {
         });
 
         let uniform_alignment = device.limits().min_uniform_buffer_offset_alignment;
-        let uniform_stride = ((size_of::<MeshUniforms>() as u32 + uniform_alignment - 1)
-            / uniform_alignment
-            * uniform_alignment) as u64;
+        let uniform_stride = u64::from(
+            (size_of::<MeshUniforms>() as u32)
+                .div_ceil(uniform_alignment)
+                * uniform_alignment,
+        );
         const INITIAL_MESH_UNIFORM_SIZE: u64 = 65536; // 64KB — room for ~40 meshes
         let mesh_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Mesh Uniform Buffer"),
@@ -989,7 +992,7 @@ impl<'window> Renderer<'window> {
 
                     // Add textured vertices for this image using normalized UVs
                     // For regular textures (not font atlas) flip V coordinate because texture assets are top-left origin
-                    let entry = ui_image_vertices_map.entry(key).or_insert_with(Vec::new);
+                    let entry = ui_image_vertices_map.entry(key).or_default();
                     let u0 = uv_n[0];
                     let v0 = uv_n[1];
                     let uw = uv_n[2];
@@ -1461,6 +1464,7 @@ impl<'window> Renderer<'window> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn emit_text_vertices(
         &self,
         text: &str,

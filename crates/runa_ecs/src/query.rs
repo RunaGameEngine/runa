@@ -8,6 +8,11 @@ use crate::Entity;
 pub struct R<T>(PhantomData<T>);
 pub struct W<T>(PhantomData<T>);
 
+/// # Safety
+///
+/// Implementations must return correct type IDs from `type_ids()` and valid
+/// references from `extract_const` / `extract_mut`. Invalid pointers or wrong
+/// type IDs lead to undefined behavior.
 pub unsafe trait Fetch: 'static {
     type Item<'w>;
     fn type_ids() -> Vec<TypeId>;

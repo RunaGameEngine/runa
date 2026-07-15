@@ -60,13 +60,13 @@ impl CursorInteractable {
     pub fn update_callbacks(&mut self) {
         if self.is_hovered && !self.was_hovered {
             if let Some(ref mut callback) = self.on_hover_enter {
-                if let Ok(mut cb) = callback.lock() {
+                if let Ok(cb) = callback.get_mut() {
                     cb();
                 }
             }
         } else if !self.is_hovered && self.was_hovered {
             if let Some(ref mut callback) = self.on_hover_exit {
-                if let Ok(mut cb) = callback.lock() {
+                if let Ok(cb) = callback.get_mut() {
                     cb();
                 }
             }

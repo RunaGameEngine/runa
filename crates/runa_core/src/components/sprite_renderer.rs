@@ -1,34 +1,31 @@
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
-use runa_asset::Handle;
-use runa_asset::TextureAsset;
+use runa_asset::{Handle, TextureAsset};
 
-pub const DEFAULT_SPRITE_PIXELS_PER_UNIT: f32 = 16.0;
+pub const DEFAULT_SPRITE_PIXELS_PER_UNIT: f32 = 100.0;
 
+/// 2D sprite component — draws a textured quad.
+#[derive(Clone)]
 pub struct SpriteRenderer {
-    texture: OnceLock<Option<Handle<TextureAsset>>>,
+    pub texture: OnceLock<Option<Handle<TextureAsset>>>,
     pub texture_path: Option<String>,
-    // Texture size in pixels is converted into world units through this value.
-    // Example: a 16px sprite at 16 PPU occupies 1 world unit before object scale.
     pub pixels_per_unit: f32,
-    // Normalized texture region: x, y, width, height.
     pub uv_rect: [f32; 4],
 }
 
 impl SpriteRenderer {
-    /// Create from a pre-loaded handle. `texture_path` is extracted from the handle's metadata.
+    pub const FULL_UV_RECT: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
+
+    /// Create a new sprite renderer with optional texture.
     pub fn new(texture: Option<Handle<TextureAsset>>) -> Self {
         let texture_path = texture
             .as_ref()
             .map(|handle| handle.inner.path.to_string_lossy().to_string());
-
         let lock = OnceLock::new();
-        if let Some(h) = texture {
-            let _ = lock.set(Some(h));
+        if let Some(t) = texture {
+            let _ = lock.set(Some(t));
         }
-
         Self {
             texture: lock,
             texture_path,
@@ -37,10 +34,8 @@ impl SpriteRenderer {
         }
     }
 
-    /// Create with a file path. The texture is loaded lazily on first render.
-    ///
-    /// `path` is resolved relative to the process working directory.
-    pub fn from_path(path: impl Into<String>) -> Self {
+    /// Create from file path (lazy-load on first access).
+    pub fn from_path(path: &str) -> Self {
         Self {
             texture: OnceLock::new(),
             texture_path: Some(path.into()),
@@ -48,17 +43,6 @@ impl SpriteRenderer {
             uv_rect: Self::FULL_UV_RECT,
         }
     }
-
-    pub fn default() -> Self {
-        Self {
-            texture: OnceLock::new(),
-            texture_path: None,
-            pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
-            uv_rect: Self::FULL_UV_RECT,
-        }
-    }
-
-    pub const FULL_UV_RECT: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
 
     /// Get the texture handle, loading from `texture_path` on first access if needed.
     pub fn texture(&self) -> Option<&Handle<TextureAsset>> {
@@ -89,7 +73,6 @@ impl SpriteRenderer {
         let texture_path = texture
             .as_ref()
             .map(|handle| handle.inner.path.to_string_lossy().to_string());
-
         let lock = OnceLock::new();
         if let Some(h) = texture {
             let _ = lock.set(Some(h));
@@ -117,5 +100,16 @@ impl SpriteRenderer {
             texture.inner.width as f32 * self.uv_rect[2].max(f32::EPSILON),
             texture.inner.height as f32 * self.uv_rect[3].max(f32::EPSILON),
         ])
+    }
+}
+
+impl Default for SpriteRenderer {
+    fn default() -> Self {
+        Self {
+            texture: OnceLock::new(),
+            texture_path: None,
+            pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
+            uv_rect: Self::FULL_UV_RECT,
+        }
     }
 }

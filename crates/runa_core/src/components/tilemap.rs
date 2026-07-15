@@ -289,6 +289,10 @@ impl TilemapRenderer {
     }
 }
 
+impl Default for TilemapRenderer {
+    fn default() -> Self { Self }
+}
+
 #[derive(Clone)]
 pub struct TilemapAtlas {
     pub texture: Arc<TextureAsset>,

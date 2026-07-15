@@ -201,7 +201,7 @@ impl<'window> App<'window> {
                         self.config.title, self.current_fps
                     ));
                 } else {
-                    window.set_title(&format!("{}", self.config.title));
+                    window.set_title(&self.config.title);
                 }
             }
         }
@@ -212,7 +212,7 @@ impl<'window> ApplicationHandler for App<'window> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() {
             let win_attr = Window::default_attributes()
-                .with_title(&format!("{}", self.config.title))
+                .with_title(self.config.title.to_string())
                 .with_visible(false);
             let window = Arc::new(
                 event_loop
@@ -230,16 +230,11 @@ impl<'window> ApplicationHandler for App<'window> {
                         eprintln!("Failed to load window icon '{}': {}", icon_path, e);
                     }
                 }
-            } else {
-                match runa_asset::load_window_icon(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/assets/icon.png"
-                )) {
-                    Ok(icon) => {
-                        window.set_window_icon(Some(icon));
-                    }
-                    Err(_) => {}
-                }
+            } else if let Ok(icon) = runa_asset::load_window_icon(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/icon.png"
+            )) {
+                window.set_window_icon(Some(icon));
             }
 
             runa_core::input::initialize_window_state(
@@ -384,13 +379,13 @@ impl<'window> ApplicationHandler for App<'window> {
                 input_state.mouse_position = (position.x as f32, position.y as f32);
             }
 
-            WindowEvent::MouseWheel { delta, .. } => match delta {
-                MouseScrollDelta::LineDelta(_, y) => {
-                    let mut input_state = InputState::current_mut();
-                    input_state.mouse_wheel_delta = y;
-                }
-                _ => {}
-            },
+            WindowEvent::MouseWheel {
+                delta: MouseScrollDelta::LineDelta(_, y),
+                ..
+            } => {
+                let mut input_state = InputState::current_mut();
+                input_state.mouse_wheel_delta = y;
+            }
 
             WindowEvent::MouseInput { state, button, .. } => {
                 let mut input_state = InputState::current_mut();

@@ -495,7 +495,7 @@ impl Console {
                 if args.is_empty() {
                     self.add_message(format!("Current timescale: {:.2}", self.time_scale));
                 } else if let Ok(value) = args[0].parse::<f32>() {
-                    self.time_scale = value.max(0.01).min(100.0);
+                    self.time_scale = value.clamp(0.01, 100.0);
                     self.add_message(format!("Timescale set to {:.2}", self.time_scale));
                 } else {
                     self.add_message(format!("Invalid value: '{}'. Use a number (0.01-100.0).", args[0]));
@@ -737,7 +737,7 @@ impl Console {
 
         if let Key::Character(c) = &event.logical_key {
             for ch in c.chars() {
-                if ch >= ' ' && ch <= '~' {
+                if (' '..='~').contains(&ch) {
                     self.input_buffer.push(ch);
                 }
             }

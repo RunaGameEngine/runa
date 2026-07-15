@@ -3,6 +3,7 @@ use runa_asset::{Handle, TextureAsset};
 use std::sync::Mutex;
 
 type UiColor = [f32; 4];
+type InteractionCallback = Mutex<Box<dyn FnMut(InteractionState) + Send>>;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UiRect {
@@ -35,7 +36,7 @@ pub struct UiNode {
     pub computed: ComputedLayout,
     pub visible: bool,
     pub interaction: InteractionState,
-    pub interaction_callback: Option<Mutex<Box<dyn FnMut(InteractionState) + Send>>>,
+    pub interaction_callback: Option<InteractionCallback>,
 }
 
 impl UiNode {
@@ -203,34 +204,24 @@ pub struct ImageProps {
     pub uv: [f32; 4],
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub enum TextAlign {
+    #[default]
     Left,
     Center,
     Right,
 }
 
-impl Default for TextAlign {
-    fn default() -> Self {
-        TextAlign::Left
-    }
-}
-
 pub use runa_render_api::FontId;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum InteractionState {
+    #[default]
     None,
     Hovered,
     Pressed,
     Dragging,
     Clicked,
-}
-
-impl Default for InteractionState {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

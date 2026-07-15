@@ -74,7 +74,7 @@ impl World {
         let loc = self.entity_location.get(&entity)?;
         let arch = self.archetypes.get(loc.archetype_id.0 as usize)?;
         let col = arch.column(TypeId::of::<T>())?;
-        let ptr = col.blob.get(loc.row as usize) as *const T;
+        let ptr = col.blob.get(loc.row as usize)? as *const T;
         unsafe { Some(&*ptr) }
     }
 
@@ -82,7 +82,7 @@ impl World {
         let loc = self.entity_location.get(&entity)?;
         let arch = self.archetypes.get_mut(loc.archetype_id.0 as usize)?;
         let col = arch.column_mut(TypeId::of::<T>())?;
-        let ptr = col.blob.get(loc.row as usize) as *mut T;
+        let ptr = col.blob.get(loc.row as usize)? as *mut T;
         unsafe { Some(&mut *ptr) }
     }
 

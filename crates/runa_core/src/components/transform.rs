@@ -1,6 +1,6 @@
 use glam::{Quat, Vec3};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Transform {
     pub position: Vec3,
     pub rotation: Quat,
@@ -12,17 +12,6 @@ pub struct Transform {
 }
 
 impl Transform {
-    /// position: Vec2::ZERO, rotation: Quat::IDENTITY, scale: Vec2::ONE,
-    pub fn default() -> Self {
-        Self {
-            position: Vec3::ZERO,
-            rotation: Quat::IDENTITY,
-            scale: Vec3::ONE,
-            previous_position: Vec3::ZERO,
-            previous_rotation: Quat::IDENTITY,
-        }
-    }
-
     pub fn rotate_x(&mut self, angle: f32) {
         self.rotation *= Quat::from_rotation_x(angle.to_radians());
     }
