@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use runa_core::components::ui::UiRenderer;
 use runa_core::components::{Camera, MeshRenderer, SpriteRenderer, Transform};
 use runa_core::input::InputState;
 use runa_core::{glam, Console};
-use runa_ecs::R;
+use runa_ecs::{R, W};
 use runa_render::Renderer;
 use runa_render_api::{Mesh3dParams, RenderQueue};
 
@@ -97,6 +98,22 @@ impl<'window> App<'window> {
         }
     }
 
+    fn render_ecs_ui(&mut self, camera: &Camera) {
+        let viewport = glam::Vec2::new(
+            camera.viewport_size.0.max(1) as f32,
+            camera.viewport_size.1.max(1) as f32,
+        );
+        let camera_ref = Some(camera);
+
+        for (_, ui) in self.ecs_world.query_mut::<W<UiRenderer>>() {
+            ui.layout(viewport, camera_ref);
+            ui.process_interaction(camera_ref);
+        }
+        for (_, ui) in self.ecs_world.query::<R<UiRenderer>>() {
+            ui.build_render_commands(&mut self.queue, camera_ref, None);
+        }
+    }
+
     fn render_ecs_meshes(&mut self) {
         let Self { ref ecs_world, ref mut queue, .. } = self;
         for (_, (transform, renderer)) in ecs_world.query::<(R<Transform>, R<MeshRenderer>)>() {
@@ -142,6 +159,7 @@ impl<'window> App<'window> {
         self.queue.clear();
         self.render_ecs_sprites();
         self.render_ecs_meshes();
+        self.render_ecs_ui(&camera);
 
         if let (Some(renderer), Some(window)) = (&mut self.renderer, &self.window) {
             self.console.current_fps = self.current_fps;
