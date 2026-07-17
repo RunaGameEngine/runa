@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use runa_core::components::ui::UiRenderer;
-use runa_core::components::{Camera, MeshRenderer, SpriteRenderer, Transform};
+use runa_core::components::{
+    ui::UiRenderer, BackgroundMode, Camera, MeshRenderer, SpriteRenderer, Transform, WorldAtmosphere,
+};
 use runa_core::input::InputState;
 use runa_core::{glam, Console};
 use runa_ecs::{R, W};
@@ -82,7 +83,11 @@ impl<'window> App<'window> {
     }
 
     fn render_ecs_sprites(&mut self) {
-        let Self { ref ecs_world, ref mut queue, .. } = self;
+        let Self {
+            ref ecs_world,
+            ref mut queue,
+            ..
+        } = self;
         for (_, (transform, sprite)) in ecs_world.query::<(R<Transform>, R<SpriteRenderer>)>() {
             if let Some(tex) = sprite.texture() {
                 queue.draw_sprite(
@@ -90,9 +95,10 @@ impl<'window> App<'window> {
                     transform.position,
                     transform.rotation,
                     transform.scale,
-                    [1.0; 4],
+                    sprite.color,
                     sprite.uv_rect,
                     0,
+                    sprite.replace_color,
                 );
             }
         }
@@ -109,15 +115,29 @@ impl<'window> App<'window> {
             ui.layout(viewport, camera_ref);
             ui.process_interaction(camera_ref);
         }
-        for (_, ui) in self.ecs_world.query::<R<UiRenderer>>() {
+        let mut ui_with_transform: Vec<u64> = Vec::new();
+        for (entity, (ui, transform)) in self.ecs_world.query::<(R<UiRenderer>, R<Transform>)>() {
+            ui.build_render_commands(&mut self.queue, camera_ref, Some(transform));
+            ui_with_transform.push(entity);
+        }
+        for (entity, ui) in self.ecs_world.query::<R<UiRenderer>>() {
+            if ui_with_transform.contains(&entity) {
+                continue;
+            }
             ui.build_render_commands(&mut self.queue, camera_ref, None);
         }
     }
 
     fn render_ecs_meshes(&mut self) {
-        let Self { ref ecs_world, ref mut queue, .. } = self;
+        let Self {
+            ref ecs_world,
+            ref mut queue,
+            ..
+        } = self;
         for (_, (transform, renderer)) in ecs_world.query::<(R<Transform>, R<MeshRenderer>)>() {
-            let Some(handle) = &renderer.mesh else { continue };
+            let Some(handle) = &renderer.mesh else {
+                continue;
+            };
             let mesh = &handle.inner;
             let model = glam::Mat4::from_scale_rotation_translation(
                 transform.scale,
@@ -125,12 +145,16 @@ impl<'window> App<'window> {
                 transform.position,
             );
             let mesh_id = mesh.vertices.as_ptr() as u64;
-            let vtx: Vec<runa_render_api::Vertex3D> = mesh.vertices.iter().map(|v| runa_render_api::Vertex3D {
-                position: v.position,
-                normal: v.normal,
-                uv: v.uv,
-                color: v.color,
-            }).collect();
+            let vtx: Vec<runa_render_api::Vertex3D> = mesh
+                .vertices
+                .iter()
+                .map(|v| runa_render_api::Vertex3D {
+                    position: v.position,
+                    normal: v.normal,
+                    uv: v.uv,
+                    color: v.color,
+                })
+                .collect();
             queue.draw_mesh_3d(Mesh3dParams {
                 mesh_id,
                 vertices: vtx,
@@ -157,6 +181,42 @@ impl<'window> App<'window> {
 
         // Phase 1: populate queue from ECS (no renderer borrow)
         self.queue.clear();
+
+        // Apply WorldAtmosphere if present (must be after clear which resets atmosphere)
+        if let Some((_, atmosphere)) = self
+            .ecs_world
+            .query::<runa_ecs::R<WorldAtmosphere>>()
+            .next()
+        {
+            use runa_render_api::BackgroundModeData;
+            let bg = match atmosphere.background {
+                BackgroundMode::SolidColor { color } => {
+                    BackgroundModeData::SolidColor {
+                        color: color.to_vec3(),
+                    }
+                }
+                BackgroundMode::VerticalGradient {
+                    zenith_color,
+                    horizon_color,
+                    ground_color,
+                    horizon_height,
+                    smoothness,
+                } => BackgroundModeData::VerticalGradient {
+                    zenith_color: zenith_color.to_vec3(),
+                    horizon_color: horizon_color.to_vec3(),
+                    ground_color: ground_color.to_vec3(),
+                    horizon_height,
+                    smoothness,
+                },
+                BackgroundMode::Sky => BackgroundModeData::Sky,
+            };
+            self.queue.set_atmosphere(runa_render_api::AtmosphereData {
+                ambient_color: atmosphere.ambient_color.to_vec3(),
+                ambient_intensity: atmosphere.ambient_intensity,
+                background_intensity: atmosphere.background_intensity,
+                background: bg,
+            });
+        }
         self.render_ecs_sprites();
         self.render_ecs_meshes();
         self.render_ecs_ui(&camera);
@@ -193,8 +253,8 @@ impl<'window> App<'window> {
                     / now.duration_since(self.last_fps_update).as_secs_f32();
                 self.frame_count = 0;
                 self.last_fps_update = now;
-                self.config.title = runa_core::input::window_title()
-                    .unwrap_or_else(|| self.config.title.clone());
+                self.config.title =
+                    runa_core::input::window_title().unwrap_or_else(|| self.config.title.clone());
                 if self.config.show_fps_in_title {
                     window.set_title(&format!(
                         "{} - {:.1} FPS",

@@ -19,7 +19,7 @@ exclude = ["templates"]
 resolver = "2"
 
 [workspace.package]
-version = "0.7.0-alpha.4"
+version = "0.7.1-alpha.1"
 authors = ["Nik Neza <nik.n.neza@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -32,5 +32,6 @@ pollster = { version = "0.4" }
 wgpu = { version = "29.0" }
 glam = { version = "0.32.1" }
 gltf = { version = "1.4", features = ["import"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }

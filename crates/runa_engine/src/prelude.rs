@@ -26,3 +26,5 @@ pub use runa_core::input::{
     is_mouse_button_just_released,
 };
 pub use runa_core::KeyCode;
+
+pub use crate::scene::{SaveData, Scene, SceneDescriptor, SceneManager};

@@ -12,6 +12,10 @@ pub struct SpriteRenderer {
     pub texture_path: Option<String>,
     pub pixels_per_unit: f32,
     pub uv_rect: [f32; 4],
+    pub color: [f32; 4],
+    /// When true, output `color` directly (using texture alpha for transparency).
+    /// When false, multiply texture with `color` (legacy behavior).
+    pub replace_color: bool,
 }
 
 impl SpriteRenderer {
@@ -31,6 +35,8 @@ impl SpriteRenderer {
             texture_path,
             pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
             uv_rect: Self::FULL_UV_RECT,
+            color: [1.0; 4],
+            replace_color: false,
         }
     }
 
@@ -41,6 +47,8 @@ impl SpriteRenderer {
             texture_path: Some(path.into()),
             pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
             uv_rect: Self::FULL_UV_RECT,
+            color: [1.0; 4],
+            replace_color: false,
         }
     }
 
@@ -110,6 +118,8 @@ impl Default for SpriteRenderer {
             texture_path: None,
             pixels_per_unit: DEFAULT_SPRITE_PIXELS_PER_UNIT,
             uv_rect: Self::FULL_UV_RECT,
+            color: [1.0; 4],
+            replace_color: false,
         }
     }
 }

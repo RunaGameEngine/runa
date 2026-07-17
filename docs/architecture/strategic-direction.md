@@ -6,10 +6,11 @@ The engine is migrating to a new archetype-based ECS (runa_ecs crate).
 
 See ROADMAP.md for the current migration track.
 -->
+
 # Strategic Direction: Code-First Engine
 
 | Status   | Last updated |
-|----------|--------------|
+| -------- | ------------ |
 | Accepted | 2026-06-23   |
 
 ## Decision
@@ -27,13 +28,13 @@ codified.
 The project started with a dual vision: "code-first runtime + convenient
 editor." In practice this created tension:
 
-| Area | Code-first | Editor |
-|------|-----------|--------|
-| **Size** | ~11k lines (core + engine layers) | ~11k lines |
-| **Coupling** | Self-contained | Tight to egui + wgpu + winit specifics |
-| **API pressure** | Designed for script ergonomics | Designed for reflection + serialization |
-| **Maintenance** | Low | High (egui API churn, GPU state, DPI) |
-| **User base** | Primary (Rust gamedevs) | Secondary (non-Rust users) |
+| Area             | Code-first                        | Editor                                  |
+| ---------------- | --------------------------------- | --------------------------------------- |
+| **Size**         | ~11k lines (core + engine layers) | ~11k lines                              |
+| **Coupling**     | Self-contained                    | Tight to egui + wgpu + winit specifics  |
+| **API pressure** | Designed for script ergonomics    | Designed for reflection + serialization |
+| **Maintenance**  | Low                               | High (egui API churn, GPU state, DPI)   |
+| **User base**    | Primary (Rust gamedevs)           | Secondary (non-Rust users)              |
 
 Maintaining both at once meant neither was excellent. The editor consumed 42%
 of the codebase but only served a prototype workflow. The core had no
@@ -171,12 +172,12 @@ fn spawn_player(world: &mut World) -> u64 {
 
 **Use GitHub Issues, even as a solo developer.** Here's why:
 
-| Tool | Solo | With team |
-|------|------|-----------|
-| GitHub Issues | Milestones, labels, search | Same, plus assignees |
-| Local TODO.md | Only you can see it | Doesn't scale |
-| ROADMAP.md | High-level only | High-level only |
-| GitHub Projects | Kanban board | Shared board |
+| Tool            | Solo                       | With team            |
+| --------------- | -------------------------- | -------------------- |
+| GitHub Issues   | Milestones, labels, search | Same, plus assignees |
+| Local TODO.md   | Only you can see it        | Doesn't scale        |
+| ROADMAP.md      | High-level only            | High-level only      |
+| GitHub Projects | Kanban board               | Shared board         |
 
 **Recommended labels:**
 
@@ -285,4 +286,3 @@ lessons from the prototype.
 - [Runtime And Editor Update Notes](runtime-and-editor-update.md) —
   retrospective on the editor prototype
 - [Object Model Notes](object-model.md) — how World/ECS works today
-

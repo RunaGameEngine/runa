@@ -7,6 +7,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) color: vec4<f32>,
+    @location(2) replace_color: f32,
 };
 
 struct InstanceData {
@@ -68,6 +69,7 @@ fn vs_main(
 
     out.tex_coords = final_uv;  // Pass to the fragment shader
     out.color = instance.color;
+    out.replace_color = select(0.0, 1.0, (instance.flip & 4u) != 0u);
 
     // ... remaining position logic ...
     return out;
@@ -75,7 +77,8 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(t_diffuse, s_sampler, in.tex_coords) * in.color;
+    let tex = textureSample(t_diffuse, s_sampler, in.tex_coords);
+    let color = select(tex * in.color, vec4<f32>(in.color.rgb * tex.a, tex.a), in.replace_color != 0.0);
     if (color.a <= 0.001) {
         discard;
     }

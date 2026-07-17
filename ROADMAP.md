@@ -16,17 +16,18 @@ The engine now uses `runa_ecs` exclusively.
 - [x] `#[system]` proc macro with inventory-based auto-registration
 - [x] Scheduler integrated into `App` — auto-runs in fixed-timestep loop
 - [x] `runa_engine` re-exports `runa_ecs`; `runa_app` hosts ECS World + Scheduler
+- [x] Port Script-based logic to `#[system]` functions
+- [x] Remove `runa_core::ocs` and `runa_core::codefirst`
 
 ## Next
 
-- [ ] Port Script-based logic to `#[system]` functions
 - [ ] Move component defs from `runa_core::components` to plain structs
 - [ ] Add command queue (deferred spawn/despawn) to `runa_ecs::World`
-- [ ] Remove `runa_core::ocs` and `runa_core::codefirst`
 
 ## Performance invariants (new ECS)
 
 These must never regress:
+
 - Unused features must have zero runtime cost (Cargo features + `#[cfg]`)
 - No per-frame GPU buffer allocations — use pools or persistent buffers
 - Archetype queries must not allocate per call

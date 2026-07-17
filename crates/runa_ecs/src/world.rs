@@ -86,6 +86,14 @@ impl World {
         unsafe { Some(&mut *ptr) }
     }
 
+    pub fn clear(&mut self) {
+        self.archetypes.clear();
+        self.archetype_by_key.clear();
+        self.next_archetype_id = 0;
+        self.entity_location.clear();
+        self.next_entity = 1;
+    }
+
     pub fn contains(&self, entity: Entity) -> bool {
         self.entity_location.contains_key(&entity)
     }

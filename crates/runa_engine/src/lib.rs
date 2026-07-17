@@ -1,5 +1,7 @@
 mod engine;
 pub mod prelude;
+pub mod scene;
+pub mod systems;
 
 pub use runa_app;
 pub use runa_asset;

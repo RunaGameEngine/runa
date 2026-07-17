@@ -2047,11 +2047,14 @@ name = "runa_engine"
 version = "0.7.0-alpha.4"
 dependencies = [
  "glam",
+ "inventory",
  "runa_app",
  "runa_asset",
  "runa_core",
  "runa_ecs",
  "runa_macros",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

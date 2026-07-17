@@ -12,4 +12,7 @@ runa_app = { path = "../runa_app" }
 runa_core = { path = "../runa_core" }
 runa_asset = { path = "../runa_asset" }
 
+inventory = "0.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
 glam.workspace = true

@@ -182,6 +182,7 @@ pub enum RenderCommands {
         color: [f32; 4],
         uv_rect: [f32; 4],
         order: i32,
+        replace_color: bool,
     },
     Text {
         text: String,
