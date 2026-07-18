@@ -11,6 +11,8 @@ pub use color::Color;
 pub use console::{Console, ConsoleCommand};
 pub use math::*;
 
+pub use runa_ecs;
+
 pub use glam;
 pub use glam::{Mat4, Quat, Vec2, Vec3};
 pub use winit::{event::MouseButton, keyboard::KeyCode};

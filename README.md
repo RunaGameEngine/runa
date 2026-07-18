@@ -92,11 +92,11 @@ cargo run -p sandbox
 
 ### Add Runa to a new project
 
-Current latest public tag: [`v0.7.1-alpha.1`](https://github.com/RunaGameEngine/runa/releases/tag/v0.7.0-alpha.4)
+Current latest public tag: [`v0.7.2`](https://github.com/RunaGameEngine/runa/releases/tag/v0.7.2)
 
 ```toml
 [dependencies]
-runa_engine = { git = "https://github.com/RunaGameEngine/runa.git", tag = "v0.7.0-alpha.1" }
+runa_engine = { git = "https://github.com/RunaGameEngine/runa.git", tag = "v0.7.2" }
 ```
 
 If you want to track the repository head instead of a tag:

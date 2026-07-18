@@ -1,10 +1,10 @@
-use runa_core::audio::AudioEngine;
-use runa_core::components::{
+use crate::audio::AudioEngine;
+use crate::components::{
     AudioListener, AudioSource, CursorInteractable, SpriteAnimator, SpriteRenderer, Transform,
 };
-use runa_core::input::InputState;
-use runa_core::systems::event_system::EventBus;
-use runa_core::MouseButton;
+use crate::input::InputState;
+use crate::systems::event_system::EventBus;
+use winit::event::MouseButton;
 use runa_ecs::{R, W};
 use runa_macros::system;
 use std::sync::{Mutex, OnceLock};

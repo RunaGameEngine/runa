@@ -369,6 +369,7 @@ impl UiNodeKindAsset {
                 };
                 UiNodeKind::Text(TextProps {
                     text: props.text.clone(),
+                    segments: vec![],
                     font: None,
                     font_size: props.font_size,
                     color: props.color,

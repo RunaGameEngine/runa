@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-07-18
+
+### Changed
+
+- **Systems migration:** Builtin systems (`cursor_interaction`, `audio_system`, `eventbus_system`, `sprite_animator_system`) moved from `runa_engine::systems` to `runa_core::systems::builtin`. `runa_engine` is now a clean umbrella crate again.
+
+## [0.7.1-alpha.2] - 2026-07-18
+
+### Added
+
+- **Rich Text:** `<b>bold</b>`, `<color=#rrggbb>text</color>` in `add_text()`
+- **Scene system:** `Scene` trait, `SceneManager`, `#[scene]` auto-registration
+- **Save/Load:** `SaveData` + `SceneManager::save_to_file()` / `load_from_file()`
+- **World::clear():** new method for clearing the world on scene switching
+
+### Changed
+
+- **Rendering:** `UiText` accepts `segments: Vec<RichTextSegment>` for per-segment styling
+
 ## [0.7.1-alpha.2] - 2026-07-17
 
 ### Added

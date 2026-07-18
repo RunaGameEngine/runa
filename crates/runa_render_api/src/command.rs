@@ -164,6 +164,14 @@ pub struct TextOutline {
     pub width: f32,
 }
 
+/// A segment of rich text with its own formatting.
+#[derive(Clone, Debug)]
+pub struct RichTextSegment {
+    pub text: String,
+    pub color: [f32; 4],
+    pub bold: bool,
+}
+
 /// Font identifier for selecting among loaded fonts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FontId(pub usize);
@@ -230,5 +238,6 @@ pub enum RenderCommands {
         font_size: u16,
         z_index: i16,
         font_id: Option<FontId>,
+        segments: Vec<RichTextSegment>,
     },
 }

@@ -189,8 +189,11 @@ impl EdgeInsets {
     };
 }
 
+pub use runa_render_api::command::RichTextSegment;
+
 pub struct TextProps {
     pub text: String,
+    pub segments: Vec<RichTextSegment>,
     pub font: Option<FontId>,
     pub font_size: u16,
     pub color: [f32; 4],

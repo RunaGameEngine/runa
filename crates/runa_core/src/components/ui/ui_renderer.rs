@@ -5,7 +5,7 @@ use runa_render_api::{command::UiRect as RenderUiRect, RenderQueue};
 
 use crate::components::ui::{
     Anchor, ContainerKind, EdgeInsets, FontId, ImageProps, InteractionState, LayoutProps,
-    SliderProps, StyleProps, TextProps, UiNode, UiNodeId, UiNodeKind,
+    RichTextSegment, SliderProps, StyleProps, TextProps, UiNode, UiNodeId, UiNodeKind,
 };
 use crate::components::{Camera, Transform};
 use crate::input::InputState;
@@ -114,6 +114,11 @@ impl UiRenderer {
         self.text(parent, content)
     }
 
+    pub fn add_rich_text(&mut self, content: &str) -> UiNodeBuilder<'_> {
+        let parent = self.current_parent();
+        self.add_rich_text_in(parent, content)
+    }
+
     pub fn add_image(&mut self) -> UiNodeBuilder<'_> {
         let parent = self.current_parent();
         self.image(parent)
@@ -189,8 +194,26 @@ impl UiRenderer {
     }
 
     pub fn text(&mut self, parent: UiNodeId, content: impl Into<String>) -> UiNodeBuilder<'_> {
+        let text = content.into();
+        let segments = crate::components::ui::parse_rich_text(&text);
         let props = TextProps {
-            text: content.into(),
+            text,
+            segments,
+            font: None,
+            font_size: 16,
+            color: [1.0, 1.0, 1.0, 1.0],
+            line_height: None,
+            align: crate::components::ui::TextAlign::Left,
+        };
+        let id = self.add_node(parent, UiNodeKind::Text(props));
+        UiNodeBuilder::new(self, id)
+    }
+
+    pub fn add_rich_text_in(&mut self, parent: UiNodeId, content: &str) -> UiNodeBuilder<'_> {
+        let segments = crate::components::ui::parse_rich_text(content);
+        let props = TextProps {
+            text: content.to_string(),
+            segments,
             font: None,
             font_size: 16,
             color: [1.0, 1.0, 1.0, 1.0],
@@ -230,6 +253,7 @@ impl UiRenderer {
                 btn_id,
                 UiNodeKind::Text(TextProps {
                     text: text.into(),
+                    segments: vec![],
                     font: None,
                     font_size: 16,
                     color: [1.0, 1.0, 1.0, 1.0],
@@ -430,6 +454,7 @@ impl UiRenderer {
                 UiNodeKind::Container(ck) => UiNodeKind::Container(*ck),
                 UiNodeKind::Text(_) => UiNodeKind::Text(TextProps {
                     text: String::new(),
+                    segments: vec![],
                     font: None,
                     font_size: 0,
                     color: [0.0; 4],
@@ -842,6 +867,15 @@ impl UiRenderer {
                 }
                 UiNodeKind::Text(props) => {
                     let rect = screen_of(node.computed.rect);
+                    let segments: Vec<RichTextSegment> = props
+                        .segments
+                        .iter()
+                        .map(|s| RichTextSegment {
+                            text: s.text.clone(),
+                            color: s.color,
+                            bold: s.bold,
+                        })
+                        .collect();
                     render_queue.draw_ui_text(
                         props.text.clone(),
                         rect,
@@ -849,6 +883,7 @@ impl UiRenderer {
                         props.font_size,
                         node.style.z_index,
                         props.font,
+                        segments,
                     );
                 }
                 UiNodeKind::Slider(props) => {

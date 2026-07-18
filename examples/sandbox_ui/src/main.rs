@@ -1,7 +1,7 @@
 use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
-use runa_engine::runa_core::glam::Vec3;
 use runa_engine::runa_core::components::ui::{CanvasSpace, UiRenderer};
 use runa_engine::runa_core::components::{Camera, Transform};
+use runa_engine::runa_core::glam::Vec3;
 use runa_engine::runa_ecs;
 use runa_engine::system;
 
@@ -16,13 +16,18 @@ fn ui_builder(world: &mut runa_ecs::World) {
                     .with_font_size(28)
                     .with_text_color(0.0, 0.8, 1.0, 1.0);
 
-                ui.add_text("This is a sandbox UI example.")
+                let s: String = "RichText".into();
+
+                ui.add_text(format!("This is a <b>{s}</b> example."))
                     .with_font_size(16)
                     .with_text_color(0.8, 0.8, 0.8, 1.0);
 
-                ui.add_button(Some("Click Me"), Some(Box::new(|| {
-                    println!("Button clicked!");
-                })))
+                ui.add_button(
+                    Some("Click Me"),
+                    Some(Box::new(|| {
+                        println!("Button clicked!");
+                    })),
+                )
                 .with_background(0.2, 0.5, 0.8, 1.0)
                 .with_size(160.0, 40.0);
 
@@ -71,7 +76,11 @@ fn main() {
     world.spawn((UiRenderer::new(CanvasSpace::Screen),));
     world.spawn((
         UiRenderer::new(CanvasSpace::World),
-        Transform { position: Vec3::new(170.0, 0.0, 0.0), scale: Vec3::ONE, ..Default::default() },
+        Transform {
+            position: Vec3::new(170.0, 0.0, 0.0),
+            scale: Vec3::ONE,
+            ..Default::default()
+        },
     ));
 
     let config = RunaWindowConfig {

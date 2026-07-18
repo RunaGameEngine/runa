@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::command::{AtmosphereData, DirectionalLightData, FontId, InstanceData, Mesh3dParams, PointLightData, ScreenEffectData, TextOutline, TileParams, UiRect};
+use crate::command::{AtmosphereData, DirectionalLightData, FontId, InstanceData, Mesh3dParams, PointLightData, RichTextSegment, ScreenEffectData, TextOutline, TileParams, UiRect};
 use crate::RenderCommands;
 use glam::{Quat, Vec2, Vec3};
 use runa_asset::TextureAsset;
@@ -142,6 +142,7 @@ impl RenderQueue {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_ui_text(
         &mut self,
         text: String,
@@ -150,6 +151,7 @@ impl RenderQueue {
         font_size: u16,
         z_index: i16,
         font_id: Option<FontId>,
+        segments: Vec<RichTextSegment>,
     ) {
         self.commands.push(RenderCommands::UiText {
             text,
@@ -158,6 +160,7 @@ impl RenderQueue {
             font_size,
             z_index,
             font_id,
+            segments,
         });
     }
 

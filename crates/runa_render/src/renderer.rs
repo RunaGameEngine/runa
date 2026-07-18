@@ -1043,19 +1043,26 @@ impl<'window> Renderer<'window> {
                     font_size,
                     z_index: _,
                     font_id,
+                    segments,
                 } => {
                     let fid = font_id.unwrap_or(FontId::DEFAULT);
                     let scale = *font_size as f32 / self.font_manager.base_font_size_for(fid);
                     let (char_width, _) = self.font_manager.char_size_for(fid);
                     let char_h = self.font_manager.line_height_for(fid) * scale;
-                    let mut x = rect.x - rect.w * 0.5;
                     let y = if rect.h > char_h {
                         rect.y + (rect.h - char_h) * 0.5
                     } else {
                         rect.y
                     };
 
-                    for ch in text.chars() {
+                    let emit_glyph = |x: &mut f32,
+                                      ch: char,
+                                      seg_color: &[f32; 4],
+                                      bold: bool,
+                                      ui_font_vertices_map: &mut HashMap<
+                        usize,
+                        Vec<UITexturedVertex>,
+                    >| {
                         let char_w = self
                             .font_manager
                             .get_char_advance_for(fid, ch)
@@ -1063,59 +1070,108 @@ impl<'window> Renderer<'window> {
                             * scale;
 
                         if ch == ' ' {
-                            x += char_w;
-                            continue;
+                            *x += char_w;
+                            return;
                         }
 
                         if let Some(glyph_info) = self.font_manager.get_glyph_info_for(fid, ch) {
                             let char_uv = glyph_info.uv;
-                            let left = x + char_uv.bearing_x * scale;
+                            let base_left = *x + char_uv.bearing_x * scale;
                             let top = y + char_uv.bearing_y * scale;
-                            let right = left + char_uv.width * scale;
+                            let right = base_left + char_uv.width * scale;
                             let bottom = top + char_uv.height * scale;
 
                             if let Some(atlas_tex) = self.font_manager.get_atlas_texture_for(fid) {
                                 let atlas_key = Arc::as_ptr(atlas_tex) as usize;
                                 let entry = ui_font_vertices_map.entry(atlas_key).or_default();
-                                entry.extend_from_slice(&[
-                                    UITexturedVertex {
-                                        position: [left, top],
-                                        tex_coords: [char_uv.u, char_uv.v],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [right, top],
-                                        tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [left, bottom],
-                                        tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [left, bottom],
-                                        tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [right, top],
-                                        tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
-                                        color: *color,
-                                    },
-                                    UITexturedVertex {
-                                        position: [right, bottom],
-                                        tex_coords: [
-                                            char_uv.u + char_uv.u_width,
-                                            char_uv.v + char_uv.v_height,
-                                        ],
-                                        color: *color,
-                                    },
-                                ]);
+
+                                let offsets: &[f32] = if bold { &[0.0, 1.0] } else { &[0.0] };
+                                for &dx in offsets {
+                                    let left = base_left + dx;
+                                    entry.extend_from_slice(&[
+                                        UITexturedVertex {
+                                            position: [left, top],
+                                            tex_coords: [char_uv.u, char_uv.v],
+                                            color: *seg_color,
+                                        },
+                                        UITexturedVertex {
+                                            position: [right + dx, top],
+                                            tex_coords: [
+                                                char_uv.u + char_uv.u_width,
+                                                char_uv.v,
+                                            ],
+                                            color: *seg_color,
+                                        },
+                                        UITexturedVertex {
+                                            position: [left, bottom],
+                                            tex_coords: [
+                                                char_uv.u,
+                                                char_uv.v + char_uv.v_height,
+                                            ],
+                                            color: *seg_color,
+                                        },
+                                        UITexturedVertex {
+                                            position: [left, bottom],
+                                            tex_coords: [
+                                                char_uv.u,
+                                                char_uv.v + char_uv.v_height,
+                                            ],
+                                            color: *seg_color,
+                                        },
+                                        UITexturedVertex {
+                                            position: [right + dx, top],
+                                            tex_coords: [
+                                                char_uv.u + char_uv.u_width,
+                                                char_uv.v,
+                                            ],
+                                            color: *seg_color,
+                                        },
+                                        UITexturedVertex {
+                                            position: [right + dx, bottom],
+                                            tex_coords: [
+                                                char_uv.u + char_uv.u_width,
+                                                char_uv.v + char_uv.v_height,
+                                            ],
+                                            color: *seg_color,
+                                        },
+                                    ]);
+                                }
                             }
                         }
 
-                        x += char_w;
+                        *x += char_w;
+                    };
+
+                    if segments.is_empty() {
+                        let mut x = rect.x - rect.w * 0.5;
+                        for ch in text.chars() {
+                            emit_glyph(&mut x, ch, color, false, &mut ui_font_vertices_map);
+                        }
+                    } else {
+                        // compute total width for centering
+                        let mut total_w = 0.0_f32;
+                        for seg in segments {
+                            for ch in seg.text.chars() {
+                                let cw = self
+                                    .font_manager
+                                    .get_char_advance_for(fid, ch)
+                                    .unwrap_or(char_width as f32)
+                                    * scale;
+                                total_w += cw;
+                            }
+                        }
+                        let mut x = rect.x - total_w * 0.5;
+                        for seg in segments {
+                            for ch in seg.text.chars() {
+                                emit_glyph(
+                                    &mut x,
+                                    ch,
+                                    &seg.color,
+                                    seg.bold,
+                                    &mut ui_font_vertices_map,
+                                );
+                            }
+                        }
                     }
                 }
             }
