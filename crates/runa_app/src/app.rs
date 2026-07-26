@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use runa_core::components::{
-    ui::UiRenderer, BackgroundMode, Camera, MeshRenderer, SpriteRenderer, Transform, WorldAtmosphere,
+    ui::UiRenderer, BackgroundMode, Camera, MeshRenderer, Sorting, SpriteRenderer, Transform,
+    WorldAtmosphere,
 };
 use runa_core::input::InputState;
 use runa_core::{glam, Console};
@@ -88,8 +90,15 @@ impl<'window> App<'window> {
             ref mut queue,
             ..
         } = self;
-        for (_, (transform, sprite)) in ecs_world.query::<(R<Transform>, R<SpriteRenderer>)>() {
+        let sort_orders: HashMap<u64, i32> = ecs_world
+            .query::<R<Sorting>>()
+            .map(|(e, s)| (e, s.order))
+            .collect();
+        for (entity, (transform, sprite)) in
+            ecs_world.query::<(R<Transform>, R<SpriteRenderer>)>()
+        {
             if let Some(tex) = sprite.texture() {
+                let order = sort_orders.get(&entity).copied().unwrap_or(0);
                 queue.draw_sprite(
                     tex.inner.clone(),
                     transform.position,
@@ -97,7 +106,7 @@ impl<'window> App<'window> {
                     transform.scale,
                     sprite.color,
                     sprite.uv_rect,
-                    0,
+                    order,
                     sprite.replace_color,
                 );
             }
@@ -134,7 +143,13 @@ impl<'window> App<'window> {
             ref mut queue,
             ..
         } = self;
-        for (_, (transform, renderer)) in ecs_world.query::<(R<Transform>, R<MeshRenderer>)>() {
+        let sort_orders: HashMap<u64, i32> = ecs_world
+            .query::<R<Sorting>>()
+            .map(|(e, s)| (e, s.order))
+            .collect();
+        for (entity, (transform, renderer)) in
+            ecs_world.query::<(R<Transform>, R<MeshRenderer>)>()
+        {
             let Some(handle) = &renderer.mesh else {
                 continue;
             };
@@ -155,6 +170,7 @@ impl<'window> App<'window> {
                     color: v.color,
                 })
                 .collect();
+            let order = sort_orders.get(&entity).copied().unwrap_or(0);
             queue.draw_mesh_3d(Mesh3dParams {
                 mesh_id,
                 vertices: vtx,
@@ -163,7 +179,7 @@ impl<'window> App<'window> {
                 color: renderer.color,
                 emission: [0.0; 3],
                 use_vertex_color: true,
-                order: 0,
+                order,
                 depth: transform.position.z,
             });
         }
