@@ -319,6 +319,19 @@ impl UiRenderer {
         self.add_node(parent, UiNodeKind::Text(props))
     }
 
+    /// Update the text content of an existing text node.
+    /// Does nothing if `id` is not a text node.
+    pub fn set_text(&mut self, id: UiNodeId, content: impl Into<String>) {
+        if let Some(UiNodeKind::Text(props)) = self
+            .node_mut(id)
+            .map(|n| &mut n.kind)
+        {
+            let text = content.into();
+            props.text = text.clone();
+            props.segments = crate::components::ui::parse_rich_text(&text);
+        }
+    }
+
     pub fn add_image_node(&mut self, parent: UiNodeId, props: ImageProps) -> UiNodeId {
         self.add_node(parent, UiNodeKind::Image(props))
     }
