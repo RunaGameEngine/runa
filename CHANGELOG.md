@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.4] - 2026-07-18
+## [0.7.5] - 2026-07-28
+
+### Changed
+
+- **EventBus** is now a global singleton (`OnceLock<Mutex<...>>`), like `InputState` / `AudioEngine`. No more `world.spawn((EventBus::new(),))` — just `EventBus::emit(event)` and `EventBus::subscribe(cb)` from anywhere.
+
+## [0.7.4] - 2026-07-28
 
 ### Added
 

@@ -82,10 +82,8 @@ pub fn audio_system(world: &mut runa_ecs::World) {
 }
 
 #[system("crate")]
-pub fn eventbus_system(world: &mut runa_ecs::World) {
-    for (_, bus) in world.query_mut::<W<EventBus>>() {
-        bus.process();
-    }
+pub fn eventbus_system(_world: &mut runa_ecs::World) {
+    EventBus::process();
 }
 
 #[system("crate")]
