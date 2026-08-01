@@ -159,9 +159,12 @@ pub fn ease_in_out_elastic(t: f32) -> f32 {
     }
     let p = 0.45;
     if t < 0.5 {
-        -0.5 * 2.0_f32.powf(20.0 * t - 10.0) * ((20.0 * t - 11.125) * (2.0 * std::f32::consts::PI / p)).sin()
+        -0.5 * 2.0_f32.powf(20.0 * t - 10.0)
+            * ((20.0 * t - 11.125) * (2.0 * std::f32::consts::PI / p)).sin()
     } else {
-        0.5 * 2.0_f32.powf(-20.0 * t + 10.0) * ((20.0 * t - 11.125) * (2.0 * std::f32::consts::PI / p)).sin() + 1.0
+        0.5 * 2.0_f32.powf(-20.0 * t + 10.0)
+            * ((20.0 * t - 11.125) * (2.0 * std::f32::consts::PI / p)).sin()
+            + 1.0
     }
 }
 
@@ -226,7 +229,14 @@ pub fn smooth_damp_unlimited(
     smooth_time: f32,
     delta_time: f32,
 ) -> f32 {
-    smooth_damp(current, target, current_velocity, smooth_time, f32::INFINITY, delta_time)
+    smooth_damp(
+        current,
+        target,
+        current_velocity,
+        smooth_time,
+        f32::INFINITY,
+        delta_time,
+    )
 }
 
 // ── move towards ────────────────────────────────────────────────────
@@ -334,9 +344,30 @@ pub fn smooth_damp_vec3(
     delta_time: f32,
 ) -> Vec3 {
     Vec3::new(
-        smooth_damp(current.x, target.x, &mut current_velocity.x, smooth_time, max_speed, delta_time),
-        smooth_damp(current.y, target.y, &mut current_velocity.y, smooth_time, max_speed, delta_time),
-        smooth_damp(current.z, target.z, &mut current_velocity.z, smooth_time, max_speed, delta_time),
+        smooth_damp(
+            current.x,
+            target.x,
+            &mut current_velocity.x,
+            smooth_time,
+            max_speed,
+            delta_time,
+        ),
+        smooth_damp(
+            current.y,
+            target.y,
+            &mut current_velocity.y,
+            smooth_time,
+            max_speed,
+            delta_time,
+        ),
+        smooth_damp(
+            current.z,
+            target.z,
+            &mut current_velocity.z,
+            smooth_time,
+            max_speed,
+            delta_time,
+        ),
     )
 }
 

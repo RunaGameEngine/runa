@@ -39,7 +39,10 @@ impl ConsoleCommand for EchoCommand {
         out(text);
     }
     fn detailed_help(&self) -> Vec<&str> {
-        vec!["echo <text> - Print text to the console.", "Example: echo Hello world"]
+        vec![
+            "echo <text> - Print text to the console.",
+            "Example: echo Hello world",
+        ]
     }
 }
 
@@ -270,10 +273,22 @@ impl Console {
 
         // Add built-in special commands
         let builtin_commands = [
-            "help", "fps_max", "show_stats", "stats", "bind", "unbind", "binds",
-            "timescale", "quit", "cls",
-            "show_ui_bounds", "ui_bounds", "show_cursor", "cursor_bounds",
-            "show_collision", "collision_bounds",
+            "help",
+            "fps_max",
+            "show_stats",
+            "stats",
+            "bind",
+            "unbind",
+            "binds",
+            "timescale",
+            "quit",
+            "cls",
+            "show_ui_bounds",
+            "ui_bounds",
+            "show_cursor",
+            "cursor_bounds",
+            "show_collision",
+            "collision_bounds",
         ];
         for name in &builtin_commands {
             if name.starts_with(&prefix) && !results.contains(&name.to_string()) {
@@ -305,16 +320,43 @@ impl Console {
             })
             .collect();
         result.push(("help".to_string(), "Show help for commands".to_string()));
-        result.push(("fps_max [value]".to_string(), "Set FPS cap (0 = unlimited)".to_string()));
-        result.push(("show_stats".to_string(), "Toggle stats overlay (FPS, frame time, etc.)".to_string()));
+        result.push((
+            "fps_max [value]".to_string(),
+            "Set FPS cap (0 = unlimited)".to_string(),
+        ));
+        result.push((
+            "show_stats".to_string(),
+            "Toggle stats overlay (FPS, frame time, etc.)".to_string(),
+        ));
         result.push(("stats".to_string(), "Alias for show_stats".to_string()));
-        result.push(("bind <key> <action>".to_string(), "Bind a key to an action".to_string()));
-        result.push(("unbind <action> [key]".to_string(), "Unbind a key from an action".to_string()));
-        result.push(("binds".to_string(), "List all action-key bindings".to_string()));
-        result.push(("timescale [value]".to_string(), "Set/get game speed multiplier".to_string()));
-        result.push(("show_ui_bounds".to_string(), "Toggle UI boundary overlay".to_string()));
-        result.push(("show_cursor".to_string(), "Toggle CursorInteractable bounds overlay".to_string()));
-        result.push(("show_collision".to_string(), "Toggle collision bounds overlay".to_string()));
+        result.push((
+            "bind <key> <action>".to_string(),
+            "Bind a key to an action".to_string(),
+        ));
+        result.push((
+            "unbind <action> [key]".to_string(),
+            "Unbind a key from an action".to_string(),
+        ));
+        result.push((
+            "binds".to_string(),
+            "List all action-key bindings".to_string(),
+        ));
+        result.push((
+            "timescale [value]".to_string(),
+            "Set/get game speed multiplier".to_string(),
+        ));
+        result.push((
+            "show_ui_bounds".to_string(),
+            "Toggle UI boundary overlay".to_string(),
+        ));
+        result.push((
+            "show_cursor".to_string(),
+            "Toggle CursorInteractable bounds overlay".to_string(),
+        ));
+        result.push((
+            "show_collision".to_string(),
+            "Toggle collision bounds overlay".to_string(),
+        ));
         result.push(("quit".to_string(), "Close the console".to_string()));
         // Add "cls" alias for "clear"
         if let Some(pos) = result.iter().position(|(n, _)| n == "clear") {
@@ -367,22 +409,32 @@ impl Console {
                             self.add_message("  Example: bind mouseleft attack");
                         }
                         "unbind" => {
-                            self.add_message("unbind <action> [key] - Unbind a key from an action.");
+                            self.add_message(
+                                "unbind <action> [key] - Unbind a key from an action.",
+                            );
                             self.add_message("  Without key, unbinds ALL keys from the action.");
                             self.add_message("  Example: unbind move_forward w");
                             self.add_message("  Example: unbind move_forward");
                         }
                         "binds" => {
                             self.add_message("binds - List all action-key bindings.");
-                            self.add_message("  Shows all registered actions and their bound keys.");
+                            self.add_message(
+                                "  Shows all registered actions and their bound keys.",
+                            );
                         }
                         "timescale" => {
                             self.add_message("timescale [value] - Set/get game speed multiplier.");
-                            self.add_message("  Default: 1.0. Use 0.5 for half speed, 2.0 for double speed.");
+                            self.add_message(
+                                "  Default: 1.0. Use 0.5 for half speed, 2.0 for double speed.",
+                            );
                         }
                         "show_ui_bounds" | "ui_bounds" => {
-                            self.add_message("show_ui_bounds / ui_bounds - Toggle UI node boundary overlay.");
-                            self.add_message("  Draws green outlines around all visible UI elements.");
+                            self.add_message(
+                                "show_ui_bounds / ui_bounds - Toggle UI node boundary overlay.",
+                            );
+                            self.add_message(
+                                "  Draws green outlines around all visible UI elements.",
+                            );
                         }
                         "show_cursor" | "cursor_bounds" => {
                             self.add_message("show_cursor / cursor_bounds - Toggle CursorInteractable bounds overlay.");
@@ -390,14 +442,23 @@ impl Console {
                         }
                         "show_collision" | "collision_bounds" => {
                             self.add_message("show_collision / collision_bounds - Toggle collision bounds overlay.");
-                            self.add_message("  Draws orange outlines around PhysicsCollision objects.");
+                            self.add_message(
+                                "  Draws orange outlines around PhysicsCollision objects.",
+                            );
                         }
                         "quit" | "exit" => {
                             self.add_message("quit / exit - Close the console.");
                         }
                         _ => {
                             let help_info = self.commands.get(topic).map(|c| {
-                                (c.name().to_string(), c.description().to_string(), c.detailed_help().iter().map(|s| s.to_string()).collect::<Vec<_>>())
+                                (
+                                    c.name().to_string(),
+                                    c.description().to_string(),
+                                    c.detailed_help()
+                                        .iter()
+                                        .map(|s| s.to_string())
+                                        .collect::<Vec<_>>(),
+                                )
                             });
                             if let Some((name, desc, help_lines)) = help_info {
                                 if help_lines.is_empty() {
@@ -418,19 +479,34 @@ impl Console {
             "fps_max" => {
                 if args.is_empty() {
                     if self.fps_max > 0.0 {
-                        self.add_message(format!("FPS cap: {:.0} ({} ms per frame)", self.fps_max, 1000.0 / self.fps_max));
+                        self.add_message(format!(
+                            "FPS cap: {:.0} ({} ms per frame)",
+                            self.fps_max,
+                            1000.0 / self.fps_max
+                        ));
                     } else {
                         self.add_message("FPS cap: unlimited");
                     }
                 } else if let Ok(value) = args[0].parse::<f32>() {
-                    self.fps_max = if value.is_finite() { value.max(0.0) } else { 0.0 };
+                    self.fps_max = if value.is_finite() {
+                        value.max(0.0)
+                    } else {
+                        0.0
+                    };
                     if self.fps_max > 0.0 {
-                        self.add_message(format!("FPS cap set to {:.0} ({} ms per frame)", self.fps_max, 1000.0 / self.fps_max));
+                        self.add_message(format!(
+                            "FPS cap set to {:.0} ({} ms per frame)",
+                            self.fps_max,
+                            1000.0 / self.fps_max
+                        ));
                     } else {
                         self.add_message("FPS cap: unlimited");
                     }
                 } else {
-                    self.add_message(format!("Invalid value: '{}'. Use a number or 0 for unlimited.", args[0]));
+                    self.add_message(format!(
+                        "Invalid value: '{}'. Use a number or 0 for unlimited.",
+                        args[0]
+                    ));
                 }
                 true
             }
@@ -498,23 +574,47 @@ impl Console {
                     self.time_scale = value.clamp(0.01, 100.0);
                     self.add_message(format!("Timescale set to {:.2}", self.time_scale));
                 } else {
-                    self.add_message(format!("Invalid value: '{}'. Use a number (0.01-100.0).", args[0]));
+                    self.add_message(format!(
+                        "Invalid value: '{}'. Use a number (0.01-100.0).",
+                        args[0]
+                    ));
                 }
                 true
             }
             "show_ui_bounds" | "ui_bounds" => {
                 self.debug_show_ui_bounds = !self.debug_show_ui_bounds;
-                self.add_message(format!("UI bounds: {}", if self.debug_show_ui_bounds { "ON" } else { "OFF" }));
+                self.add_message(format!(
+                    "UI bounds: {}",
+                    if self.debug_show_ui_bounds {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                ));
                 true
             }
             "show_cursor" | "cursor_bounds" => {
                 self.debug_show_cursor_bounds = !self.debug_show_cursor_bounds;
-                self.add_message(format!("Cursor bounds: {}", if self.debug_show_cursor_bounds { "ON" } else { "OFF" }));
+                self.add_message(format!(
+                    "Cursor bounds: {}",
+                    if self.debug_show_cursor_bounds {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                ));
                 true
             }
             "show_collision" | "collision_bounds" => {
                 self.debug_draw_collisions = !self.debug_draw_collisions;
-                self.add_message(format!("Collision bounds: {}", if self.debug_draw_collisions { "ON" } else { "OFF" }));
+                self.add_message(format!(
+                    "Collision bounds: {}",
+                    if self.debug_draw_collisions {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                ));
                 true
             }
             "quit" | "exit" => {
@@ -769,7 +869,14 @@ impl Console {
 
             let mut y = 8.0;
             let line_h = 19.0;
-            let stats_lines = [fps_text, frame_text, render_text, update_text, fps_cap, draw_text];
+            let stats_lines = [
+                fps_text,
+                frame_text,
+                render_text,
+                update_text,
+                fps_cap,
+                draw_text,
+            ];
             for line in &stats_lines {
                 queue.commands.push(RenderCommands::Text {
                     text: line.clone(),

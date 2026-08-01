@@ -44,7 +44,13 @@ impl World {
 
         arch.entities.push(entity);
         bundle.put(&mut arch.columns);
-        self.entity_location.insert(entity, Location { archetype_id: arch_id, row: row as u32 });
+        self.entity_location.insert(
+            entity,
+            Location {
+                archetype_id: arch_id,
+                row: row as u32,
+            },
+        );
 
         entity
     }
@@ -102,18 +108,17 @@ impl World {
         self.entity_location.len()
     }
 
-    fn find_or_create_archetype(
-        &mut self,
-        key: &[TypeId],
-        infos: &[ComponentInfo],
-    ) -> ArchetypeId {
+    fn find_or_create_archetype(&mut self, key: &[TypeId], infos: &[ComponentInfo]) -> ArchetypeId {
         if let Some(&id) = self.archetype_by_key.get(key) {
             return id;
         }
         let id = ArchetypeId(self.next_archetype_id);
         self.next_archetype_id += 1;
 
-        let columns: Vec<BlobColumn> = infos.iter().map(|info| BlobColumn::new(info.clone())).collect();
+        let columns: Vec<BlobColumn> = infos
+            .iter()
+            .map(|info| BlobColumn::new(info.clone()))
+            .collect();
         let arch = Archetype::new(id, columns);
         self.archetypes.push(arch);
         self.archetype_by_key.insert(key.to_vec(), id);

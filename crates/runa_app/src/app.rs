@@ -94,8 +94,7 @@ impl<'window> App<'window> {
             .query::<R<Sorting>>()
             .map(|(e, s)| (e, s.order))
             .collect();
-        for (entity, (transform, sprite)) in
-            ecs_world.query::<(R<Transform>, R<SpriteRenderer>)>()
+        for (entity, (transform, sprite)) in ecs_world.query::<(R<Transform>, R<SpriteRenderer>)>()
         {
             if let Some(tex) = sprite.texture() {
                 let order = sort_orders.get(&entity).copied().unwrap_or(0);
@@ -147,8 +146,7 @@ impl<'window> App<'window> {
             .query::<R<Sorting>>()
             .map(|(e, s)| (e, s.order))
             .collect();
-        for (entity, (transform, renderer)) in
-            ecs_world.query::<(R<Transform>, R<MeshRenderer>)>()
+        for (entity, (transform, renderer)) in ecs_world.query::<(R<Transform>, R<MeshRenderer>)>()
         {
             let Some(handle) = &renderer.mesh else {
                 continue;
@@ -206,11 +204,9 @@ impl<'window> App<'window> {
         {
             use runa_render_api::BackgroundModeData;
             let bg = match atmosphere.background {
-                BackgroundMode::SolidColor { color } => {
-                    BackgroundModeData::SolidColor {
-                        color: color.to_vec3(),
-                    }
-                }
+                BackgroundMode::SolidColor { color } => BackgroundModeData::SolidColor {
+                    color: color.to_vec3(),
+                },
                 BackgroundMode::VerticalGradient {
                     zenith_color,
                     horizon_color,

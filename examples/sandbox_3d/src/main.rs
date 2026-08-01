@@ -1,7 +1,7 @@
 use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
-use runa_engine::runa_ecs;
-use runa_engine::runa_core::components::{Camera, MeshRenderer, Mesh, Transform};
+use runa_engine::runa_core::components::{Camera, Mesh, MeshRenderer, Transform};
 use runa_engine::runa_core::glam::{Quat, Vec3};
+use runa_engine::runa_ecs;
 use runa_engine::system;
 
 #[system]
@@ -35,16 +35,14 @@ fn main() {
         MeshRenderer::new(Mesh::cube(1.0)),
     ));
 
-    world.spawn((
-        Camera::new_perspective(
-            Vec3::new(0.0, 0.0, 5.0),
-            Vec3::ZERO,
-            Vec3::Y,
-            75.0,
-            0.1,
-            1000.0,
-        ),
-    ));
+    world.spawn((Camera::new_perspective(
+        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::ZERO,
+        Vec3::Y,
+        75.0,
+        0.1,
+        1000.0,
+    ),));
 
     let config = RunaWindowConfig {
         title: "Runa 3D Sandbox - rotating cubes".to_string(),

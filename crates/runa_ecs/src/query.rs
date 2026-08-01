@@ -22,7 +22,9 @@ pub unsafe trait Fetch: 'static {
 
 unsafe impl<T: 'static> Fetch for R<T> {
     type Item<'w> = &'w T;
-    fn type_ids() -> Vec<TypeId> { vec![TypeId::of::<T>()] }
+    fn type_ids() -> Vec<TypeId> {
+        vec![TypeId::of::<T>()]
+    }
     unsafe fn extract_const<'w>(ptrs: &[*const u8], row: usize) -> &'w T {
         &*((ptrs[0] as *const T).add(row))
     }
@@ -33,7 +35,9 @@ unsafe impl<T: 'static> Fetch for R<T> {
 
 unsafe impl<T: 'static> Fetch for W<T> {
     type Item<'w> = &'w mut T;
-    fn type_ids() -> Vec<TypeId> { vec![TypeId::of::<T>()] }
+    fn type_ids() -> Vec<TypeId> {
+        vec![TypeId::of::<T>()]
+    }
     unsafe fn extract_const<'w>(_ptrs: &[*const u8], _row: usize) -> &'w mut T {
         panic!("W<T> used in immutable query; use query_mut")
     }
@@ -89,11 +93,17 @@ impl_fetch_tuple!(A, B, C, D, E);
 impl_fetch_tuple!(A, B, C, D, E, F);
 
 fn collect_ptrs(arch: &Archetype, type_ids: &[TypeId]) -> Option<Vec<*const u8>> {
-    type_ids.iter().map(|tid| Some(arch.column(*tid)?.blob.as_ptr())).collect()
+    type_ids
+        .iter()
+        .map(|tid| Some(arch.column(*tid)?.blob.as_ptr()))
+        .collect()
 }
 
 fn collect_ptrs_mut(arch: &mut Archetype, type_ids: &[TypeId]) -> Option<Vec<*mut u8>> {
-    type_ids.iter().map(|tid| Some(arch.column_mut(*tid)?.blob.as_mut_ptr())).collect()
+    type_ids
+        .iter()
+        .map(|tid| Some(arch.column_mut(*tid)?.blob.as_mut_ptr()))
+        .collect()
 }
 
 struct Table<'w> {
@@ -121,13 +131,24 @@ impl<'w, M: Fetch> Query<'w, M> {
         let mut tables = Vec::new();
         for arch in &world.archetypes {
             if let Some(ptrs) = collect_ptrs(arch, &type_ids) {
-                tables.push(Table { entities: &arch.entities, ptrs, len: arch.entity_count() });
+                tables.push(Table {
+                    entities: &arch.entities,
+                    ptrs,
+                    len: arch.entity_count(),
+                });
             }
         }
-        Self { tables, table_idx: 0, row: 0, _marker: PhantomData }
+        Self {
+            tables,
+            table_idx: 0,
+            row: 0,
+            _marker: PhantomData,
+        }
     }
 
-    pub fn is_empty(&self) -> bool { self.tables.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.tables.is_empty()
+    }
 }
 
 impl<'w, M: Fetch> Iterator for Query<'w, M> {
@@ -159,8 +180,12 @@ impl<'w, M: Fetch> QueryMut<'w, M> {
         let type_ids = M::type_ids();
         let mut tables = Vec::new();
         for arch in &mut world.archetypes {
-            if !arch.has_type(type_ids[0]) { continue }
-            let Some(ptrs) = collect_ptrs_mut(arch, &type_ids) else { continue };
+            if !arch.has_type(type_ids[0]) {
+                continue;
+            }
+            let Some(ptrs) = collect_ptrs_mut(arch, &type_ids) else {
+                continue;
+            };
             let entities = &arch.entities as *const Vec<Entity>;
             tables.push(TableMut {
                 entities: unsafe { &*entities },
@@ -168,10 +193,17 @@ impl<'w, M: Fetch> QueryMut<'w, M> {
                 len: arch.entity_count(),
             });
         }
-        Self { tables, table_idx: 0, row: 0, _marker: PhantomData }
+        Self {
+            tables,
+            table_idx: 0,
+            row: 0,
+            _marker: PhantomData,
+        }
     }
 
-    pub fn is_empty(&self) -> bool { self.tables.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.tables.is_empty()
+    }
 }
 
 impl<'w, M: Fetch> Iterator for QueryMut<'w, M> {
@@ -192,8 +224,12 @@ impl<'w, M: Fetch> Iterator for QueryMut<'w, M> {
 }
 
 impl World {
-    pub fn query<M: Fetch>(&self) -> Query<'_, M> { Query::new(self) }
-    pub fn query_mut<M: Fetch>(&mut self) -> QueryMut<'_, M> { QueryMut::new(self) }
+    pub fn query<M: Fetch>(&self) -> Query<'_, M> {
+        Query::new(self)
+    }
+    pub fn query_mut<M: Fetch>(&mut self) -> QueryMut<'_, M> {
+        QueryMut::new(self)
+    }
     pub fn entities_with<T: 'static>(&self) -> Vec<Entity> {
         let tid = TypeId::of::<T>();
         self.archetypes

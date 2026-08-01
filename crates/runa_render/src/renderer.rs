@@ -367,9 +367,7 @@ impl<'window> Renderer<'window> {
 
         let uniform_alignment = device.limits().min_uniform_buffer_offset_alignment;
         let uniform_stride = u64::from(
-            (size_of::<MeshUniforms>() as u32)
-                .div_ceil(uniform_alignment)
-                * uniform_alignment,
+            (size_of::<MeshUniforms>() as u32).div_ceil(uniform_alignment) * uniform_alignment,
         );
         const INITIAL_MESH_UNIFORM_SIZE: u64 = 65536; // 64KB — room for ~40 meshes
         let mesh_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -871,12 +869,30 @@ impl<'window> Renderer<'window> {
                         let nx = -dy / len * width * 0.5;
                         let ny = dx / len * width * 0.5;
                         self.ui_vertices.extend_from_slice(&[
-                            UIVertex { position: [start.x + nx, start.y + ny], color: *color },
-                            UIVertex { position: [end.x + nx, end.y + ny], color: *color },
-                            UIVertex { position: [start.x - nx, start.y - ny], color: *color },
-                            UIVertex { position: [start.x - nx, start.y - ny], color: *color },
-                            UIVertex { position: [end.x + nx, end.y + ny], color: *color },
-                            UIVertex { position: [end.x - nx, end.y - ny], color: *color },
+                            UIVertex {
+                                position: [start.x + nx, start.y + ny],
+                                color: *color,
+                            },
+                            UIVertex {
+                                position: [end.x + nx, end.y + ny],
+                                color: *color,
+                            },
+                            UIVertex {
+                                position: [start.x - nx, start.y - ny],
+                                color: *color,
+                            },
+                            UIVertex {
+                                position: [start.x - nx, start.y - ny],
+                                color: *color,
+                            },
+                            UIVertex {
+                                position: [end.x + nx, end.y + ny],
+                                color: *color,
+                            },
+                            UIVertex {
+                                position: [end.x - nx, end.y - ny],
+                                color: *color,
+                            },
                         ]);
                     }
                 }
@@ -1096,34 +1112,22 @@ impl<'window> Renderer<'window> {
                                         },
                                         UITexturedVertex {
                                             position: [right + dx, top],
-                                            tex_coords: [
-                                                char_uv.u + char_uv.u_width,
-                                                char_uv.v,
-                                            ],
+                                            tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
                                             color: *seg_color,
                                         },
                                         UITexturedVertex {
                                             position: [left, bottom],
-                                            tex_coords: [
-                                                char_uv.u,
-                                                char_uv.v + char_uv.v_height,
-                                            ],
+                                            tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
                                             color: *seg_color,
                                         },
                                         UITexturedVertex {
                                             position: [left, bottom],
-                                            tex_coords: [
-                                                char_uv.u,
-                                                char_uv.v + char_uv.v_height,
-                                            ],
+                                            tex_coords: [char_uv.u, char_uv.v + char_uv.v_height],
                                             color: *seg_color,
                                         },
                                         UITexturedVertex {
                                             position: [right + dx, top],
-                                            tex_coords: [
-                                                char_uv.u + char_uv.u_width,
-                                                char_uv.v,
-                                            ],
+                                            tex_coords: [char_uv.u + char_uv.u_width, char_uv.v],
                                             color: *seg_color,
                                         },
                                         UITexturedVertex {

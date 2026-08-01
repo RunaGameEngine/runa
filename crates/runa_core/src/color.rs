@@ -364,7 +364,10 @@ pub enum ParseColorError {
 impl std::fmt::Display for ParseColorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidLength(len) => write!(f, "invalid hex color length: {len} (expected 3, 4, 6, or 8)"),
+            Self::InvalidLength(len) => write!(
+                f,
+                "invalid hex color length: {len} (expected 3, 4, 6, or 8)"
+            ),
             Self::InvalidHexChar(ch) => write!(f, "invalid hex character: '{ch}'"),
         }
     }
@@ -374,16 +377,17 @@ impl std::fmt::Display for ParseColorError {
 
 fn u8_from_hex_pair(s: &str, start: usize, len: usize) -> Result<u8, ParseColorError> {
     let hex_str = &s[start..start + len];
-    u8::from_str_radix(hex_str, 16)
-        .map_err(|_| {
-            let bad = s.chars().nth(start).unwrap_or('?');
-            ParseColorError::InvalidHexChar(bad)
-        })
+    u8::from_str_radix(hex_str, 16).map_err(|_| {
+        let bad = s.chars().nth(start).unwrap_or('?');
+        ParseColorError::InvalidHexChar(bad)
+    })
 }
 
 fn hue_to_0_360(hue: f32) -> f32 {
     let h = hue % 360.0;
-    if h < 0.0 { h + 360.0 } else { h }
+    if h < 0.0 {
+        h + 360.0
+    } else {
+        h
+    }
 }
-
-

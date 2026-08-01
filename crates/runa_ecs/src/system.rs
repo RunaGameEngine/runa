@@ -17,8 +17,12 @@ impl FunctionSystem {
 }
 
 impl System for FunctionSystem {
-    fn name(&self) -> &'static str { self.name }
-    fn run(&mut self, world: &mut World) { (self.func)(world) }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn run(&mut self, world: &mut World) {
+        (self.func)(world)
+    }
 }
 
 // ─── Auto-registration via inventory ─────────────────────────
@@ -39,7 +43,10 @@ pub struct SystemStage {
 
 impl SystemStage {
     pub fn new(name: &'static str) -> Self {
-        Self { name, systems: Vec::new() }
+        Self {
+            name,
+            systems: Vec::new(),
+        }
     }
 
     pub fn add_system(&mut self, system: impl System) -> &mut Self {
@@ -87,5 +94,7 @@ impl Scheduler {
 }
 
 impl Default for Scheduler {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

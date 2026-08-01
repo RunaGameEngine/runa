@@ -52,7 +52,10 @@ impl BlobVec {
     }
 
     pub fn new_with_info(info: ComponentInfo) -> Self {
-        Self { info, data: Vec::new() }
+        Self {
+            info,
+            data: Vec::new(),
+        }
     }
 
     pub fn info(&self) -> &ComponentInfo {
@@ -68,7 +71,10 @@ impl BlobVec {
     }
 
     pub fn len(&self) -> usize {
-        self.data.len().checked_div(self.info.layout.size()).unwrap_or(self.data.len())
+        self.data
+            .len()
+            .checked_div(self.info.layout.size())
+            .unwrap_or(self.data.len())
     }
 
     pub fn is_empty(&self) -> bool {

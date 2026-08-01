@@ -4,10 +4,10 @@ use crate::components::{
 };
 use crate::input::InputState;
 use crate::systems::event_system::EventBus;
-use winit::event::MouseButton;
 use runa_ecs::{R, W};
 use runa_macros::system;
 use std::sync::{Mutex, OnceLock};
+use winit::event::MouseButton;
 
 fn audio_engine() -> &'static Mutex<Option<AudioEngine>> {
     static ENGINE: OnceLock<Mutex<Option<AudioEngine>>> = OnceLock::new();

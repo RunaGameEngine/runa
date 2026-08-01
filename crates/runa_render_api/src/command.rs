@@ -101,11 +101,21 @@ impl ScreenEffectFlags {
 
     pub fn to_u32(&self) -> u32 {
         let mut flags = 0u32;
-        if self.fade { flags |= 1; }
-        if self.vignette { flags |= 2; }
-        if self.rgb_shift { flags |= 4; }
-        if self.tint { flags |= 8; }
-        if self.color_adjust { flags |= 16; }
+        if self.fade {
+            flags |= 1;
+        }
+        if self.vignette {
+            flags |= 2;
+        }
+        if self.rgb_shift {
+            flags |= 4;
+        }
+        if self.tint {
+            flags |= 8;
+        }
+        if self.color_adjust {
+            flags |= 16;
+        }
         flags
     }
 }

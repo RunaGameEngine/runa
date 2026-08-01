@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::command::{AtmosphereData, DirectionalLightData, FontId, InstanceData, Mesh3dParams, PointLightData, RichTextSegment, ScreenEffectData, TextOutline, TileParams, UiRect};
+use crate::command::{
+    AtmosphereData, DirectionalLightData, FontId, InstanceData, Mesh3dParams, PointLightData,
+    RichTextSegment, ScreenEffectData, TextOutline, TileParams, UiRect,
+};
 use crate::RenderCommands;
 use glam::{Quat, Vec2, Vec3};
 use runa_asset::TextureAsset;

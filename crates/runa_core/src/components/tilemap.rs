@@ -290,7 +290,9 @@ impl TilemapRenderer {
 }
 
 impl Default for TilemapRenderer {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 #[derive(Clone)]

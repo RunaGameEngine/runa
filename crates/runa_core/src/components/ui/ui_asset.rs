@@ -252,7 +252,11 @@ impl UiAssetFile {
     }
 
     pub fn from_ui_renderer(renderer: &UiRenderer) -> Self {
-        let nodes: Vec<UiNodeAsset> = renderer.nodes.iter().map(UiNodeAsset::from_ui_node).collect();
+        let nodes: Vec<UiNodeAsset> = renderer
+            .nodes
+            .iter()
+            .map(UiNodeAsset::from_ui_node)
+            .collect();
         Self {
             viewport_width: 1920.0,
             viewport_height: 1080.0,
@@ -262,7 +266,11 @@ impl UiAssetFile {
 
     pub fn into_ui_renderer(self, project_root: Option<&Path>) -> UiRenderer {
         let mut renderer = UiRenderer::new(CanvasSpace::Screen);
-        renderer.nodes = self.nodes.iter().map(|n| n.to_ui_node(project_root)).collect();
+        renderer.nodes = self
+            .nodes
+            .iter()
+            .map(|n| n.to_ui_node(project_root))
+            .collect();
         if let Some(first) = self.nodes.first() {
             renderer.root = UiNodeId(first.id);
         }
@@ -303,13 +311,11 @@ impl UiNodeAsset {
 impl UiNodeKindAsset {
     pub fn from_kind(kind: &UiNodeKind) -> Self {
         match kind {
-            UiNodeKind::Container(ck) => {
-                UiNodeKindAsset::Container(match ck {
-                    ContainerKind::Free => ContainerKindAsset::Free,
-                    ContainerKind::HorizontalBox => ContainerKindAsset::HorizontalBox,
-                    ContainerKind::VerticalBox => ContainerKindAsset::VerticalBox,
-                })
-            }
+            UiNodeKind::Container(ck) => UiNodeKindAsset::Container(match ck {
+                ContainerKind::Free => ContainerKindAsset::Free,
+                ContainerKind::HorizontalBox => ContainerKindAsset::HorizontalBox,
+                ContainerKind::VerticalBox => ContainerKindAsset::VerticalBox,
+            }),
             UiNodeKind::Image(props) => UiNodeKindAsset::Image(ImagePropsAsset {
                 texture_path: None,
                 tint: props.tint,
@@ -345,10 +351,13 @@ impl UiNodeKindAsset {
                 ContainerKindAsset::VerticalBox => ContainerKind::VerticalBox,
             }),
             UiNodeKindAsset::Image(props) => {
-                let texture = if let (Some(root), Some(path)) = (project_root, &props.texture_path) {
+                let texture = if let (Some(root), Some(path)) = (project_root, &props.texture_path)
+                {
                     let full = root.join(path);
                     if let Ok(tex) = TextureAsset::load(&full) {
-                        Some(Handle { inner: Arc::new(tex) })
+                        Some(Handle {
+                            inner: Arc::new(tex),
+                        })
                     } else {
                         None
                     }

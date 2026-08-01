@@ -1,7 +1,7 @@
 use wgpu::{
-    self, BindGroupLayout, BlendState, ColorTargetState, ColorWrites, Device, FragmentState,
-    PrimitiveState, RenderPipeline, SamplerBindingType, ShaderModule, TextureFormat,
-    TextureSampleType, BindingType, BufferBindingType, ShaderStages,
+    self, BindGroupLayout, BindingType, BlendState, BufferBindingType, ColorTargetState,
+    ColorWrites, Device, FragmentState, PrimitiveState, RenderPipeline, SamplerBindingType,
+    ShaderModule, ShaderStages, TextureFormat, TextureSampleType,
 };
 
 #[repr(C)]
@@ -27,46 +27,42 @@ pub struct PostProcessPipeline {
 
 impl PostProcessPipeline {
     pub fn new(device: &Device, format: TextureFormat) -> Self {
-        let shader: ShaderModule =
-            device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("PostProcess Shader"),
-                source: wgpu::ShaderSource::Wgsl(
-                    include_str!("../shaders/post_process.wgsl").into(),
-                ),
-            });
+        let shader: ShaderModule = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("PostProcess Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/post_process.wgsl").into()),
+        });
 
-        let bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("PostProcess BindGroup Layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            multisampled: false,
-                            sample_type: TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        count: None,
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("PostProcess BindGroup Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                        count: None,
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
+                    count: None,
+                },
+            ],
+        });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("PostProcess Pipeline Layout"),

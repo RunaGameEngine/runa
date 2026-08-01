@@ -27,8 +27,8 @@ pub struct UiRenderer {
 impl UiRenderer {
     pub fn new(space: CanvasSpace) -> Self {
         let root = UiNodeId(0);
-        let root_node = UiNode::new(root, None, UiNodeKind::Container(ContainerKind::Free))
-            .named("root");
+        let root_node =
+            UiNode::new(root, None, UiNodeKind::Container(ContainerKind::Free)).named("root");
 
         Self {
             root_node_path: None,
@@ -45,8 +45,8 @@ impl UiRenderer {
         }
     }
     pub fn clear(&mut self) {
-        let root_node = UiNode::new(self.root, None, UiNodeKind::Container(ContainerKind::Free))
-            .named("root");
+        let root_node =
+            UiNode::new(self.root, None, UiNodeKind::Container(ContainerKind::Free)).named("root");
         self.nodes.clear();
         self.nodes.push(root_node);
         self.parent_stack.clear();
@@ -322,10 +322,7 @@ impl UiRenderer {
     /// Update the text content of an existing text node.
     /// Does nothing if `id` is not a text node.
     pub fn set_text(&mut self, id: UiNodeId, content: impl Into<String>) {
-        if let Some(UiNodeKind::Text(props)) = self
-            .node_mut(id)
-            .map(|n| &mut n.kind)
-        {
+        if let Some(UiNodeKind::Text(props)) = self.node_mut(id).map(|n| &mut n.kind) {
             let text = content.into();
             props.text = text.clone();
             props.segments = crate::components::ui::parse_rich_text(&text);
@@ -537,8 +534,16 @@ impl UiRenderer {
                 Anchor::Stretch => pcy,
             };
 
-            let final_w = if matches!(anchor, Anchor::Stretch) { pw - margin.left - margin.right - pos.x * 2.0 } else { w };
-            let final_h = if matches!(anchor, Anchor::Stretch) { ph - margin.top - margin.bottom - pos.y * 2.0 } else { h };
+            let final_w = if matches!(anchor, Anchor::Stretch) {
+                pw - margin.left - margin.right - pos.x * 2.0
+            } else {
+                w
+            };
+            let final_h = if matches!(anchor, Anchor::Stretch) {
+                ph - margin.top - margin.bottom - pos.y * 2.0
+            } else {
+                h
+            };
             rects[i] = (cx, cy, final_w, final_h);
         }
 
@@ -547,7 +552,11 @@ impl UiRenderer {
             if let UiNodeKind::Container(ck) = &kinds[i] {
                 match ck {
                     ContainerKind::HorizontalBox | ContainerKind::VerticalBox => {
-                        let children: Vec<usize> = self.nodes[i].children.iter().map(|id| id.0 as usize).collect();
+                        let children: Vec<usize> = self.nodes[i]
+                            .children
+                            .iter()
+                            .map(|id| id.0 as usize)
+                            .collect();
                         if children.is_empty() {
                             continue;
                         }
@@ -567,37 +576,67 @@ impl UiRenderer {
                         let mut base_sizes = Vec::with_capacity(children.len());
                         let mut total_min = 0.0f32;
                         for &ci in &children {
-                            let (min_val, mgn) = if let Some(child) = self.node(UiNodeId(ci as u32)) {
-                                let base = match &child.kind {
-                                    UiNodeKind::Text(props) => {
-                                        let raw = if is_horizontal {
-                                            (props.text.len() as f32) * props.font_size as f32 * 0.5 * font_scale
-                                        } else {
-                                            props.font_size as f32 * font_scale
+                            let (min_val, mgn) =
+                                if let Some(child) = self.node(UiNodeId(ci as u32)) {
+                                    let base =
+                                        match &child.kind {
+                                            UiNodeKind::Text(props) => {
+                                                let raw = if is_horizontal {
+                                                    (props.text.len() as f32)
+                                                        * props.font_size as f32
+                                                        * 0.5
+                                                        * font_scale
+                                                } else {
+                                                    props.font_size as f32 * font_scale
+                                                };
+                                                raw.max(if is_horizontal {
+                                                    child.layout.min_size.x
+                                                } else {
+                                                    child.layout.min_size.y
+                                                })
+                                                .min(if is_horizontal {
+                                                    child.layout.max_size.x
+                                                } else {
+                                                    child.layout.max_size.y
+                                                })
+                                            }
+                                            UiNodeKind::Slider(_) => {
+                                                if is_horizontal {
+                                                    child.layout.min_size.x.max(100.0)
+                                                } else {
+                                                    30.0
+                                                }
+                                            }
+                                            UiNodeKind::Image(_) => {
+                                                if is_horizontal {
+                                                    child.computed.rect.w.max(1.0)
+                                                } else {
+                                                    child.computed.rect.h.max(1.0)
+                                                }
+                                            }
+                                            UiNodeKind::Container(_) => {
+                                                if is_horizontal {
+                                                    child
+                                                        .computed
+                                                        .rect
+                                                        .w
+                                                        .max(child.layout.min_size.x)
+                                                        .max(1.0)
+                                                } else {
+                                                    child
+                                                        .computed
+                                                        .rect
+                                                        .h
+                                                        .max(child.layout.min_size.y)
+                                                        .max(1.0)
+                                                }
+                                            }
                                         };
-                                        raw
-                                            .max(if is_horizontal { child.layout.min_size.x } else { child.layout.min_size.y })
-                                            .min(if is_horizontal { child.layout.max_size.x } else { child.layout.max_size.y })
-                                    }
-                                    UiNodeKind::Slider(_) => {
-                                        if is_horizontal { child.layout.min_size.x.max(100.0) } else { 30.0 }
-                                    }
-                                    UiNodeKind::Image(_) => {
-                                        if is_horizontal { child.computed.rect.w.max(1.0) } else { child.computed.rect.h.max(1.0) }
-                                    }
-                                    UiNodeKind::Container(_) => {
-                                        if is_horizontal {
-                                            child.computed.rect.w.max(child.layout.min_size.x).max(1.0)
-                                        } else {
-                                            child.computed.rect.h.max(child.layout.min_size.y).max(1.0)
-                                        }
-                                    }
+                                    let m = child.layout.margin;
+                                    (base.max(0.0), m)
+                                } else {
+                                    (0.0, EdgeInsets::ZERO)
                                 };
-                                let m = child.layout.margin;
-                                (base.max(0.0), m)
-                            } else {
-                                (0.0, EdgeInsets::ZERO)
-                            };
                             // Include margin in the effective size (space reserved in layout)
                             let effective = if is_horizontal {
                                 min_val + mgn.left + mgn.right
@@ -609,9 +648,17 @@ impl UiRenderer {
                             total_min += effective;
                         }
 
-                        let spacing = if children.len() > 1 { gap * (children.len() - 1) as f32 } else { 0.0 };
+                        let spacing = if children.len() > 1 {
+                            gap * (children.len() - 1) as f32
+                        } else {
+                            0.0
+                        };
                         let remaining = (available - spacing - total_min).max(0.0);
-                        let extra = if !children.is_empty() { remaining / children.len() as f32 } else { 0.0 };
+                        let extra = if !children.is_empty() {
+                            remaining / children.len() as f32
+                        } else {
+                            0.0
+                        };
 
                         let mut offset = if is_horizontal {
                             pcx - pw * 0.5 + padding.left
@@ -622,21 +669,43 @@ impl UiRenderer {
                         for (idx, &ci) in children.iter().enumerate() {
                             let base = base_sizes[idx];
                             let mgn = margins[idx];
-                            let effective = if is_horizontal { base + mgn.left + mgn.right } else { base + mgn.top + mgn.bottom };
+                            let effective = if is_horizontal {
+                                base + mgn.left + mgn.right
+                            } else {
+                                base + mgn.top + mgn.bottom
+                            };
                             let final_effective = effective + extra;
-                            let content_size = (final_effective - (if is_horizontal { mgn.left + mgn.right } else { mgn.top + mgn.bottom })).max(0.0);
-                            let content_size = self.node(UiNodeId(ci as u32)).map(|n| {
-                                let main_min = if is_horizontal { n.layout.min_size.x } else { n.layout.min_size.y };
-                                let main_max = if is_horizontal { n.layout.max_size.x } else { n.layout.max_size.y };
-                                content_size.max(main_min).min(main_max)
-                            }).unwrap_or(content_size);
+                            let content_size = (final_effective
+                                - (if is_horizontal {
+                                    mgn.left + mgn.right
+                                } else {
+                                    mgn.top + mgn.bottom
+                                }))
+                            .max(0.0);
+                            let content_size = self
+                                .node(UiNodeId(ci as u32))
+                                .map(|n| {
+                                    let main_min = if is_horizontal {
+                                        n.layout.min_size.x
+                                    } else {
+                                        n.layout.min_size.y
+                                    };
+                                    let main_max = if is_horizontal {
+                                        n.layout.max_size.x
+                                    } else {
+                                        n.layout.max_size.y
+                                    };
+                                    content_size.max(main_min).min(main_max)
+                                })
+                                .unwrap_or(content_size);
                             let content_half = content_size * 0.5;
 
                             if is_horizontal {
                                 let child_h = self
                                     .node(UiNodeId(ci as u32))
                                     .map(|n| {
-                                        rects[ci].3
+                                        rects[ci]
+                                            .3
                                             .max(n.layout.min_size.y)
                                             .min(n.layout.max_size.y)
                                     })
@@ -653,7 +722,8 @@ impl UiRenderer {
                                 let child_w = self
                                     .node(UiNodeId(ci as u32))
                                     .map(|n| {
-                                        rects[ci].2
+                                        rects[ci]
+                                            .2
                                             .max(n.layout.min_size.x)
                                             .min(n.layout.max_size.x)
                                     })
@@ -741,7 +811,9 @@ impl UiRenderer {
             }
         };
 
-        let left_down = input.mouse_buttons_pressed.contains(&winit::event::MouseButton::Left);
+        let left_down = input
+            .mouse_buttons_pressed
+            .contains(&winit::event::MouseButton::Left);
         let left_just_down = left_down && !self.interaction_was_pressed;
         let left_just_up = self.interaction_was_pressed && !left_down;
         drop(input);
@@ -909,14 +981,24 @@ impl UiRenderer {
                         [0.2, 0.2, 0.3, 1.0]
                     };
                     render_queue.draw_ui_rect(
-                        RenderUiRect { x: rect.x, y: rect.y, w: rect.w, h: rect.h * 0.4 },
+                        RenderUiRect {
+                            x: rect.x,
+                            y: rect.y,
+                            w: rect.w,
+                            h: rect.h * 0.4,
+                        },
                         track_color,
                         node.style.z_index,
                     );
                     let t = ((props.value - props.min) / (props.max - props.min)).clamp(0.0, 1.0);
                     let thumb_x = rect.x - rect.w * 0.5 + t * rect.w;
                     render_queue.draw_ui_rect(
-                        RenderUiRect { x: thumb_x, y: rect.y, w: 12.0, h: rect.h },
+                        RenderUiRect {
+                            x: thumb_x,
+                            y: rect.y,
+                            w: 12.0,
+                            h: rect.h,
+                        },
                         [0.8, 0.8, 1.0, 1.0],
                         node.style.z_index,
                     );
@@ -927,7 +1009,9 @@ impl UiRenderer {
         if self.debug_show_bounds {
             let outline_color = [0.0, 1.0, 0.0, 0.8];
             for node in &self.nodes {
-                if !node.visible { continue; }
+                if !node.visible {
+                    continue;
+                }
                 let rect = screen_of(node.computed.rect);
                 let l = rect.x - rect.w * 0.5;
                 let t = rect.y - rect.h * 0.5;
@@ -1085,14 +1169,24 @@ impl<'a> UiNodeBuilder<'a> {
 
     pub fn with_padding(self, l: f32, t: f32, r: f32, b: f32) -> Self {
         if let Some(node) = self.renderer.node_mut(self.id) {
-            node.layout.padding = crate::components::ui::EdgeInsets { left: l, top: t, right: r, bottom: b };
+            node.layout.padding = crate::components::ui::EdgeInsets {
+                left: l,
+                top: t,
+                right: r,
+                bottom: b,
+            };
         }
         self
     }
 
     pub fn with_margin(self, l: f32, t: f32, r: f32, b: f32) -> Self {
         if let Some(node) = self.renderer.node_mut(self.id) {
-            node.layout.margin = crate::components::ui::EdgeInsets { left: l, top: t, right: r, bottom: b };
+            node.layout.margin = crate::components::ui::EdgeInsets {
+                left: l,
+                top: t,
+                right: r,
+                bottom: b,
+            };
         }
         self
     }

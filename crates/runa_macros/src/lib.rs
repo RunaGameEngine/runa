@@ -12,9 +12,8 @@ pub fn system(attr: TokenStream, item: TokenStream) -> TokenStream {
     let crate_path: proc_macro2::TokenStream = if attr.is_empty() {
         "::runa_engine".parse().unwrap()
     } else {
-        let lit: LitStr = syn::parse(attr).expect(
-            "expected optional crate path argument, e.g. #[system(\"::my_crate\")]",
-        );
+        let lit: LitStr = syn::parse(attr)
+            .expect("expected optional crate path argument, e.g. #[system(\"::my_crate\")]");
         lit.value().parse().expect("invalid crate path")
     };
 

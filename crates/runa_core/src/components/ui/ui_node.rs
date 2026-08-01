@@ -281,12 +281,22 @@ impl StyleSheet {
     }
 
     pub fn with_padding(mut self, l: f32, t: f32, r: f32, b: f32) -> Self {
-        self.padding = Some(EdgeInsets { left: l, top: t, right: r, bottom: b });
+        self.padding = Some(EdgeInsets {
+            left: l,
+            top: t,
+            right: r,
+            bottom: b,
+        });
         self
     }
 
     pub fn with_margin(mut self, l: f32, t: f32, r: f32, b: f32) -> Self {
-        self.margin = Some(EdgeInsets { left: l, top: t, right: r, bottom: b });
+        self.margin = Some(EdgeInsets {
+            left: l,
+            top: t,
+            right: r,
+            bottom: b,
+        });
         self
     }
 
