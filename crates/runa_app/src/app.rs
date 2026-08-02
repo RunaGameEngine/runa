@@ -188,9 +188,10 @@ impl<'window> App<'window> {
 
         let camera = self
             .ecs_world
-            .query::<runa_ecs::R<Camera>>()
+            .query::<(R<Camera>, R<Transform>)>()
             .next()
-            .map(|(_, c)| *c)
+            .map(|(_, (c, t))| c.resolved_with_transform(Some(t)))
+            .or_else(|| self.ecs_world.query::<R<Camera>>().next().map(|(_, c)| *c))
             .unwrap_or_default();
 
         // Phase 1: populate queue from ECS (no renderer borrow)
@@ -349,9 +350,15 @@ impl<'window> ApplicationHandler for App<'window> {
                 let mut input_state = InputState::current_mut();
                 input_state.camera = self
                     .ecs_world
-                    .query::<runa_ecs::R<Camera>>()
+                    .query::<(runa_ecs::R<Camera>, runa_ecs::R<Transform>)>()
                     .next()
-                    .map(|(_, c)| *c);
+                    .map(|(_, (c, t))| c.resolved_with_transform(Some(t)))
+                    .or_else(|| {
+                        self.ecs_world
+                            .query::<runa_ecs::R<Camera>>()
+                            .next()
+                            .map(|(_, c)| *c)
+                    });
             }
 
             self.scheduler.run(&mut self.ecs_world);
