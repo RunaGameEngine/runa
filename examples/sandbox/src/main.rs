@@ -53,5 +53,5 @@ fn main() {
         window_icon: None,
     };
 
-    let _ = RunaApp::run_with_world(config, world);
+    let _ = RunaApp::run_with_config(world, config);
 }

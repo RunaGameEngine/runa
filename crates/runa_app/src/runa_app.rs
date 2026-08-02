@@ -12,9 +12,9 @@ use crate::app::{App, RunaWindowConfig};
 pub struct RunaApp {}
 
 impl RunaApp {
-    pub fn run_with_world(
-        config: RunaWindowConfig,
+    fn run_with_world(
         ecs_world: runa_ecs::World,
+        config: RunaWindowConfig,
     ) -> Result<(), EventLoopError> {
         let event_loop = EventLoop::new()?;
         event_loop.set_control_flow(ControlFlow::Poll);
@@ -48,13 +48,14 @@ impl RunaApp {
         event_loop.run_app(&mut app)
     }
 
-    pub fn run_with_config(config: RunaWindowConfig) -> Result<(), EventLoopError> {
-        let mut ecs_world = runa_ecs::World::new();
-        ecs_world.spawn((runa_core::components::Camera::default(),));
-        Self::run_with_world(config, ecs_world)
+    pub fn run_with_config(
+        ecs_world: runa_ecs::World,
+        config: RunaWindowConfig,
+    ) -> Result<(), EventLoopError> {
+        Self::run_with_world(ecs_world, config)
     }
 
-    pub fn run_default() -> Result<(), EventLoopError> {
-        Self::run_with_config(RunaWindowConfig::default())
+    pub fn run_default(ecs_world: runa_ecs::World) -> Result<(), EventLoopError> {
+        Self::run_with_config(ecs_world, RunaWindowConfig::default())
     }
 }
