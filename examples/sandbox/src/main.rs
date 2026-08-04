@@ -36,12 +36,13 @@ fn main() {
     world.spawn((
         Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
+            scale: Vec3::new(1., 1., 16.),
             ..Transform::default()
         },
         SpriteRenderer::new(Some(texture)),
     ));
 
-    world.spawn((Camera::new_orthographic(320.0, 180.0),));
+    world.spawn((Camera::new_orthographic(32.0, 18.0),));
 
     let config = RunaWindowConfig {
         title: "Runa Sandbox".to_string(),
