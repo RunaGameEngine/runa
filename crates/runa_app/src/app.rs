@@ -61,6 +61,7 @@ pub struct App<'window> {
     pub current_frame_time_ms: f32,
     pub current_render_time_ms: f32,
     pub current_update_time_ms: f32,
+    pub interpolation_alpha: f32,
 
     pub console: Console,
 
@@ -84,7 +85,7 @@ impl<'window> App<'window> {
         }
     }
 
-    fn render_ecs_sprites(&mut self) {
+    fn render_ecs_sprites(&mut self, alpha: f32) {
         let Self {
             ref ecs_world,
             ref mut queue,
@@ -100,8 +101,8 @@ impl<'window> App<'window> {
                 let order = sort_orders.get(&entity).copied().unwrap_or(0);
                 queue.draw_sprite(
                     tex.inner.clone(),
-                    transform.position,
-                    transform.rotation,
+                    transform.interpolated_position(alpha),
+                    transform.interpolated_rotation(alpha),
                     transform.scale,
                     sprite.color,
                     sprite.uv_rect,
@@ -136,7 +137,7 @@ impl<'window> App<'window> {
         }
     }
 
-    fn render_ecs_meshes(&mut self) {
+    fn render_ecs_meshes(&mut self, alpha: f32) {
         let Self {
             ref ecs_world,
             ref mut queue,
@@ -154,8 +155,8 @@ impl<'window> App<'window> {
             let mesh = &handle.inner;
             let model = glam::Mat4::from_scale_rotation_translation(
                 transform.scale,
-                transform.rotation,
-                transform.position,
+                transform.interpolated_rotation(alpha),
+                transform.interpolated_position(alpha),
             );
             let mesh_id = mesh.vertices.as_ptr() as u64;
             let vtx: Vec<runa_render_api::Vertex3D> = mesh
@@ -190,7 +191,12 @@ impl<'window> App<'window> {
             .ecs_world
             .query::<(R<Camera>, R<Transform>)>()
             .next()
-            .map(|(_, (c, t))| c.resolved_with_transform(Some(t)))
+            .map(|(_, (c, t))| {
+                let mut resolved = t.clone();
+                resolved.position = t.interpolated_position(self.interpolation_alpha);
+                resolved.rotation = t.interpolated_rotation(self.interpolation_alpha);
+                c.resolved_with_transform(Some(&resolved))
+            })
             .or_else(|| self.ecs_world.query::<R<Camera>>().next().map(|(_, c)| *c))
             .unwrap_or_default();
 
@@ -230,8 +236,8 @@ impl<'window> App<'window> {
                 background: bg,
             });
         }
-        self.render_ecs_sprites();
-        self.render_ecs_meshes();
+        self.render_ecs_sprites(self.interpolation_alpha);
+        self.render_ecs_meshes(self.interpolation_alpha);
         self.render_ecs_ui(&camera);
 
         if let (Some(renderer), Some(window)) = (&mut self.renderer, &self.window) {
@@ -361,12 +367,18 @@ impl<'window> ApplicationHandler for App<'window> {
                     });
             }
 
+            for (_, transform) in self.ecs_world.query_mut::<runa_ecs::W<Transform>>() {
+                transform.prepare_for_update();
+            }
+
             self.scheduler.run(&mut self.ecs_world);
 
             InputState::update_frame();
 
             self.accumulator -= scaled_timestep;
         }
+
+        self.interpolation_alpha = self.accumulator / scaled_timestep;
 
         self.current_update_time_ms = update_start.elapsed().as_secs_f32() * 1000.0;
 

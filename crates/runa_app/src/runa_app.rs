@@ -39,6 +39,7 @@ impl RunaApp {
             current_frame_time_ms: 0.0,
             current_render_time_ms: 0.0,
             current_update_time_ms: 0.0,
+            interpolation_alpha: 0.0,
             frame_start: Instant::now(),
             console,
             config,
