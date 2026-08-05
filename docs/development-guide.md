@@ -6,14 +6,14 @@ The engine is migrating to a new archetype-based ECS (runa_ecs crate).
 
 See ROADMAP.md for the current migration track.
 -->
+
 # Development Guide
 
 ## Versioning & Releases
 
 ### Current Scheme
 
-The project uses [Semantic Versioning 2.0](https://semver.org/) with
-a pre-release suffix: `0.6.0-alpha.1`.
+The project uses [Semantic Versioning 2.0](https://semver.org/): `0.6.0-alpha.1`.
 
 ```
 MAJOR.MINOR.PATCH-PRERELEASE.COUNT
@@ -60,12 +60,12 @@ Each crate inherits it via `version.workspace = true`.
 
 ### When to Bump
 
-| Change Type | Bump |
-|-------------|------|
-| Breaking API change | MAJOR (or MINOR while 0.x) |
-| New feature | MINOR |
-| Bug fix | PATCH |
-| Pre-release iteration | COUNT |
+| Change Type           | Bump                       |
+| --------------------- | -------------------------- |
+| Breaking API change   | MAJOR (or MINOR while 0.x) |
+| New feature           | MINOR                      |
+| Bug fix               | PATCH                      |
+| Pre-release iteration | COUNT                      |
 
 ---
 
@@ -74,6 +74,7 @@ Each crate inherits it via `version.workspace = true`.
 ### Current CI (`.github/workflows/ci.yml`)
 
 Runs on every push/PR to `main`:
+
 - `cargo check --workspace`
 - `cargo test --workspace`
 - `cargo clippy --workspace -- -D warnings`
@@ -216,13 +217,13 @@ Group changes under:
 
 ## How Other Teams Do It
 
-| Project | Version Scheme | Build | CI | Release |
-|---------|---------------|-------|----|---------|
-| **Bevy** | semver + rc | `cargo build` + examples | GitHub Actions (matrix) | GitHub Releases + crates.io |
-| **Fyrox** | semver | `cargo build` | GitHub Actions | GitHub Releases + crates.io |
-| **Godot-Rust** | semver + git | `cargo build` + bindings | GitHub Actions | GitHub Releases + docs |
-| **Rapier** | semver | `cargo build` | GitHub Actions | crates.io only |
-| **Unity** | year.release.patch | Custom build system | Jenkins/DevOps | Installer per platform |
+| Project        | Version Scheme     | Build                    | CI                      | Release                     |
+| -------------- | ------------------ | ------------------------ | ----------------------- | --------------------------- |
+| **Bevy**       | semver + rc        | `cargo build` + examples | GitHub Actions (matrix) | GitHub Releases + crates.io |
+| **Fyrox**      | semver             | `cargo build`            | GitHub Actions          | GitHub Releases + crates.io |
+| **Godot-Rust** | semver + git       | `cargo build` + bindings | GitHub Actions          | GitHub Releases + docs      |
+| **Rapier**     | semver             | `cargo build`            | GitHub Actions          | crates.io only              |
+| **Unity**      | year.release.patch | Custom build system      | Jenkins/DevOps          | Installer per platform      |
 
 **Common patterns:**
 
@@ -236,13 +237,13 @@ Group changes under:
 
 ## Recommended Tools
 
-| Tool | Purpose |
-|------|---------|
-| `cargo-release` | Automate version bump, tag, publish |
-| `cargo-bump` | Bump version in Cargo.toml |
-| `git-cliff` | Generate changelog from conventional commits |
-| `cargo-dist` | Build and package Rust binaries for distribution |
-| `release-plz` | Automated releases with PR-based version bumps |
+| Tool               | Purpose                                             |
+| ------------------ | --------------------------------------------------- |
+| `cargo-release`    | Automate version bump, tag, publish                 |
+| `cargo-bump`       | Bump version in Cargo.toml                          |
+| `git-cliff`        | Generate changelog from conventional commits        |
+| `cargo-dist`       | Build and package Rust binaries for distribution    |
+| `release-plz`      | Automated releases with PR-based version bumps      |
 | `vergen` / `built` | Embed git hash, build time, rustc version in binary |
 
 ### Quick Start with cargo-release
@@ -262,4 +263,3 @@ cargo install cargo-release
 cargo release patch --execute   # bumps 0.5.1 → 0.5.2
 cargo release alpha --execute   # bumps 0.6.0-alpha.1 → 0.6.0-alpha.2
 ```
-

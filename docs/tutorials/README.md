@@ -6,6 +6,7 @@ The engine is migrating to a new archetype-based ECS (runa_ecs crate).
 
 See ROADMAP.md for the current migration track.
 -->
+
 # Runa Engine Tutorials
 
 These guides assume the current runtime model:
@@ -44,6 +45,8 @@ These guides assume the current runtime model:
 - [Tilemap](tilemap/tilemap.md)
 
 ## Getting Started Example
+
+Needs to be rewritten to match the current data.
 
 ```rust
 use runa_engine::prelude::*;
@@ -89,4 +92,3 @@ This style keeps:
 - editor dependency out of runtime code
 
 It also gives Runa a future path for editor tools without moving the source of truth away from the runtime object model.
-

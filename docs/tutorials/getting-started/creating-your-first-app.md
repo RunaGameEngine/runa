@@ -1,12 +1,3 @@
-<!--
-?? DEPRECATED � ECS Migration in Progress
-
-This documentation refers to the old OCS (runa_core::ocs) system.
-The engine is migrating to a new archetype-based ECS (runa_ecs crate).
-
-See ROADMAP.md for the current migration track.
--->
-
 # Creating Your First App
 
 This tutorial shows the smallest useful Runa application using the code-first API.
