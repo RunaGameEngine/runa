@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.6] - 2026-08-05
+
+### Bug Fixes
+
+- Camera respects entity Transform (closes [#12](https://github.com/RunaGameEngine/runa/issues/12))
+- Changed RunaApp creation methods
+- Transform interpolation now used at render time
+- *(changelog)* Preserve header on prepend and linkify issues
+
+### Documentation
+
+- Remove deprecated OCS migration notices from guides
+- Remove stale OCS migration banners and tidy up guides
+
+### Styling
+
+- Cargo fmt --all
+
 ## [0.7.5] - 2026-07-28
 
 ### Changed
