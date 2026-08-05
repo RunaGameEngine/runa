@@ -3,6 +3,19 @@
 
 
 [changelog]
+# A Tera template to be rendered at the top of the changelog.
+# When prepending, the first occurrence of this exact string is stripped
+# from the existing file so the header is never duplicated.
+# NOTE: keep it in sync with the top of CHANGELOG.md.
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
 # A Tera template to be rendered for each release in the changelog.
 # See https://keats.github.io/tera/docs/#introduction
 body = """
@@ -11,7 +24,7 @@ body = """
 {% else %}\
     ## [unreleased]
 {% endif %}\
-{% for group, commits in commits | group_by(attribute="group") %}
+    {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
     {% for commit in commits %}
         - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
@@ -19,6 +32,7 @@ body = """
             {{ commit.message | upper_first }}\
     {% endfor %}
 {% endfor %}
+
 """
 # Remove leading and trailing whitespaces from the changelog's body.
 trim = true
@@ -47,11 +61,8 @@ require_conventional = false
 split_commits = false
 # An array of regex based parsers to modify commit messages prior to further processing.
 commit_preprocessors = [
-    # Replace issue numbers with link templates to be updated in `changelog.postprocessors`.
-    #{ pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))"},
-    # Check spelling of the commit message using https://github.com/crate-ci/typos.
-    # If the spelling is incorrect, it will be fixed automatically.
-    #{ pattern = '.*', replace_command = 'typos --write-changes -' },
+    # Turn issue references like "(closes #12)" into clickable links.
+    { pattern = '#([0-9]+)', replace = "[#$1](https://github.com/RunaGameEngine/runa/issues/$1)" },
 ]
 # Prevent commits that are breaking from being excluded by commit parsers.
 protect_breaking_commits = false
