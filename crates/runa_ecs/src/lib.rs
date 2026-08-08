@@ -1,5 +1,6 @@
 mod archetype;
 mod blob_vec;
+mod commands;
 mod entity;
 mod query;
 mod system;
@@ -12,4 +13,5 @@ pub use query::{Query, QueryMut, R, W};
 pub use system::{Scheduler, System, SystemDescriptor, SystemStage};
 pub use world::World;
 
+pub use commands::commands;
 pub use inventory;

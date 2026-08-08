@@ -1,4 +1,4 @@
-use crate::World;
+use crate::{commands::apply_commands, World};
 
 pub trait System: Send + Sync + 'static {
     fn name(&self) -> &'static str;
@@ -90,6 +90,7 @@ impl Scheduler {
         for stage in &mut self.stages {
             stage.run(world);
         }
+        apply_commands(world);
     }
 }
 
