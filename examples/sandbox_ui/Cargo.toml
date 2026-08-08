@@ -7,12 +7,3 @@ authors.workspace = true
 
 [dependencies]
 runa_engine = { path = "../../crates/runa_engine" }
-runa_render = { path = "../../crates/runa_render" }
-runa_asset = { path = "../../crates/runa_asset" }
-runa_render_api = { path = "../../crates/runa_render_api" }
-runa_core = { path = "../../crates/runa_core" }
-runa_app = { path = "../../crates/runa_app" }
-winit.workspace = true
-
-[dev-dependencies]
-image = "0.24"

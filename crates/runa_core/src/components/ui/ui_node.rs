@@ -93,6 +93,14 @@ impl UiNode {
         let (left, top, right, bottom) = self.bounds();
         px >= left && px <= right && py >= top && py <= bottom
     }
+
+    /// Return slider value if node is slider else return None
+    pub fn get_slider_value(&self) -> Option<f32> {
+        match &self.kind {
+            UiNodeKind::Slider(p) => Some(p.value),
+            _ => None,
+        }
+    }
 }
 
 pub enum UiNodeKind {

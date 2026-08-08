@@ -2,9 +2,9 @@ use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
 use runa_engine::runa_core::components::{Camera, SpriteRenderer, Transform};
 use runa_engine::runa_core::glam::Vec3;
 use runa_engine::runa_core::input::InputState;
-use runa_engine::runa_ecs;
+use runa_engine::runa_core::KeyCode;
 use runa_engine::system;
-use winit::keyboard::KeyCode;
+use runa_engine::{runa_asset, runa_ecs};
 
 #[system]
 fn player_movement(world: &mut runa_ecs::World) {

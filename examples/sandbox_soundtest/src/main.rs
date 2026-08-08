@@ -1,9 +1,9 @@
 use runa_engine::runa_app::{RunaApp, RunaWindowConfig};
 use runa_engine::runa_core::components::{AudioListener, AudioSource, Camera, Transform};
 use runa_engine::runa_core::input::InputState;
-use runa_engine::runa_ecs;
+use runa_engine::runa_core::KeyCode;
 use runa_engine::system;
-use winit::keyboard::KeyCode;
+use runa_engine::{runa_asset, runa_ecs};
 
 #[system]
 fn toggle_sound(world: &mut runa_ecs::World) {

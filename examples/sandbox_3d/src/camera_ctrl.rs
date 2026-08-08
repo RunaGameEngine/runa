@@ -1,4 +1,4 @@
-use runa_core::{
+use runa_engine::runa_core::{
     components::{Camera, Transform},
     glam::{Quat, Vec3},
     input::{lock_cursor, show_cursor, InputState},
